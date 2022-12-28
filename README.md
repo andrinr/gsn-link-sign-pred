@@ -1,4 +1,4 @@
-# Sign prediction using GNN's
+# Sign predictions 
 
 ## Learnings from other papers:
 
@@ -9,4 +9,13 @@
 ## Questions:
 
 - Should I use edge embeddings or not?
+
+## Ideas:
+
+- Apply GNN direclty where new node is added for each edge.
+
+
+## Datasets:
+
+- Slash Dot: https://paperswithcode.com/paper/signed-graph-attention-networks#code
 
