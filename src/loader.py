@@ -2,7 +2,7 @@ import pandas as pd
 import torch
 from torch_geometric.data import Data
 
-def load_graph(path):
+def load_graph(path) -> Data:
     df = pd.read_csv('datasets/slashdot.csv', sep=',', header=0, index_col = 0)
     
     graph_array = df.to_numpy()
