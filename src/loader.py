@@ -11,6 +11,7 @@ def load_graph(path) -> Data:
     edge_attr = torch.tensor(graph_array[:,2], dtype=torch.float)
 
     data = Data(edge_index=edge_index, edge_attr=edge_attr)
+    data.num_nodes = df.shape[0]
 
     data.coalesce()
 

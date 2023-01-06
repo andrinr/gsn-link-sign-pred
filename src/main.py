@@ -12,7 +12,7 @@ from loader import load_graph
 from sampler import sample
 
 graph = load_graph('datasets/slashdot.csv')
-samples = sample(graph, 100, 300)
+samples = sample(graph, 100, 1000)
 
 nx.draw(to_networkx(samples[0]))
 

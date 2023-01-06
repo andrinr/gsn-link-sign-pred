@@ -1,19 +1,35 @@
 import networkx as nx
 import numpy as np
-def simulate(n_nodes : int, n_steps : int, n_opinions, p_init : float = 0.1):
 
-    G = nx.empty_graph(n_nodes)
+def fast_chung_lung(degrees : np.ndarray):
+    n_edges = np.sum(degrees) / 2
+    n_nodes = len(degrees)
 
-    # init opinions randomly
-    random = np.random.random((n_dims, n_nodes))
-    indices = np.arange(n_nodes)
+    print(n_edges)
+    print(n_nodes)
 
-    for i in range(n_opinions):
-        nx.set_node_attributes(G, dict(zip(indices, random[i])), f"dim_{i}")
-
+    # probability matrix by multiplying degree vectors
+    prob_matrix = np.outer(degrees, degrees) / (n_edges ** 2)
+    prob_matrix_flat = prob_matrix.flatten()
     
-    for i in range(n_steps):
-        likelihoods = np.array(list(dict(G.degree()).values())) + 1
-        
+    print(prob_matrix)
+    print(np.sum(prob_matrix))
+    # new empty graph
+    G = nx.Graph()
 
-simulate(10, 10, 3)
+    # m edge insertions
+    for i in range(n_edges):
+        # choose a random edge
+        ind = np.random.choice(
+            n_nodes ** 2, 
+            replace=False, 
+            p=prob_matrix_flat)
+
+        u, v = np.unravel_index(ind, prob_matrix.shape)
+
+        # add edge to graph
+        G.add_edge(u, v)
+    
+    return G
+
+fast_chung_lung(np.array([1, 2, 3, 4, 4]))
