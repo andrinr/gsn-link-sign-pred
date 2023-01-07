@@ -3,6 +3,10 @@ from torch.nn import Linear, Parameter
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
 
+def denoise(G):
+    n_edges = G.num_edges
+    n_nodes = G.num_nodes
+
 class GCNConv(MessagePassing):
     def __init__(self, in_channels, out_channels):
         super().__init__(aggr='add')  # "Add" aggregation (Step 5).

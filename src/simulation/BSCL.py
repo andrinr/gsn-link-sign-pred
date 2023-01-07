@@ -68,6 +68,16 @@ def BSCL(
     return G
 
 def two_hop_walk(G, u):
+    """ 
+    Performs a two hop walk on the graph G starting at node u.
+
+    Args:
+        G (nx.graph): The graph to perform the walk on.
+        u (int): The node to start the walk at.
+
+    Returns:
+        tuple: The two nodes that were visited.
+    """
     neighbors = list(G.neighbors(u))
     if len(neighbors) == 0:
         return None
