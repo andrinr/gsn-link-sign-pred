@@ -10,10 +10,13 @@ from diffusion import graph_diffusion
 from generators import random_edge_features
 from loader import load_graph
 from sampler import sample
+from simulation.BSCL import BSCL
+from helpers import even_uniform, even_exponential
 
-graph = load_graph('datasets/slashdot.csv')
-samples = sample(graph, 100, 1000)
+G = BSCL(even_exponential(5, 100))
+edges = G.edges()
+pos = nx.spring_layout(G, seed=63)
+colors = [G[u][v]['sign'] for u,v in edges]
 
-nx.draw(to_networkx(samples[0]))
-
-diffusion_series = graph_diffusion(graph, 50)
+nx.draw(G, pos, edge_color=colors, node_size=10)
+plt.show()
