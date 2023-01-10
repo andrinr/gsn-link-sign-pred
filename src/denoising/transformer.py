@@ -8,9 +8,9 @@ from torch.nn.modules.normalization import LayerNorm
 from torch.nn import functional as F
 from torch import Tensor
 
-from dgd import utils
-from dgd.diffusion import diffusion_utils
-from dgd.models.layers import Xtoy, Etoy
+from utils import assert_correctly_masked
+from utils import PlaceHolder
+from layers import Xtoy, Etoy
 
 """
 source: https://github.com/cvignac/DiGress
@@ -148,7 +148,7 @@ class NodeEdgeBlock(nn.Module):
         # 1. Map X to keys and queries
         Q = self.q(X) * x_mask           # (bs, n, dx)
         K = self.k(X) * x_mask           # (bs, n, dx)
-        diffusion_utils.assert_correctly_masked(Q, x_mask)
+        assert_correctly_masked(Q, x_mask)
         # 2. Reshape to (bs, n, n_head, df) with dx = n_head * df
 
         Q = Q.reshape((Q.size(0), Q.size(1), self.n_head, self.df))
@@ -160,7 +160,7 @@ class NodeEdgeBlock(nn.Module):
         # Compute unnormalized attentions. Y is (bs, n, n, n_head, df)
         Y = Q * K
         Y = Y / math.sqrt(Y.size(-1))
-        diffusion_utils.assert_correctly_masked(Y, (e_mask1 * e_mask2).unsqueeze(-1))
+        assert_correctly_masked(Y, (e_mask1 * e_mask2).unsqueeze(-1))
 
         E1 = self.e_mul(E) * e_mask1 * e_mask2                        # bs, n, n, dx
         E1 = E1.reshape((E.size(0), E.size(1), E.size(2), self.n_head, self.df))
@@ -179,7 +179,7 @@ class NodeEdgeBlock(nn.Module):
 
         # Output E
         newE = self.e_out(newE) * e_mask1 * e_mask2      # bs, n, n, de
-        diffusion_utils.assert_correctly_masked(newE, e_mask1 * e_mask2)
+        assert_correctly_masked(newE, e_mask1 * e_mask2)
 
         # Compute attentions. attn is still (bs, n, n, n_head, df)
         attn = F.softmax(Y, dim=2)
@@ -202,7 +202,7 @@ class NodeEdgeBlock(nn.Module):
 
         # Output X
         newX = self.x_out(newX) * x_mask
-        diffusion_utils.assert_correctly_masked(newX, x_mask)
+        assert_correctly_masked(newX, x_mask)
 
         # Process y based on X axnd E
         y = self.y_y(y)
@@ -266,7 +266,7 @@ class GraphTransformer(nn.Module):
 
         new_E = self.mlp_in_E(E)
         new_E = (new_E + new_E.transpose(1, 2)) / 2
-        after_in = utils.PlaceHolder(X=self.mlp_in_X(X), E=new_E, y=self.mlp_in_y(y)).mask(node_mask)
+        after_in = PlaceHolder(X=self.mlp_in_X(X), E=new_E, y=self.mlp_in_y(y)).mask(node_mask)
         X, E, y = after_in.X, after_in.E, after_in.y
 
         for layer in self.tf_layers:
@@ -282,4 +282,4 @@ class GraphTransformer(nn.Module):
 
         E = 1/2 * (E + torch.transpose(E, 1, 2))
 
-        return utils.PlaceHolder(X=X, E=E, y=y).mask(node_mask)
+        return PlaceHolder(X=X, E=E, y=y).mask(node_mask)

@@ -1,3 +1,7 @@
+def assert_correctly_masked(variable, node_mask):
+    assert (variable * (1 - node_mask.long())).abs().max().item() < 1e-4, \
+        'Variables not masked properly.'
+
 class PlaceHolder:
     def __init__(self, X, E, y):
         self.X = X

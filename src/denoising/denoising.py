@@ -3,7 +3,8 @@ from torch.nn import Linear, Parameter
 from torch_geometric.nn import MessagePassing
 from torch_geometric.utils import add_self_loops, degree
 
-def denoise(G):
+def denoise(G): 
+    
     n_edges = G.num_edges
     n_nodes = G.num_nodes
 
