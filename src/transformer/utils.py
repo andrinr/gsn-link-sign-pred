@@ -1,3 +1,6 @@
+import numpy as np
+import torch
+
 class Feature():
     """
     Feature class to store the feature size and hidden size of a feature.
@@ -9,3 +12,9 @@ class Feature():
     ):
         self.feature_size = feature_size
         self.hidden_size = hidden_size
+
+def subsequent_mask(size):
+    "Mask out subsequent positions."
+    attn_shape = (1, size, size)
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    return torch.from_numpy(subsequent_mask) == 0
