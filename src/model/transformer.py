@@ -8,9 +8,9 @@ from torch.nn.modules.normalization import LayerNorm
 from torch.nn import functional as F
 from torch import Tensor
 
-from utils import assert_correctly_masked
-from utils import PlaceHolder
-from layers import Xtoy, Etoy
+from model.utils import assert_correctly_masked
+from model.utils import PlaceHolder
+from model.layers import Xtoy, Etoy
 
 """
 source: https://github.com/cvignac/DiGress
