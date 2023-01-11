@@ -1,4 +1,4 @@
-__pycache__/
+**/__pycache__/
+**/outputs/
 *.py[cod]
 *$py.class
-/outputs

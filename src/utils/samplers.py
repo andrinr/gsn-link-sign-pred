@@ -17,7 +17,7 @@ def even_uniform(min : int, max : int, size : int):
         sample = np.random.randint(min, max, size)
     return sample
 
-def even_exponential(scale : float, size : int):
+def even_exponential(size : int, scale : float = 5.0):
     """ 
     creates an integer array with an even sum of size `size` with values sampled from an exponential distribution
 

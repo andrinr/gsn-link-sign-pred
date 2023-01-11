@@ -2,8 +2,38 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from tqdm import tqdm
+from simulation.simulation import Simulation
+from utils.samplers import even_uniform, even_exponential
 
-def BSCL(
+class BSCL(Simulation):
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    def run(self, n_simulations : int = 1, n_nodes : int = 100):
+        graphs = []
+        print("Generating {} graphs with {} nodes each".format(n_simulations, n_nodes))
+        for i in tqdm(range(n_simulations)):
+            degrees = None
+            if self.cfg.sampling_method == "uniform":
+                degrees = even_uniform(1, 20, n_nodes)
+            elif self.cfg.sampling_method == "exp":
+                degrees = even_exponential(n_nodes, 5.0)
+            else:
+                raise Exception("Sampling method not implemented")
+
+            graph = generate_bscl_instance(
+                degrees,
+                self.cfg.p_positive, 
+                self.cfg.p_close_triangle,
+                self.cfg.p_close_for_balance,
+                self.cfg.remove_self_loops)
+
+            graphs.append(graph)
+       
+        return graphs
+        
+def generate_bscl_instance(
     degrees : np.ndarray, 
     p_positive_sign : float = 0.9,
     p_close_triangle : float = 0.2,
@@ -88,24 +118,6 @@ def two_hop_walk(G, u):
     w = np.random.choice(neighbors)
     return v, w
 
-def is_triad_balanced(G : nx.graph, u : int, v : int, w : int):
-    return triad_sign == 1
-
-def triad_sign(G : nx.graph, u : int, v : int, w : int):
-    return G.nodes[u]['sign'] * G.nodes[v]['sign'] * G.nodes[w]['sign']
-
-def coin(p : float):
-    return np.random.choice([True, False], p=[1 - p, p])
-
-def invert(sign : int):
-    return -1 * sign
-
-def sign_partition(G : nx.graph, p_pos : float = 0.5):
-    p_neg = 1 - p_pos
-    random_signs = np.random.choice([-1, 1], G.number_of_edges(), p=[p_neg, p_pos])
-    nx.set_edge_attributes(G, dict(zip(G.edges(), random_signs)), 'sign')
-    return G
-
 def fast_chung_lung(degrees : np.ndarray):
     """
     Generates a graph with the given degrees.
@@ -126,10 +138,11 @@ def fast_chung_lung(degrees : np.ndarray):
     # probability matrix by multiplying degree vectors
     prob_matrix = np.outer(degrees, degrees) / ((n_edges * 2) ** 2)
     prob_matrix_flat = prob_matrix.flatten()
-    # avoid numerical errors
-    prob_matrix_flat[0] += 1.0 - np.sum(prob_matrix_flat)
+    # avoid numerical errors, we offset maximal probability by numerical rounding error
+    # maximal entry is choosen to avoid negative probabilites
+    max_index = np.argmax(prob_matrix_flat)
+    prob_matrix_flat[max_index] += 1.0 - np.sum(prob_matrix_flat)
     
-
     G = nx.empty_graph(n_nodes)
 
     # choose random edges according to the probability matrix
@@ -144,4 +157,22 @@ def fast_chung_lung(degrees : np.ndarray):
     for i in range(n_edges):
         G.add_edge(u[i], v[i])
     
+    return G
+
+def is_triad_balanced(G : nx.graph, u : int, v : int, w : int):
+    return triad_sign == 1
+
+def triad_sign(G : nx.graph, u : int, v : int, w : int):
+    return G.nodes[u]['sign'] * G.nodes[v]['sign'] * G.nodes[w]['sign']
+
+def coin(p : float):
+    return np.random.choice([True, False], p=[1 - p, p])
+
+def invert(sign : int):
+    return -1 * sign
+
+def sign_partition(G : nx.graph, p_pos : float = 0.5):
+    p_neg = 1 - p_pos
+    random_signs = np.random.choice([-1, 1], G.number_of_edges(), p=[p_neg, p_pos])
+    nx.set_edge_attributes(G, dict(zip(G.edges(), random_signs)), 'sign')
     return G

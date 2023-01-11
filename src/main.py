@@ -6,12 +6,13 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 # Local dependenvies
 from simulation.BSCL import BSCL
-from utils.utils import even_uniform, even_exponential
 from denoising import DenoisingModel
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def DDSNG(cfg : DictConfig) -> None:
-    print(OmegaConf.to_yaml(cfg))
+    # Generate dataset
+    bscl = BSCL(cfg.simulation.BSCL)
+    bscl.run(cfg.simulation.n_simulations, cfg.simulation.n_nodes)
 
     #denoisingModel = DenoisingModel(cfg)
 
