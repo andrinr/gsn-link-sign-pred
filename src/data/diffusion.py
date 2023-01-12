@@ -9,6 +9,9 @@ def sign_diffusion(graph, fraction : float):
     Take a pyg gtaph and return a diffusion series where only signs are diffused
     """
 
+    if fraction > 1.0 or fraction < 0.0:
+        raise ValueError("fraction should be between 0 and 1")
+
     edge_index : torchTensor = graph.edge_index
     edge_attr : torchTensor = graph.edge_attr
 
@@ -35,6 +38,8 @@ def sign_link_diffusion(graph : Data, fraction : float):
     """"
     Take a pyg graph and return a diffusion seriess where both signs and links are diffused
     """
+    if fraction > 1.0 or fraction < 0.0:
+        raise ValueError("fraction should be between 0 and 1")
 
     edge_index : torchTensor = graph.edge_index
     edge_attr : torchTensor = graph.edge_attr
