@@ -6,7 +6,7 @@ import hydra
 import pathlib
 from omegaconf import DictConfig
 # Local dependenvies
-from simulation.BSCL_dataset import BSCLDataset
+from data.BSCL_dataset import BSCLDataset
 from denoising import DenoisingModel
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
