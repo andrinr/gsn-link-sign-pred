@@ -1,38 +1,9 @@
-import networkx as nx
 import numpy as np
-import matplotlib.pyplot as plt
+import networkx as nx
 import random
-from tqdm import tqdm
-from simulation.simulation import Simulation
-from utils.samplers import even_uniform, even_exponential
+from torch_geometric.utils import from_networkx
+import torch
 
-class BSCL(Simulation):
-    def __init__(self, cfg):
-        self.cfg = cfg
-
-    def run(self, n_simulations : int = 1, n_nodes : int = 100):
-        graphs = []
-        print("Generating {} graphs with {} nodes each".format(n_simulations, n_nodes))
-        for i in tqdm(range(n_simulations)):
-            degrees = None
-            if self.cfg.sampling_method == "uniform":
-                degrees = even_uniform(1, 20, n_nodes)
-            elif self.cfg.sampling_method == "exp":
-                degrees = even_exponential(n_nodes, 5.0)
-            else:
-                raise Exception("Sampling method not implemented")
-
-            graph = generate_bscl_instance(
-                degrees,
-                self.cfg.p_positive, 
-                self.cfg.p_close_triangle,
-                self.cfg.p_close_for_balance,
-                self.cfg.remove_self_loops)
-
-            graphs.append(graph)
-       
-        return graphs
-        
 def generate_bscl_instance(
     degrees : np.ndarray, 
     p_positive_sign : float = 0.9,
@@ -95,7 +66,7 @@ def generate_bscl_instance(
     if remove_self_loops:
         G.remove_edges_from(nx.selfloop_edges(G))
 
-    return G
+    return from_networkx(G)
 
 def two_hop_walk(G, u):
     """ 

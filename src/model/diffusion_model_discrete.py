@@ -460,7 +460,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                    "loss_term_0": loss_term_0,
                    'test_nll' if test else 'val_nll': nll}, commit=False)
         return nll
-
+        
     def forward(self, noisy_data, extra_data, node_mask):
         X = torch.cat((noisy_data['X_t'], extra_data.X), dim=2).float()
         E = torch.cat((noisy_data['E_t'], extra_data.E), dim=3).float()

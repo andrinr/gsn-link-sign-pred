@@ -1,4 +1,6 @@
 **/__pycache__/
 **/outputs/
+**/processed/
+**/raw/
 *.py[cod]
 *$py.class
