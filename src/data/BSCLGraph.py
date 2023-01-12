@@ -4,13 +4,13 @@ import random
 from typing import Any, Callable, Dict, List, Optional, Union
 from torch_geometric.data import Data
 from torch_geometric.utils import from_networkx
-from torch_geometric.datasets.base import GraphGenerator
+from torch_geometric.datasets.graph_generator import GraphGenerator
 
 class BSCLGraph(GraphGenerator):
     def __init__(
         self, 
         degree_generator : Callable, 
-        degree_generator_kwargs: Optional[Dict[str, Any]] = None,
+        degree_generator_kwargs: Optional[Dict[str, Any]] = None,   
         p_positive_sign : float = 0.9,
         p_close_triangle : float = 0.2,
         p_close_for_balance : float = 0.8,

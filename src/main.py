@@ -8,7 +8,7 @@ from omegaconf import DictConfig
 # Local dependenvies
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
-from data.utils.sampler import even_exponential
+from data.utils.samplers import even_exponential
 from denoising import DenoisingModel
 import pytorch_geometric.transforms as T
 
