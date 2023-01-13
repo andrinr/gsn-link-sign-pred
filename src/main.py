@@ -5,12 +5,16 @@ import matplotlib.pyplot as plt
 import hydra
 import pathlib
 from omegaconf import DictConfig
-# Local dependenvies
+# torch imports
+import torch
+import torch_geometric.transforms as T
+from torch_geometric.loader import DataLoader
+import pytorch_lightning as pl
+from model.denoising import SignDenoising
+# Local dependencies
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
 from data.utils.samplers import even_exponential
-from denoising import DenoisingModel
-import pytorch_geometric.transforms as T
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def DDSNG(cfg : DictConfig) -> None:
@@ -24,6 +28,8 @@ def DDSNG(cfg : DictConfig) -> None:
         "remove_self_loops": cfg.dataset.BSCL.remove_self_loops
     }
 
+    # We transorm the graph to a line graph, meaning each edge is replaced with a node
+    # Signs are not node features and note edge features anymore
     transform = T.Compose([T.LineGraph])
 
     dataset = SignedDataset(
@@ -32,7 +38,25 @@ def DDSNG(cfg : DictConfig) -> None:
         transform=transform,
         num_graphs=cfg.dataset.n_graphs)
 
-    denoisingModel = DenoisingModel(cfg.model)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=32,
+        shuffle=True,
+    )
+   
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = SignDenoising().to(device)
+    data = dataset[0].to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+    model.train()
+    for epoch in range(200):
+        optimizer.zero_grad()
+        out = model(data)
+        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+        loss.backward()
+        optimizer.step()
+
 
 if __name__ == "__main__":
     DDSNG()

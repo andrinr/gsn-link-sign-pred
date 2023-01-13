@@ -89,82 +89,82 @@ class BSCLGraph(GraphGenerator):
             self.remove_self_loops)
 
 
-    def two_hop_walk(G, u):
-        """ 
-        Performs a two hop walk on the graph G starting at node u.
+def two_hop_walk(G, u):
+    """ 
+    Performs a two hop walk on the graph G starting at node u.
 
-        Args:
-            G (nx.graph): The graph to perform the walk on.
-            u (int): The node to start the walk at.
+    Args:
+        G (nx.graph): The graph to perform the walk on.
+        u (int): The node to start the walk at.
 
-        Returns:
-            tuple: The two nodes that were visited.
-        """
-        neighbors = list(G.neighbors(u))
-        if len(neighbors) == 0:
-            return None
-        v = np.random.choice(neighbors)
-        neighbors = list(G.neighbors(v))
-        if len(neighbors) == 0:
-            return None
-        w = np.random.choice(neighbors)
-        return v, w
+    Returns:
+        tuple: The two nodes that were visited.
+    """
+    neighbors = list(G.neighbors(u))
+    if len(neighbors) == 0:
+        return None
+    v = np.random.choice(neighbors)
+    neighbors = list(G.neighbors(v))
+    if len(neighbors) == 0:
+        return None
+    w = np.random.choice(neighbors)
+    return v, w
 
-    def fast_chung_lung(degrees : np.ndarray):
-        """
-        Generates a graph with the given degrees.
-        Based on paper: GENERATING LARGE SCALE-FREE NETWORKS WITH THE CHUNG–LU RANDOM GRAPH MODEL∗
+def fast_chung_lung(degrees : np.ndarray):
+    """
+    Generates a graph with the given degrees.
+    Based on paper: GENERATING LARGE SCALE-FREE NETWORKS WITH THE CHUNG–LU RANDOM GRAPH MODEL∗
 
-        Args:
-            degrees (np.ndarray): The degrees of the nodes in the graph.
+    Args:
+        degrees (np.ndarray): The degrees of the nodes in the graph.
 
-        Returns:
-            nx.graph: The generated graph.
-        """
+    Returns:
+        nx.graph: The generated graph.
+    """
 
-        n_edges = np.sum(degrees) / 2
-        if n_edges != int(n_edges): raise ValueError("degrees must be even")
-        n_edges = int(n_edges)
-        n_nodes = len(degrees)
+    n_edges = np.sum(degrees) / 2
+    if n_edges != int(n_edges): raise ValueError("degrees must be even")
+    n_edges = int(n_edges)
+    n_nodes = len(degrees)
 
-        # probability matrix by multiplying degree vectors
-        prob_matrix = np.outer(degrees, degrees) / ((n_edges * 2) ** 2)
-        prob_matrix_flat = prob_matrix.flatten()
-        # avoid numerical errors, we offset maximal probability by numerical rounding error
-        # maximal entry is choosen to avoid negative probabilites
-        max_index = np.argmax(prob_matrix_flat)
-        prob_matrix_flat[max_index] += 1.0 - np.sum(prob_matrix_flat)
-        
-        G = nx.empty_graph(n_nodes)
+    # probability matrix by multiplying degree vectors
+    prob_matrix = np.outer(degrees, degrees) / ((n_edges * 2) ** 2)
+    prob_matrix_flat = prob_matrix.flatten()
+    # avoid numerical errors, we offset maximal probability by numerical rounding error
+    # maximal entry is choosen to avoid negative probabilites
+    max_index = np.argmax(prob_matrix_flat)
+    prob_matrix_flat[max_index] += 1.0 - np.sum(prob_matrix_flat)
+    
+    G = nx.empty_graph(n_nodes)
 
-        # choose random edges according to the probability matrix
-        ind = np.random.choice(
-            n_nodes ** 2,
-            n_edges,
-            replace=False, 
-            p=prob_matrix_flat)
+    # choose random edges according to the probability matrix
+    ind = np.random.choice(
+        n_nodes ** 2,
+        n_edges,
+        replace=False, 
+        p=prob_matrix_flat)
 
-        # add the random edges
-        u, v = np.unravel_index(ind, prob_matrix.shape)
-        for i in range(n_edges):
-            G.add_edge(u[i], v[i])
-        
-        return G
+    # add the random edges
+    u, v = np.unravel_index(ind, prob_matrix.shape)
+    for i in range(n_edges):
+        G.add_edge(u[i], v[i])
+    
+    return G
 
-    def is_triad_balanced(G : nx.graph, u : int, v : int, w : int):
-        return triad_sign == 1
+def is_triad_balanced(G : nx.graph, u : int, v : int, w : int):
+    return triad_sign == 1
 
-    def triad_sign(G : nx.graph, u : int, v : int, w : int):
-        return G.nodes[u]['sign'] * G.nodes[v]['sign'] * G.nodes[w]['sign']
+def triad_sign(G : nx.graph, u : int, v : int, w : int):
+    return G.nodes[u]['sign'] * G.nodes[v]['sign'] * G.nodes[w]['sign']
 
-    def coin(p : float):
-        return np.random.choice([True, False], p=[1 - p, p])
+def coin(p : float):
+    return np.random.choice([True, False], p=[1 - p, p])
 
-    def invert(sign : int):
-        return -1 * sign
+def invert(sign : int):
+    return -1 * sign
 
-    def sign_partition(G : nx.graph, p_pos : float = 0.5):
-        p_neg = 1 - p_pos
-        random_signs = np.random.choice([-1, 1], G.number_of_edges(), p=[p_neg, p_pos])
-        nx.set_edge_attributes(G, dict(zip(G.edges(), random_signs)), 'sign')
-        return G
+def sign_partition(G : nx.graph, p_pos : float = 0.5):
+    p_neg = 1 - p_pos
+    random_signs = np.random.choice([-1, 1], G.number_of_edges(), p=[p_neg, p_pos])
+    nx.set_edge_attributes(G, dict(zip(G.edges(), random_signs)), 'sign')
+    return G

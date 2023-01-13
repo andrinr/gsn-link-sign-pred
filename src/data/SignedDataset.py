@@ -18,10 +18,8 @@ class SignedDataset(InMemoryDataset):
         num_graphs: Optional[int] = None):
         super().__init__(root=None, transform = transform)
 
-        self.graph_generator = GraphGenerator.resolve(
-            graph_generator,
-            **(graph_generator_kwargs or {}),
-        )
+        self.graph_generator = graph_generator
+        self.graph_generator_kwargs = graph_generator_kwargs
 
         if num_graphs is None:
             num_graphs = 1
@@ -30,30 +28,7 @@ class SignedDataset(InMemoryDataset):
         for i in range(num_graphs):
             data_list.append(self.get_graph())
 
-
-
-    def get_graph(self, 
-        num_infected_nodes: int,
-                  max_path_length: int) -> Explanation:
-        """
-        Data is simulated instead of downloaded
-        """
-        self.raw_data_list = []
-
-        for i in tqdm(range(self.cfg.n_simulations)):
-            degrees = None
-            if self.cfg.BSCL.sampling_method == "uniform":
-                degrees = even_uniform(1, 20, self.cfg.n_nodes)
-            elif self.cfg.BSCL.sampling_method == "exp":
-                degrees = even_exponential(self.cfg.n_nodes, 5.0)
-            else:
-                raise Exception("Sampling method not implemented")
-
-            regular_graph = generate_bscl_instance(
-                degrees,
-                self.cfg.BSCL.p_positive, 
-                self.cfg.BSCL.p_close_triangle,
-                self.cfg.BSCL.p_close_for_balance,
-                self.cfg.BSCL.remove_self_loops)
-
-            self.raw_data_list.append(pyg_graph)
+    def get_graph(self) -> Explanation:
+        
+        y = self.transform(self.graph_generator(self.graph_generator_kwargs))
+        return y
