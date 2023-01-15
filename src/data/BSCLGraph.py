@@ -9,13 +9,13 @@ from torch_geometric.datasets.graph_generator import GraphGenerator
 class BSCLGraph(GraphGenerator):
     def __init__(
         self, 
-        degree_generator : Callable, 
-        degree_generator_kwargs: Optional[Dict[str, Any]] = None,   
-        p_positive_sign : float = 0.9,
-        p_close_triangle : float = 0.2,
-        p_close_for_balance : float = 0.8,
-        remove_self_loops : bool = True):
+        degree_generator : Optional[Callable] = None,
+        p_positive_sign : Optional[float] = 0.9,
+        p_close_triangle : Optional[float] = 0.2,
+        p_close_for_balance : Optional[float] = 0.8,
+        remove_self_loops : Optional[bool] = True):
 
+        self.degree_generator = degree_generator
         self.p_positive_sign = p_positive_sign
         self.p_close_triangle = p_close_triangle
         self.p_close_for_balance = p_close_for_balance
@@ -34,7 +34,8 @@ class BSCLGraph(GraphGenerator):
         Returns:
             nx.graph: The generated graph.
         """
-        degrees = degree_generator(**(degree_generator_kwargs or {}))
+
+        degrees = self.degree_generator()
         G = fast_chung_lung(degrees)
         # return list of edges from edge view iterable
         old_edges_list = list(G.edges)
@@ -56,13 +57,13 @@ class BSCLGraph(GraphGenerator):
         for i in range(n_edges):
             u = node_choices[i]
             # close a triangle
-            if coin(p_close_triangle):
+            if coin(self.p_close_triangle):
                 res = two_hop_walk(G, u)
                 if not res: continue
                 v, w = res
                 sign = G[u][v]['sign'] * G[v][w]['sign']
                 # make it balanced
-                if coin(p_close_for_balance):
+                if coin(self.p_close_for_balance):
                     G.add_edge(u, w, sign=sign)
                 # make it unbalanced
                 else:
@@ -70,12 +71,12 @@ class BSCLGraph(GraphGenerator):
             # insert random edge
             else:
                 v = node_choices[i + n_edges]
-                G.add_edge(u, v, sign=coin(p_positive_sign) * 2 - 1)
+                G.add_edge(u, v, sign=coin(self.p_positive_sign) * 2 - 1)
 
             a, b = old_edges_list[i]
             G.remove_edge(a, b)
 
-        if remove_self_loops:
+        if self.remove_self_loops:
             G.remove_edges_from(nx.selfloop_edges(G))
 
         return from_networkx(G)

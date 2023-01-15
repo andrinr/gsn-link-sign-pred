@@ -15,13 +15,15 @@ from model.denoising import SignDenoising
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
 from data.utils.samplers import even_exponential
+from functools import partial
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def DDSNG(cfg : DictConfig) -> None:
 
+    degree_generator = partial(even_exponential, size=cfg.dataset.n_nodes, scale=5.0)
+    print(degree_generator())
     BSCL_graph_kwargs = {
-        "degree_generator": even_exponential,
-        "degree_generator_kwargs": {"size": cfg.dataset.n_nodes, "scale": 5.0},
+        "degree_generator": degree_generator,
         "p_positive_sign": cfg.dataset.BSCL.p_positive,
         "p_close_triangle": cfg.dataset.BSCL.p_close_triangle,
         "p_close_for_balance": cfg.dataset.BSCL.p_close_for_balance,
@@ -35,7 +37,7 @@ def DDSNG(cfg : DictConfig) -> None:
     dataset = SignedDataset(
         graph_generator=BSCLGraph,
         graph_generator_kwargs=BSCL_graph_kwargs,
-        transform=transform,
+        #transform=transform,
         num_graphs=cfg.dataset.n_graphs)
 
     dataloader = DataLoader(
@@ -45,7 +47,8 @@ def DDSNG(cfg : DictConfig) -> None:
     )
    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = SignDenoising().to(device)
+    model = SignDenoising(1, 1).to(device)
+    print(dataset[0])
     data = dataset[0].to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 
