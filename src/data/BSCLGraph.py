@@ -36,24 +36,27 @@ class BSCLGraph(GraphGenerator):
         """
 
         degrees = self.degree_generator()
-        G = fast_chung_lung(degrees)
+        data = fast_chung_lung(degrees)
         # return list of edges from edge view iterable
-        old_edges_list = list(G.edges)
+        old_edges_list = data.edge_index.T.tolist()
         random.shuffle(old_edges_list)
-        G = sign_partition(G, self.p_positive_sign)
+        data = sign_partition(data, self.p_positive_sign)
 
-        n_edges = G.number_of_edges()
-        n_nodes = G.number_of_nodes()
+        n_edges = len(old_edges_list)
+        n_nodes = data.num_nodes
 
         # Precompute node choices for all iterations for performance
         probabilities = degrees / np.sum(degrees)
         probabilities[0] += 1.0 - np.sum(probabilities)
+        ax_index = np.argmax(probabilities)
+        probabilities[max_index] += 1.0 - np.sum(prob_matrix_flat)
         node_choices = np.random.choice(
             n_nodes, 
             n_edges * 2, 
-            p=degrees / np.sum(degrees),
+            p=probabilities,
             replace=True)
 
+        new_edge_list = tensor([[0, 0], [0, 0]])
         for i in range(n_edges):
             u = node_choices[i]
             # close a triangle
@@ -79,7 +82,7 @@ class BSCLGraph(GraphGenerator):
         if self.remove_self_loops:
             G.remove_edges_from(nx.selfloop_edges(G))
 
-        return from_networkx(G)
+        return from_networkx(G, edge_attr=nx.get_edge_attributes(G, "sign"))
 
     def __repr__(self) -> str:
         return '{}(p_positive_sign={}, p_close_triangle={}, p_close_for_balance={}, remove_self_loops={})'.format(
@@ -111,7 +114,20 @@ def two_hop_walk(G, u):
     w = np.random.choice(neighbors)
     return v, w
 
-def fast_chung_lung(degrees : np.ndarray):
+def coin(p : float):
+    return np.random.choice([True, False], p=[1 - p, p])
+
+def invert(sign : int):
+    return -1 * sign
+
+def sign_partition(data : Data, p_pos : float = 0.5):
+    n_edges = len(data.edge_index[0])
+    p_neg = 1 - p_pos
+    random_signs = np.random.choice([-1, 1], n_edges, p=[p_neg, p_pos])
+    data.edge_attr = torch.tensor(random_signs, dtype=torch.float)
+    return G
+
+def fast_chung_lung(degrees : np.ndarray) -> Data:
     """
     Generates a graph with the given degrees.
     Based on paper: GENERATING LARGE SCALE-FREE NETWORKS WITH THE CHUNG–LU RANDOM GRAPH MODEL∗
@@ -135,8 +151,6 @@ def fast_chung_lung(degrees : np.ndarray):
     # maximal entry is choosen to avoid negative probabilites
     max_index = np.argmax(prob_matrix_flat)
     prob_matrix_flat[max_index] += 1.0 - np.sum(prob_matrix_flat)
-    
-    G = nx.empty_graph(n_nodes)
 
     # choose random edges according to the probability matrix
     ind = np.random.choice(
@@ -147,25 +161,5 @@ def fast_chung_lung(degrees : np.ndarray):
 
     # add the random edges
     u, v = np.unravel_index(ind, prob_matrix.shape)
-    for i in range(n_edges):
-        G.add_edge(u[i], v[i])
     
-    return G
-
-def is_triad_balanced(G : nx.graph, u : int, v : int, w : int):
-    return triad_sign == 1
-
-def triad_sign(G : nx.graph, u : int, v : int, w : int):
-    return G.nodes[u]['sign'] * G.nodes[v]['sign'] * G.nodes[w]['sign']
-
-def coin(p : float):
-    return np.random.choice([True, False], p=[1 - p, p])
-
-def invert(sign : int):
-    return -1 * sign
-
-def sign_partition(G : nx.graph, p_pos : float = 0.5):
-    p_neg = 1 - p_pos
-    random_signs = np.random.choice([-1, 1], G.number_of_edges(), p=[p_neg, p_pos])
-    nx.set_edge_attributes(G, dict(zip(G.edges(), random_signs)), 'sign')
-    return G
+    return Data(num_nodes = n_nodes, edge_index=torch.tensor([u, v]))

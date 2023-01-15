@@ -16,7 +16,7 @@ class SignedDataset(InMemoryDataset):
         graph_generator_kwargs: Optional[Dict[str, Any]] = None,
         transform: Optional[Callable] = None,
         num_graphs: Optional[int] = None):
-        super().__init__(root=None, transform=transform)
+        super().__init__(root=None, transform=None)
 
         self.graph_generator = graph_generator(**graph_generator_kwargs)
 
@@ -31,12 +31,10 @@ class SignedDataset(InMemoryDataset):
 
     def get_graph(self) -> Explanation:
         data = self.graph_generator()
-        print(data)
-        #if self.transform is not None:
-        #    data = self.transform(data)
-        return Explanation(
-            x=None,
-            edge_index=data.edge_index,
-            y=data.node_attr,
-            edge_mask=None
-        )
+        y = data.edge_attr
+        print(y)
+        if self.transform is not None:
+            data = self.transform(data)
+        
+        data.y = y
+        return data
