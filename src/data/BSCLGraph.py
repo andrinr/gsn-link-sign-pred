@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 import random
 from typing import Any, Callable, Dict, List, Optional, Union
+import torch
 from torch_geometric.data import Data
 from torch_geometric.utils import from_networkx
 from torch_geometric.datasets.graph_generator import GraphGenerator
@@ -37,52 +38,54 @@ class BSCLGraph(GraphGenerator):
 
         degrees = self.degree_generator()
         data = fast_chung_lung(degrees)
+        n_nodes = data.num_nodes
         # return list of edges from edge view iterable
         old_edges_list = data.edge_index.T.tolist()
         random.shuffle(old_edges_list)
-        data = sign_partition(data, self.p_positive_sign)
+        sign_partition(data, self.p_positive_sign)
 
         n_edges = len(old_edges_list)
-        n_nodes = data.num_nodes
 
         # Precompute node choices for all iterations for performance
         probabilities = degrees / np.sum(degrees)
         probabilities[0] += 1.0 - np.sum(probabilities)
-        ax_index = np.argmax(probabilities)
-        probabilities[max_index] += 1.0 - np.sum(prob_matrix_flat)
+        max_index = np.argmax(probabilities)
+        probabilities[max_index] += 1.0 - np.sum(probabilities)
         node_choices = np.random.choice(
             n_nodes, 
             n_edges * 2, 
             p=probabilities,
             replace=True)
 
-        new_edge_list = tensor([[0, 0], [0, 0]])
         for i in range(n_edges):
             u = node_choices[i]
             # close a triangle
             if coin(self.p_close_triangle):
-                res = two_hop_walk(G, u)
+                res = two_hop_walk(data, u)
                 if not res: continue
                 v, w = res
-                sign = G[u][v]['sign'] * G[v][w]['sign']
+                sign = edge_attr(data, u, v) * edge_attr(data, v, w)
                 # make it balanced
                 if coin(self.p_close_for_balance):
-                    G.add_edge(u, w, sign=sign)
+                    data.edge_index[0][i] = u
+                    data.edge_index[1][i] = w
+                    data.edge_attr[i] = sign
                 # make it unbalanced
                 else:
-                    G.add_edge(u, w, sign=invert(sign))
+                    data.edge_index[0][i] = u
+                    data.edge_index[1][i] = w
+                    data.edge_attr[i] = invert(sign)
             # insert random edge
             else:
                 v = node_choices[i + n_edges]
-                G.add_edge(u, v, sign=coin(self.p_positive_sign) * 2 - 1)
-
-            a, b = old_edges_list[i]
-            G.remove_edge(a, b)
+                data.edge_index[0][i] = u
+                data.edge_index[1][i] = v
+                data.edge_attr[i] = coin(self.p_positive_sign) * 2 - 1
 
         if self.remove_self_loops:
-            G.remove_edges_from(nx.selfloop_edges(G))
+            remove_self_loops(data.edge_index, data.edge_attr)
 
-        return from_networkx(G, edge_attr=nx.get_edge_attributes(G, "sign"))
+        return data
 
     def __repr__(self) -> str:
         return '{}(p_positive_sign={}, p_close_triangle={}, p_close_for_balance={}, remove_self_loops={})'.format(
@@ -92,8 +95,7 @@ class BSCLGraph(GraphGenerator):
             self.p_close_for_balance,
             self.remove_self_loops)
 
-
-def two_hop_walk(G, u):
+def two_hop_walk(data, u):
     """ 
     Performs a two hop walk on the graph G starting at node u.
 
@@ -104,15 +106,31 @@ def two_hop_walk(G, u):
     Returns:
         tuple: The two nodes that were visited.
     """
-    neighbors = list(G.neighbors(u))
+    neighbors = get_neighbours(data, u)
     if len(neighbors) == 0:
         return None
     v = np.random.choice(neighbors)
-    neighbors = list(G.neighbors(v))
+    neighbors = get_neighbours(data, v)
     if len(neighbors) == 0:
         return None
     w = np.random.choice(neighbors)
     return v, w
+
+def edge_attr(data, u, v):
+    edge_index, edge_attr = data.edge_index, data.edge_attr
+    src, dst = edge_index
+
+    node_edges = src == u
+    node_edges &= dst == v
+
+    return edge_attr[node_edges]
+    
+def get_neighbours(data, u):
+    src, dst = data.edge_index
+
+    node_edges = src == u
+
+    return dst[node_edges]
 
 def coin(p : float):
     return np.random.choice([True, False], p=[1 - p, p])
@@ -125,7 +143,6 @@ def sign_partition(data : Data, p_pos : float = 0.5):
     p_neg = 1 - p_pos
     random_signs = np.random.choice([-1, 1], n_edges, p=[p_neg, p_pos])
     data.edge_attr = torch.tensor(random_signs, dtype=torch.float)
-    return G
 
 def fast_chung_lung(degrees : np.ndarray) -> Data:
     """
