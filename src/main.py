@@ -32,7 +32,7 @@ def DDSNG(cfg : DictConfig) -> None:
 
     # We transorm the graph to a line graph, meaning each edge is replaced with a node
     # Signs are not node features and note edge features anymore
-    transform = T.Compose([T.LineGraph(), T.ToUndirected()])
+    transform = T.Compose([T.ToUndirected(), T.LineGraph(), T.AddLaplacianEigenvectorPE(k=10)])
 
     dataset = SignedDataset(
         graph_generator=BSCLGraph,

@@ -8,7 +8,6 @@ class SignDenoising(MessagePassing):
         super().__init__(aggr='add')  # "Add" aggregation (Step 5).
         self.lin = Linear(in_channels, out_channels, bias=False)
         self.bias = Parameter(torch.Tensor(out_channels))
-
         self.reset_parameters()
 
     def reset_parameters(self):

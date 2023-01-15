@@ -32,7 +32,6 @@ class SignedDataset(InMemoryDataset):
     def get_graph(self) -> Explanation:
         data = self.graph_generator()
         y = data.edge_attr
-        print(y)
         if self.transform is not None:
             data = self.transform(data)
         

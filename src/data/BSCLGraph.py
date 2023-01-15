@@ -4,7 +4,7 @@ import random
 from typing import Any, Callable, Dict, List, Optional, Union
 import torch
 from torch_geometric.data import Data
-from torch_geometric.utils import from_networkx
+from torch_geometric.utils import from_networkx, remove_self_loops
 from torch_geometric.datasets.graph_generator import GraphGenerator
 
 class BSCLGraph(GraphGenerator):
@@ -60,7 +60,7 @@ class BSCLGraph(GraphGenerator):
         for i in range(n_edges):
             u = node_choices[i]
             # close a triangle
-            if coin(self.p_close_triangle):
+            if coin(self.p_close_triangle and two_hop_walk(data, u) is not None):	
                 res = two_hop_walk(data, u)
                 if not res: continue
                 v, w = res
@@ -123,7 +123,7 @@ def edge_attr(data, u, v):
     node_edges = src == u
     node_edges &= dst == v
 
-    return edge_attr[node_edges]
+    return edge_attr[node_edges][0]
     
 def get_neighbours(data, u):
     src, dst = data.edge_index
@@ -179,4 +179,4 @@ def fast_chung_lung(degrees : np.ndarray) -> Data:
     # add the random edges
     u, v = np.unravel_index(ind, prob_matrix.shape)
     
-    return Data(num_nodes = n_nodes, edge_index=torch.tensor([u, v]))
+    return Data(num_nodes = n_nodes, edge_index=torch.tensor(np.array([u, v])))
