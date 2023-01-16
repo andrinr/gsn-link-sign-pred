@@ -23,19 +23,6 @@ class BSCLGraph(GraphGenerator):
         self.remove_self_loops = remove_self_loops
 
     def __call__(self) -> Data:
-        """
-        Generates a signed graph with the given degrees and p_pos.
-        Based on paper: Signed Network Modeling Based on Structural Balance Theory
-        Structural Balance Theory: https://en.wikipedia.org/wiki/Balance_theory
-
-        Args:
-            degrees (np.ndarray): The degrees of the nodes in the graph.
-            p_pos (float, optional): The probability of a node being positive. Defaults to 0.5.
-        
-        Returns:
-            nx.graph: The generated graph.
-        """
-
         degrees = self.degree_generator()
         data = fast_chung_lung(degrees)
         n_nodes = data.num_nodes
@@ -48,19 +35,18 @@ class BSCLGraph(GraphGenerator):
 
         # Precompute node choices for all iterations for performance
         probabilities = degrees / np.sum(degrees)
-        probabilities[0] += 1.0 - np.sum(probabilities)
         max_index = np.argmax(probabilities)
         probabilities[max_index] += 1.0 - np.sum(probabilities)
         node_choices = np.random.choice(
-            n_nodes, 
-            n_edges * 2, 
+            n_nodes,
+            n_edges * 2,
             p=probabilities,
             replace=True)
 
         for i in range(n_edges):
             u = node_choices[i]
             # close a triangle
-            if coin(self.p_close_triangle and two_hop_walk(data, u) is not None):	
+            if coin(self.p_close_triangle) and two_hop_walk(data, u) is not None:	
                 res = two_hop_walk(data, u)
                 if not res: continue
                 v, w = res
@@ -106,11 +92,11 @@ def two_hop_walk(data, u):
     Returns:
         tuple: The two nodes that were visited.
     """
-    neighbors = get_neighbours(data, u)
+    neighbors = get_neighbors(data, u)
     if len(neighbors) == 0:
         return None
     v = np.random.choice(neighbors)
-    neighbors = get_neighbours(data, v)
+    neighbors = get_neighbors(data, v)
     if len(neighbors) == 0:
         return None
     w = np.random.choice(neighbors)
@@ -125,7 +111,7 @@ def edge_attr(data, u, v):
 
     return edge_attr[node_edges][0]
     
-def get_neighbours(data, u):
+def get_neighbors(data, u):
     src, dst = data.edge_index
 
     node_edges = src == u
@@ -133,7 +119,7 @@ def get_neighbours(data, u):
     return dst[node_edges]
 
 def coin(p : float):
-    return np.random.choice([True, False], p=[1 - p, p])
+    return np.random.choice([False, True], p=[1 - p, p])
 
 def invert(sign : int):
     return -1 * sign
@@ -142,7 +128,7 @@ def sign_partition(data : Data, p_pos : float = 0.5):
     n_edges = len(data.edge_index[0])
     p_neg = 1 - p_pos
     random_signs = np.random.choice([-1, 1], n_edges, p=[p_neg, p_pos])
-    data.edge_attr = torch.tensor(random_signs, dtype=torch.float)
+    data.edge_attr = torch.tensor(random_signs)
 
 def fast_chung_lung(degrees : np.ndarray) -> Data:
     """
@@ -165,7 +151,7 @@ def fast_chung_lung(degrees : np.ndarray) -> Data:
     prob_matrix = np.outer(degrees, degrees) / ((n_edges * 2) ** 2)
     prob_matrix_flat = prob_matrix.flatten()
     # avoid numerical errors, we offset maximal probability by numerical rounding error
-    # maximal entry is choosen to avoid negative probabilites
+    # maximal entry is chosen to avoid negative probabilities
     max_index = np.argmax(prob_matrix_flat)
     prob_matrix_flat[max_index] += 1.0 - np.sum(prob_matrix_flat)
 

@@ -30,7 +30,7 @@ def DDSNG(cfg : DictConfig) -> None:
         "remove_self_loops": cfg.dataset.BSCL.remove_self_loops
     }
 
-    # We transorm the graph to a line graph, meaning each edge is replaced with a node
+    # We transform the graph to a line graph, meaning each edge is replaced with a node
     # Signs are not node features and note edge features anymore
     transform = T.Compose([T.ToUndirected(), T.LineGraph(), T.AddLaplacianEigenvectorPE(k=10)])
 
@@ -40,6 +40,8 @@ def DDSNG(cfg : DictConfig) -> None:
         transform=transform,
         num_graphs=cfg.dataset.n_graphs)
 
+    print("dataset[0].y", dataset[0].y)
+
     dataloader = DataLoader(
         dataset,
         batch_size=32,
@@ -47,7 +49,8 @@ def DDSNG(cfg : DictConfig) -> None:
     )
 
     nx.draw(to_networkx(dataset[0]))
-   
+
+    print('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = SignDenoising(1, 1).to(device)
     print(dataset[0].y)
