@@ -30,7 +30,6 @@ class BSCLGraph(GraphGenerator):
         old_edges_list = data.edge_index.T.tolist()
         random.shuffle(old_edges_list)
         sign_partition(data, self.p_positive_sign)
-
         n_edges = len(old_edges_list)
 
         # Precompute node choices for all iterations for performance
@@ -113,9 +112,7 @@ def edge_attr(data, u, v):
     
 def get_neighbors(data, u):
     src, dst = data.edge_index
-
     node_edges = src == u
-
     return dst[node_edges]
 
 def coin(p : float):
@@ -128,7 +125,7 @@ def sign_partition(data : Data, p_pos : float = 0.5):
     n_edges = len(data.edge_index[0])
     p_neg = 1 - p_pos
     random_signs = np.random.choice([-1, 1], n_edges, p=[p_neg, p_pos])
-    data.edge_attr = torch.tensor(random_signs)
+    data.edge_attr = torch.unsqueeze(torch.tensor(random_signs),-1)
 
 def fast_chung_lung(degrees : np.ndarray) -> Data:
     """
@@ -141,7 +138,6 @@ def fast_chung_lung(degrees : np.ndarray) -> Data:
     Returns:
         nx.graph: The generated graph.
     """
-
     n_edges = np.sum(degrees) / 2
     if n_edges != int(n_edges): raise ValueError("degrees must be even")
     n_edges = int(n_edges)

@@ -3,23 +3,21 @@ import numpy as np
 import networkx as nx 
 import matplotlib.pyplot as plt
 import hydra
-import pathlib
 from omegaconf import DictConfig
+from functools import partial
 # torch imports
 import torch
 import torch_geometric.transforms as T
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import to_networkx
-import pytorch_lightning as pl
-from model.denoising import SignDenoising
 # Local dependencies
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
 from data.utils.samplers import even_exponential
-from functools import partial
+from model.denoising import SignDenoising
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
-def DDSNG(cfg : DictConfig) -> None:
+def main(cfg : DictConfig) -> None:
 
     degree_generator = partial(even_exponential, size=cfg.dataset.n_nodes, scale=5.0)
     BSCL_graph_kwargs = {
@@ -32,15 +30,16 @@ def DDSNG(cfg : DictConfig) -> None:
 
     # We transform the graph to a line graph, meaning each edge is replaced with a node
     # Signs are not node features and note edge features anymore
-    transform = T.Compose([T.ToUndirected(), T.LineGraph(), T.AddLaplacianEigenvectorPE(k=10)])
+    transform = T.Compose([
+        T.ToUndirected(),
+        T.LineGraph(force_directed=False),
+        T.AddLaplacianEigenvectorPE(k=10, attr_name='pe')])
 
     dataset = SignedDataset(
         graph_generator=BSCLGraph,
         graph_generator_kwargs=BSCL_graph_kwargs,
         transform=transform,
         num_graphs=cfg.dataset.n_graphs)
-
-    print("dataset[0].y", dataset[0].y)
 
     dataloader = DataLoader(
         dataset,
@@ -53,7 +52,7 @@ def DDSNG(cfg : DictConfig) -> None:
     print('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = SignDenoising(1, 1).to(device)
-    print(dataset[0].y)
+    print(dataset[0]['pe'].shape)
 
     data = dataset[0].to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
@@ -70,4 +69,4 @@ def DDSNG(cfg : DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    DDSNG()
+    main()
