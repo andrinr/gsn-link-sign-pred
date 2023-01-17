@@ -24,8 +24,9 @@ class BSCLGraph(GraphGenerator):
 
     def __call__(self) -> Data:
         degrees = self.degree_generator()
-        data = fast_chung_lung(degrees)
-        n_nodes = data.num_nodes
+        n_nodes = len(degrees)
+        edge_index = fast_chung_lung(degrees)
+        data = Data(edge_index=edge_index, num_nodes=n_nodes)
         # return list of edges from edge view iterable
         old_edges_list = data.edge_index.T.tolist()
         random.shuffle(old_edges_list)
@@ -36,39 +37,30 @@ class BSCLGraph(GraphGenerator):
         probabilities = degrees / np.sum(degrees)
         max_index = np.argmax(probabilities)
         probabilities[max_index] += 1.0 - np.sum(probabilities)
-        node_choices = np.random.choice(
-            n_nodes,
-            n_edges * 2,
-            p=probabilities,
-            replace=True)
 
         for i in range(n_edges):
-            u = node_choices[i]
-            # close a triangle
-            if coin(self.p_close_triangle) and two_hop_walk(data, u) is not None:	
-                res = two_hop_walk(data, u)
-                if not res: continue
-                v, w = res
-                sign = edge_attr(data, u, v) * edge_attr(data, v, w)
-                # make it balanced
-                if coin(self.p_close_for_balance):
-                    data.edge_index[0][i] = u
-                    data.edge_index[1][i] = w
-                    data.edge_attr[i] = sign
-                # make it unbalanced
+            unique = False
+            while not unique:
+                u = np.random.choice(n_nodes, size=1, p=probabilities)[0]
+                # close a triangle
+                if coin(self.p_close_triangle) and two_hop_walk(data, u) is not None:	
+                    res = two_hop_walk(data, u)
+                    if not res: continue
+                    v, w = res
+                    sign = edge_attr(data, u, v) * edge_attr(data, v, w)
+                    # make it balanced
+                    if coin(self.p_close_for_balance):
+                        unique = check_and_add_edge(data, i, u, w, sign)
+                        continue
+                    # make it unbalanced
+                    else:
+                        unique = check_and_add_edge(data, i, u, w, invert(sign))
+                        continue
+                # insert random edge
                 else:
-                    data.edge_index[0][i] = u
-                    data.edge_index[1][i] = w
-                    data.edge_attr[i] = invert(sign)
-            # insert random edge
-            else:
-                v = node_choices[i + n_edges]
-                data.edge_index[0][i] = u
-                data.edge_index[1][i] = v
-                data.edge_attr[i] = coin(self.p_positive_sign) * 2 - 1
-
-        if self.remove_self_loops:
-            remove_self_loops(data.edge_index, data.edge_attr)
+                    v = np.random.choice(n_nodes, size=1, p=probabilities)[0]
+                    unique = check_and_add_edge(data, i, u, v, coin(self.p_positive_sign) * 2 - 1)
+                    continue
 
         return data
 
@@ -101,6 +93,21 @@ def two_hop_walk(data, u):
     w = np.random.choice(neighbors)
     return v, w
 
+def check_and_add_edge(data, index,  u, v, sign):
+    if check_edge_exists(data, u, v) or u == v:
+        return False
+    data.edge_index[0][index] = u
+    data.edge_index[1][index] = v
+    data.edge_attr[index] = sign
+    return True
+
+def check_edge_exists(data, u, v):
+    edge_index = data.edge_index
+    src, dst = edge_index
+    node_edges = src == u
+    node_edges &= dst == v
+    return node_edges.any()
+
 def edge_attr(data, u, v):
     edge_index, edge_attr = data.edge_index, data.edge_attr
     src, dst = edge_index
@@ -125,9 +132,9 @@ def sign_partition(data : Data, p_pos : float = 0.5):
     n_edges = len(data.edge_index[0])
     p_neg = 1 - p_pos
     random_signs = np.random.choice([-1, 1], n_edges, p=[p_neg, p_pos])
-    data.edge_attr = torch.unsqueeze(torch.tensor(random_signs),-1)
+    data.edge_attr = torch.unsqueeze(torch.tensor(random_signs, dtype=torch.long),-1)
 
-def fast_chung_lung(degrees : np.ndarray) -> Data:
+def fast_chung_lung(degrees : np.ndarray):
     """
     Generates a graph with the given degrees.
     Based on paper: GENERATING LARGE SCALE-FREE NETWORKS WITH THE CHUNG–LU RANDOM GRAPH MODEL∗
@@ -160,5 +167,15 @@ def fast_chung_lung(degrees : np.ndarray) -> Data:
 
     # add the random edges
     u, v = np.unravel_index(ind, prob_matrix.shape)
-    
-    return Data(num_nodes = n_nodes, edge_index=torch.tensor(np.array([u, v])))
+    edge_index = np.array([u, v])
+    edge_index = np.sort(edge_index, axis=0)
+    edge_index = torch.tensor(np.array([u, v]),  dtype=torch.long)
+
+    # remove self loops
+    self_loops = edge_index[0] == edge_index[1]
+    edge_index = edge_index[:, ~self_loops]
+
+    # remove duplicate edges
+    edge_index = torch.unique(edge_index, dim=1)
+
+    return edge_index

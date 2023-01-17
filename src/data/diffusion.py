@@ -4,6 +4,30 @@ import torch
 from torch_geometric.data import Data
 from torch_geometric.utils import degree
 
+def node_sign_diffusion(node_features, fraction : float):
+
+    if fraction > 1.0 or fraction < 0.0:
+        raise ValueError("fraction should be between 0 and 1")
+    n = node_features.shape[0]
+
+    negative_fraction = torch.count_nonzero(node_features == -1) / n
+    positive_fraction = 1.0 - negative_fraction
+
+    random_signs = np.random.choice(
+        np.array([-1, 1], dtype=np.float32),
+        size=(n,1),
+        p=[negative_fraction, positive_fraction]
+    )
+    random_signs = torch.tensor(random_signs, dtype=torch.long)
+
+    mutation_time = np.random.random((n,1))
+    mutation_time = torch.tensor(mutation_time, dtype=torch.long)
+
+    diffused_node_features = torch.clone(node_features)
+    diffused_node_features[mutation_time < fraction] = random_signs[mutation_time < fraction]
+
+    return diffused_node_features
+
 def sign_diffusion(graph, fraction : float):
     """
     Take a pyg gtaph and return a diffusion series where only signs are diffused
@@ -12,8 +36,10 @@ def sign_diffusion(graph, fraction : float):
     if fraction > 1.0 or fraction < 0.0:
         raise ValueError("fraction should be between 0 and 1")
 
-    edge_index : torchTensor = graph.edge_index
-    edge_attr : torchTensor = graph.edge_attr
+    edge_index = graph.edge_index
+    edge_attr = graph.edge_attr
+    num_nodes = graph.num_nodes
+    num_edges = graph.num_edges
 
     negative_fraction = np.count_nonzero(edge_attr == -1) / len(edge_attr)
     positive_fraction = 1.0 - negative_fraction

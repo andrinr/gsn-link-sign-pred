@@ -36,3 +36,5 @@ dataset = InfectionDataset(
     max_path_length=3,
     transform=transform,
 )
+
+print(dataset[0].node_attrs)

@@ -1,9 +1,9 @@
 # External dependencies
-import numpy as np 
-import networkx as nx 
-import matplotlib.pyplot as plt
+import numpy as np
 import hydra
 from omegaconf import DictConfig
+import networkx as nx 
+import matplotlib.pyplot as plt
 from functools import partial
 # torch imports
 import torch
@@ -14,6 +14,7 @@ from torch_geometric.utils import to_networkx
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
 from data.utils.samplers import even_exponential
+from data.diffusion import node_sign_diffusion
 from model.denoising import SignDenoising
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
@@ -30,10 +31,10 @@ def main(cfg : DictConfig) -> None:
 
     # We transform the graph to a line graph, meaning each edge is replaced with a node
     # Signs are not node features and note edge features anymore
+    node_attr_size = cfg.dataset.laplacian_eigenvector_pe_size + 1
     transform = T.Compose([
-        T.ToUndirected(),
-        T.LineGraph(force_directed=False),
-        T.AddLaplacianEigenvectorPE(k=10, attr_name='pe')])
+        T.LineGraph(force_directed=True),
+        T.AddLaplacianEigenvectorPE(k=cfg.dataset.laplacian_eigenvector_pe_size, attr_name='pe')])
 
     dataset = SignedDataset(
         graph_generator=BSCLGraph,
@@ -47,25 +48,23 @@ def main(cfg : DictConfig) -> None:
         shuffle=True,
     )
 
-    nx.draw(to_networkx(dataset[0]))
-
     print('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = SignDenoising(1, 1).to(device)
-    print(dataset[0]['pe'].shape)
+    model = SignDenoising(16, node_attr_size).to(device)
 
     data = dataset[0].to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-
-    plt.show()
-    """
+    
     model.train()
     for epoch in range(200):
         optimizer.zero_grad()
-        out = model(data)
-        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+        true_signs = data.x
+        diffused_signs = node_sign_diffusion(true_signs.cpu(), np.random.random()).to(device)
+        sign_predictions = model(diffused_signs, data['pe'], data.edge_index)
+
+        loss = F.nll_loss(sign_predictions, true_signs)
         loss.backward()
-        optimizer.step()"""
+        optimizer.step()
 
 
 if __name__ == "__main__":

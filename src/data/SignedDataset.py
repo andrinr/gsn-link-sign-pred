@@ -30,11 +30,5 @@ class SignedDataset(InMemoryDataset):
         self.data, self.slices = self.collate(data_list)
 
     def get_graph(self) -> Explanation:
-        data = self.graph_generator()
-        y = data.edge_attr
-        data.edge_attr = None
-        #for transform in self.transforms:
-        #    data = transform(data)
-        
-        data.y = y
-        return data
+        return self.graph_generator()
+    
