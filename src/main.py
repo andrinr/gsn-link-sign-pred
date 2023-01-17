@@ -10,6 +10,7 @@ import torch
 import torch_geometric.transforms as T
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import to_networkx
+import torch.nn.functional as F
 # Local dependencies
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
@@ -53,18 +54,22 @@ def main(cfg : DictConfig) -> None:
     model = SignDenoising(16, node_attr_size).to(device)
 
     data = dataset[0].to(device)
+    print(data)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     
     model.train()
-    for epoch in range(200):
-        optimizer.zero_grad()
-        true_signs = data.x
-        diffused_signs = node_sign_diffusion(true_signs.cpu(), np.random.random()).to(device)
-        sign_predictions = model(diffused_signs, data['pe'], data.edge_index)
-
-        loss = F.nll_loss(sign_predictions, true_signs)
-        loss.backward()
-        optimizer.step()
+    for epoch in range(20):
+        print(f"Epoch {epoch}")
+        for data in dataset:
+            true_signs = data.x
+            diffused_signs = node_sign_diffusion(true_signs.cpu(), np.random.random())
+            pe = data['pe']
+            x = torch.cat([diffused_signs, pe], dim=1)
+            sign_predictions = model(x.to(device), data.edge_index.to(device))
+            optimizer.zero_grad()
+            loss = F.nll_loss(torch.squeeze(sign_predictions), torch.squeeze(true_signs).to(device))
+            loss.backward()
+            optimizer.step()
 
 
 if __name__ == "__main__":

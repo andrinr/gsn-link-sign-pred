@@ -10,7 +10,7 @@ def node_sign_diffusion(node_features, fraction : float):
         raise ValueError("fraction should be between 0 and 1")
     n = node_features.shape[0]
 
-    negative_fraction = torch.count_nonzero(node_features == -1) / n
+    negative_fraction = (torch.count_nonzero(node_features == -1) / n).item()
     positive_fraction = 1.0 - negative_fraction
 
     random_signs = np.random.choice(
@@ -20,7 +20,7 @@ def node_sign_diffusion(node_features, fraction : float):
     )
     random_signs = torch.tensor(random_signs, dtype=torch.long)
 
-    mutation_time = np.random.random((n,1))
+    mutation_time = np.random.random((n, 1))
     mutation_time = torch.tensor(mutation_time, dtype=torch.long)
 
     diffused_node_features = torch.clone(node_features)
