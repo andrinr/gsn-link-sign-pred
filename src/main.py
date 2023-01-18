@@ -2,15 +2,10 @@
 import numpy as np
 import hydra
 from omegaconf import DictConfig
-import networkx as nx 
-import matplotlib.pyplot as plt
 from functools import partial
 # torch imports
 import torch
 import torch_geometric.transforms as T
-from torch_geometric.loader import DataLoader
-from torch_geometric.utils import to_networkx
-import torch.nn.functional as F
 # Local dependencies
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
@@ -31,19 +26,23 @@ def main(cfg : DictConfig) -> None:
     }
 
     # We transform the graph to a line graph, meaning each edge is replaced with a node
-    # Signs are not node features and note edge features anymore
-    node_attr_size = cfg.dataset.laplacian_eigenvector_pe_size + 1
+    # Source: Line Graph Neural Networks for Link Prediction
+    # Signs are now node features
+    node_attr_size = cfg.dataset.pe_size + 1
     transform = T.Compose([
         T.LineGraph(force_directed=True),
-        T.AddLaplacianEigenvectorPE(k=cfg.dataset.laplacian_eigenvector_pe_size, attr_name='pe')])
+        #T.AddLaplacianEigenvectorPE(k=cfg.dataset.pe_size, attr_name='pe')
+        T.AddRandomWalkPE(cfg.dataset.pe_size, attr_name='pe')
+        ])
 
+    print("Loading dataset")
     dataset = SignedDataset(
         graph_generator=BSCLGraph,
         graph_generator_kwargs=BSCL_graph_kwargs,
         transform=transform,
         num_graphs=cfg.dataset.n_graphs)
 
-    print('cuda' if torch.cuda.is_available() else 'cpu')
+    print('cuda available :)' if torch.cuda.is_available() else 'falling back to cpu :(')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = SignDenoising(16, node_attr_size).to(device)
 
@@ -61,7 +60,7 @@ def main(cfg : DictConfig) -> None:
             true_signs = torch.squeeze(true_signs)
             pe = data['pe']
             # generate x
-            x = torch.cat([diffused_signs, pe], dim=1)
+            x = torch.cat([diffused_signs, pe, ], dim=1)
             # squeeze data 
             true_signs = torch.squeeze(true_signs)
             # send data to device

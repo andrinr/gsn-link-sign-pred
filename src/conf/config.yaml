@@ -4,7 +4,7 @@ model:
 dataset:
   n_graphs : 100
   n_nodes : 100
-  laplacian_eigenvector_pe_size : 3
+  pe_size : 20
 
   BSCL:
     sampling_method : 'exp'
