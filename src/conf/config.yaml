@@ -2,9 +2,9 @@ model:
   n_layers : 5
 
 dataset:
-  n_graphs : 40
-  n_nodes : 60
-  laplacian_eigenvector_pe_size : 10
+  n_graphs : 100
+  n_nodes : 100
+  laplacian_eigenvector_pe_size : 3
 
   BSCL:
     sampling_method : 'exp'

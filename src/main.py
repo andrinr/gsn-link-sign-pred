@@ -43,18 +43,12 @@ def main(cfg : DictConfig) -> None:
         transform=transform,
         num_graphs=cfg.dataset.n_graphs)
 
-    dataloader = DataLoader(
-        dataset,
-        batch_size=32,
-        shuffle=True,
-    )
-
     print('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = SignDenoising(16, node_attr_size).to(device)
 
-    data = dataset[0].to(device)
-    print(data)
+    criterion = torch.nn.CrossEntropyLoss()  # Define loss criterion.
+
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
     
     model.train()
@@ -62,12 +56,23 @@ def main(cfg : DictConfig) -> None:
         print(f"Epoch {epoch}")
         for data in dataset:
             true_signs = data.x
-            diffused_signs = node_sign_diffusion(true_signs.cpu(), np.random.random())
+            diffused_signs = node_sign_diffusion(true_signs, np.random.random())
+            # squeeze
+            true_signs = torch.squeeze(true_signs)
             pe = data['pe']
+            # generate x
             x = torch.cat([diffused_signs, pe], dim=1)
-            sign_predictions = model(x.to(device), data.edge_index.to(device))
-            optimizer.zero_grad()
-            loss = F.nll_loss(torch.squeeze(sign_predictions), torch.squeeze(true_signs).to(device))
+            # squeeze data 
+            true_signs = torch.squeeze(true_signs)
+            # send data to device
+            d_x = x.to(device)
+            d_edge_index = data.edge_index.to(device)
+            d_true_signs = true_signs.to(device)
+            # make prediction
+            sign_predictions = model(d_x, d_edge_index)
+            loss = criterion(sign_predictions, d_true_signs)
+            #print(sign_predictions, d_true_signs)
+            print(loss.item())
             loss.backward()
             optimizer.step()
 

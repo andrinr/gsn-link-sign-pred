@@ -15,10 +15,12 @@ class SignedDataset(InMemoryDataset):
         graph_generator :  Union[GraphGenerator, str],
         graph_generator_kwargs: Optional[Dict[str, Any]] = None,
         transform: Optional[Callable] = None,
-        num_graphs: Optional[int] = None):
+        num_graphs: Optional[int] = None,
+        convert_to_classes: Optional[bool] = True):
         super().__init__(root=None, transform=transform)
 
         self.graph_generator = graph_generator(**graph_generator_kwargs)
+        self.convert_to_classes = convert_to_classes
 
         if num_graphs is None:
             num_graphs = 1
@@ -30,5 +32,10 @@ class SignedDataset(InMemoryDataset):
         self.data, self.slices = self.collate(data_list)
 
     def get_graph(self) -> Explanation:
-        return self.graph_generator()
+        data = self.graph_generator()
+        # convert edge attributes to classes
+        if self.convert_to_classes:
+            data.edge_attr = (data.edge_attr + 1) / 2
+            data.edge_attr = data.edge_attr.long()
+        return data
     

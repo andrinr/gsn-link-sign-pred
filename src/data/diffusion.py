@@ -14,7 +14,7 @@ def node_sign_diffusion(node_features, fraction : float):
     positive_fraction = 1.0 - negative_fraction
 
     random_signs = np.random.choice(
-        np.array([-1, 1], dtype=np.float32),
+        np.array([0, 1], dtype=np.int32),
         size=(n,1),
         p=[negative_fraction, positive_fraction]
     )
