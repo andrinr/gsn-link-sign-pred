@@ -5,11 +5,9 @@ from functools import partial
 # torch imports
 import torch_geometric.transforms as T
 # Local dependencies
-from data.BSCLGraph import BSCLGraph
-from data.SignedDataset import SignedDataset
-from data.utils.samplers import even_exponential
-from model.denoising import SignDenoising
-from model.training import Training
+from data import SignedDataset, BSCLGraph, even_exponential
+from model import SignDenoising, Training
+from visualize import visualize
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
@@ -28,9 +26,10 @@ def main(cfg : DictConfig) -> None:
     # Signs are now node features
     node_attr_size = cfg.dataset.pe_size + 1
     transform = T.Compose([
+        T.LargestConnectedComponents(),
         T.LineGraph(force_directed=True),
-        T.AddLaplacianEigenvectorPE(k=cfg.dataset.pe_size, attr_name='pe')
-        #T.AddRandomWalkPE(cfg.dataset.pe_size, attr_name='pe')
+        T.AddLaplacianEigenvectorPE(k=cfg.dataset.pe_size, attr_name='pe'),
+        #T.AddRandomWalkPE(cfg.dataset.pe_size, attr_name='pe'),
         ])
 
     model = SignDenoising(16, node_attr_size)
@@ -52,7 +51,7 @@ def main(cfg : DictConfig) -> None:
         cfg=cfg,
         model=model)
 
-    training.train(dataset=train_dataset, epochs=1)
+    training.train(dataset=train_dataset, epochs=10)
     training.test(dataset=test_dataset)
 
 if __name__ == "__main__":

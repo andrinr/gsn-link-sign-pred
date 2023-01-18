@@ -11,19 +11,19 @@ class SignDenoising(torch.nn.Module):
     def __init__(self, hidden_channels, num_features):
         super().__init__()
         torch.manual_seed(1234567)
-        self.linear = Linear(num_features, num_features)
-        self.conv1 = GATConv(num_features, hidden_channels)
-        self.conv2 = GATConv(hidden_channels, 2)
+        self.conv1 = GCNConv(num_features, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        self.conv3 = GCNConv(hidden_channels, hidden_channels)
+        self.linear = Linear(hidden_channels, 2)
 
     def forward(self, x, edge_index):
-        x = self.linear(x)
         x = self.conv1(x, edge_index)
         x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
         x = self.conv2(x, edge_index)
         x = F.relu(x)
-        #x = torch.sigmoid(x)
-        #x = torch.softmax(x, dim=1)
+        x = self.conv3(x, edge_index)
+        x = F.relu(x)
+        x = self.linear(x)
 
         return x
 

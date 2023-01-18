@@ -1,9 +1,7 @@
 import torch
 from typing import Any, Callable, Dict, List, Optional, Union
 from torch_geometric.data import InMemoryDataset
-from torch_geometric.transforms import LineGraph
 from torch_geometric.explain import Explanation
-from data.utils.samplers import even_uniform, even_exponential
 from torch_geometric.datasets.graph_generator import GraphGenerator
 
 class SignedDataset(InMemoryDataset):

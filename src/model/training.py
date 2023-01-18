@@ -1,28 +1,33 @@
 import torch
-from data.diffusion import node_sign_diffusion
+from data import node_sign_diffusion
 import numpy as np
 
 class Training:
-    def __init__(self, cfg, model):
+    def __init__(self, cfg, model, offset_unbalanced=False):
         self.cfg = cfg
         self.model = model
+        self.offset_unbalanced = offset_unbalanced
 
     def train(self, dataset, epochs=20):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
 
-        weights = torch.Tensor(np.array([
-            self.cfg.dataset.p_positive, 
-            1-self.cfg.dataset.p_positive]))
+        if self.offset_unbalanced:
+            weights = torch.Tensor(np.array([
+                self.cfg.dataset.p_positive, 
+                1-self.cfg.dataset.p_positive]))
 
-        d_weights = weights.to(self.device)
+            d_weights = weights.to(self.device)
 
-        criterion = torch.nn.CrossEntropyLoss(weight=d_weights)
+            criterion = torch.nn.CrossEntropyLoss(weight=d_weights)
+        else:
+            criterion = torch.nn.CrossEntropyLoss()
+
         optimizer = torch.optim.Adam(
             self.model.parameters(), 
             lr=0.01, 
-            weight_decay=5e-4)
+            weight_decay=0)
         
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
@@ -51,9 +56,11 @@ class Training:
     def step(self, data):
         target = data.x
         diffused = node_sign_diffusion(target, np.random.random())
-        target = torch.squeeze(target)
         pe = data['pe']
-        x = torch.cat([diffused, pe, ], dim=1)
+        x = torch.cat([diffused, pe], dim=1)
+
+        target = torch.squeeze(target)
+
         #print(diffused, target )
         #print((target == torch.squeeze(diffused)).sum().item() / len(target))
         target = torch.squeeze(target)

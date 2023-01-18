@@ -5,8 +5,8 @@ dataset:
   train_size : 80
   test_size : 20
   n_nodes : 100
-  pe_size : 20
-  p_positive : 0.9
+  pe_size : 10
+  p_positive : 0.5
   BSCL:
     sampling_method : 'exp'
     p_close_triangle : 0.1
