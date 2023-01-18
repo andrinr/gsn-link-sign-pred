@@ -6,11 +6,9 @@ dataset:
   test_size : 20
   n_nodes : 100
   pe_size : 20
-
+  p_positive : 0.9
   BSCL:
     sampling_method : 'exp'
-    p_positive : 0.9
     p_close_triangle : 0.1
     p_close_for_balance : 0.8
     remove_self_loops : True
-

@@ -12,14 +12,24 @@ class Training:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
 
-        criterion = torch.nn.CrossEntropyLoss()  # Define loss criterion.
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01, weight_decay=5e-4)
+        weights = torch.Tensor(np.array([
+            self.cfg.dataset.p_positive, 
+            1-self.cfg.dataset.p_positive]))
+
+        d_weights = weights.to(self.device)
+
+        criterion = torch.nn.CrossEntropyLoss(weight=d_weights)
+        optimizer = torch.optim.Adam(
+            self.model.parameters(), 
+            lr=0.01, 
+            weight_decay=5e-4)
         
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
             for data in dataset:
                 optimizer.zero_grad()
                 predictions, target = self.step(data)
+                predicted_class = torch.argmax(predictions, 1)
                 loss = criterion(predictions, target)
                 #print(sign_predictions, d_true_signs)
                 print(loss.item())
@@ -32,6 +42,7 @@ class Training:
             for data in dataset:
                 predictions, target = self.step(data)
                 predicted_class = torch.argmax(predictions, 1)
+                print(predicted_class)
                 correct = (predicted_class == target).float()
                 acc.append(correct.sum() / len(correct))
 
@@ -51,7 +62,7 @@ class Training:
         d_x = x.to(self.device)
         d_edge_index = data.edge_index.to(self.device)
         d_target = target.to(self.device)
-        
+
         # make prediction
         return self.model(d_x, d_edge_index), d_target
         
