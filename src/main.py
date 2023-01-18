@@ -52,8 +52,8 @@ def main(cfg : DictConfig) -> None:
         cfg=cfg,
         model=model)
 
-    training.train(dataset=train_dataset, epochs=20)
-
+    training.train(dataset=train_dataset, epochs=4)
     training.test(dataset=test_dataset)
+
 if __name__ == "__main__":
     main()

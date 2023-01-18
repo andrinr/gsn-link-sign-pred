@@ -1,8 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 from torch_geometric.data import Data
-from torch_geometric.utils import degree
 
 def node_sign_diffusion(node_features, fraction : float):
 
