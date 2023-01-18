@@ -1,17 +1,15 @@
 # External dependencies
-import numpy as np
 import hydra
 from omegaconf import DictConfig
 from functools import partial
 # torch imports
-import torch
 import torch_geometric.transforms as T
 # Local dependencies
 from data.BSCLGraph import BSCLGraph
 from data.SignedDataset import SignedDataset
 from data.utils.samplers import even_exponential
-from data.diffusion import node_sign_diffusion
 from model.denoising import SignDenoising
+from model.training import Training
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
@@ -35,46 +33,27 @@ def main(cfg : DictConfig) -> None:
         T.AddRandomWalkPE(cfg.dataset.pe_size, attr_name='pe')
         ])
 
+    model = SignDenoising(16, node_attr_size)
+
     print("Loading dataset")
-    dataset = SignedDataset(
+    train_dataset = SignedDataset(
         graph_generator=BSCLGraph,
         graph_generator_kwargs=BSCL_graph_kwargs,
         transform=transform,
-        num_graphs=cfg.dataset.n_graphs)
+        num_graphs=cfg.dataset.train_size)
 
-    print('cuda available :)' if torch.cuda.is_available() else 'falling back to cpu :(')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = SignDenoising(16, node_attr_size).to(device)
-
-    criterion = torch.nn.CrossEntropyLoss()  # Define loss criterion.
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+    test_dataset = SignedDataset(
+        graph_generator=BSCLGraph,
+        graph_generator_kwargs=BSCL_graph_kwargs,
+        transform=transform,
+        num_graphs=cfg.dataset.test_size)
     
-    model.train()
-    for epoch in range(20):
-        print(f"Epoch {epoch}")
-        for data in dataset:
-            true_signs = data.x
-            diffused_signs = node_sign_diffusion(true_signs, np.random.random())
-            # squeeze
-            true_signs = torch.squeeze(true_signs)
-            pe = data['pe']
-            # generate x
-            x = torch.cat([diffused_signs, pe, ], dim=1)
-            # squeeze data 
-            true_signs = torch.squeeze(true_signs)
-            # send data to device
-            d_x = x.to(device)
-            d_edge_index = data.edge_index.to(device)
-            d_true_signs = true_signs.to(device)
-            # make prediction
-            sign_predictions = model(d_x, d_edge_index)
-            loss = criterion(sign_predictions, d_true_signs)
-            #print(sign_predictions, d_true_signs)
-            print(loss.item())
-            loss.backward()
-            optimizer.step()
+    training = Training(
+        cfg=cfg,
+        model=model)
 
+    training.train(dataset=train_dataset, epochs=20)
 
+    training.test(dataset=test_dataset)
 if __name__ == "__main__":
     main()

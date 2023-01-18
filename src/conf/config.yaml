@@ -2,7 +2,8 @@ model:
   n_layers : 5
 
 dataset:
-  n_graphs : 100
+  train_size : 80
+  test_size : 20
   n_nodes : 100
   pe_size : 20
 

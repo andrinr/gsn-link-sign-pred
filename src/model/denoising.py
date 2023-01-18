@@ -16,9 +16,10 @@ class SignDenoising(torch.nn.Module):
 
     def forward(self, x, edge_index):
         x = self.conv1(x, edge_index)
-        x = x.relu()
+        x = F.relu(x)
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.conv2(x, edge_index)
+        x = F.relu(x)
         #x = torch.sigmoid(x)
         #x = torch.softmax(x, dim=1)
 
