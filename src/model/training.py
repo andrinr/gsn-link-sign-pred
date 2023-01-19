@@ -10,6 +10,7 @@ class Training:
 
     def train(self, dataset, epochs=20, use_node_mask=False):
 
+        print(dataset[0].x.shape)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
 

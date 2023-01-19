@@ -11,6 +11,7 @@ def node_sign_diffusion(node_features, fraction : float):
     negative_fraction = (torch.count_nonzero(node_features == 0) / n).item()
     positive_fraction = 1.0 - negative_fraction
 
+    print(node_features)
     random_signs = np.random.choice(
         np.array([0, 1], dtype=np.int32),
         size=(n,1),

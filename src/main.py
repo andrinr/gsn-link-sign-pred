@@ -4,11 +4,11 @@ from omegaconf import DictConfig
 from functools import partial
 # torch imports
 import torch_geometric.transforms as T
-from torch_geometric.datasets import BitcoinOTC
 # Local dependencies
 from data import SignedDataset, BSCLGraph, even_exponential
 from model import SignDenoising, Training
 from visualize import visualize
+from data import BitcoinOTC
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
@@ -23,7 +23,7 @@ def main(cfg : DictConfig) -> None:
     if cfg.dataset.transform.line_graph:
         transform.append(T.LineGraph(force_directed=True))
 
-    if cfg.dataset.transofrm.pe_type == "laplacian":
+    if cfg.dataset.transform.pe_type == "laplacian":
         transform.append(T.AddLaplacianEigenvectorPE(k=cfg.dataset.transform.pe_size, attr_name='pe'))
     elif cfg.dataset.transform.pe_type == "random_walk":
         transform.append(T.AddRandomWalkPE(cfg.dataset.transform.pe_size, attr_name='pe'))
@@ -60,9 +60,6 @@ def main(cfg : DictConfig) -> None:
         # in this case node masks are used to split the dataset
         test_dataset = train_dataset
         use_node_mask = cfg.dataset.bitcoin.node_mask
-
-        print(train_dataset[0].train_mask)
-
 
     # Define the model 
     model = SignDenoising(16, node_attr_size)
