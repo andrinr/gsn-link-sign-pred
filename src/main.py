@@ -13,13 +13,24 @@ from visualize import visualize
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
 
-    # Define the model 
-    model = SignDenoising(16, node_attr_size)
-    training = Training(
-        cfg=cfg,
-        model=model)
+    node_attr_size = cfg.dataset.pe_size + 1
 
-    # Load the dataset
+    # Define the transforms
+    transform = []
+    if cfg.dataset.transform.largest_cc:
+        transform.append(T.LargestConnectedComponents())
+
+    if cfg.dataset.transform.line_graph:
+        transform.append(T.LineGraph(force_directed=True))
+
+    if cfg.dataset.transofrm.pe_type == "laplacian":
+        transform.append(T.AddLaplacianEigenvectorPE(k=cfg.dataset.transform.pe_size, attr_name='pe'))
+    elif cfg.dataset.transform.pe_type == "random_walk":
+        transform.append(T.AddRandomWalkPE(cfg.dataset.transform.pe_size, attr_name='pe'))
+    transform = T.Compose(transform)
+
+    # Define the dataset
+    print("Loading dataset")
     if cfg.dataset.id == "bscl":
         degree_generator = partial(even_exponential, size=cfg.dataset.simulation.n_nodes, scale=5.0)
         BSCL_graph_kwargs = {
@@ -30,18 +41,6 @@ def main(cfg : DictConfig) -> None:
             "remove_self_loops": cfg.dataset.simulation.BSCL.remove_self_loops
         }
 
-        # We transform the graph to a line graph, meaning each edge is replaced with a node
-        # Source: Line Graph Neural Networks for Link Prediction
-        # Signs are now node features
-        node_attr_size = cfg.dataset.pe_size + 1
-        transform = T.Compose([
-            T.LargestConnectedComponents(),
-            T.LineGraph(force_directed=True),
-            T.AddLaplacianEigenvectorPE(k=cfg.dataset.pe_size, attr_name='pe'),
-            #T.AddRandomWalkPE(cfg.dataset.pe_size, attr_name='pe'),
-            ])
-
-        print("Loading dataset")
         train_dataset = SignedDataset(
             graph_generator=BSCLGraph,
             graph_generator_kwargs=BSCL_graph_kwargs,
@@ -56,12 +55,6 @@ def main(cfg : DictConfig) -> None:
         use_node_mask = cfg.dataset.simulation.BSCL.node_mask
 
     elif cfg.dataset.id == "bitcoin":
-        transform = T.Compose([
-            T.LargestConnectedComponents(),
-            T.LineGraph(force_directed=True),
-            T.AddLaplacianEigenvectorPE(k=cfg.dataset.pe_size, attr_name='pe'),
-            #T.AddRandomWalkPE(cfg.dataset.pe_size, attr_name='pe'),
-            ])
 
         train_dataset = BitcoinOTC(root=cfg.dataset.root, transform=transform)
         # in this case node masks are used to split the dataset
@@ -70,6 +63,14 @@ def main(cfg : DictConfig) -> None:
 
         print(train_dataset[0].train_mask)
 
+
+    # Define the model 
+    model = SignDenoising(16, node_attr_size)
+    training = Training(
+        cfg=cfg,
+        model=model)
+
+    # Train and test
     training.train(dataset=train_dataset, epochs=10, use_node_mask=use_node_mask)
     training.test(dataset=test_dataset, use_node_mask=use_node_mask)
 

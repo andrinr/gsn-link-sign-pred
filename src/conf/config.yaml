@@ -7,6 +7,12 @@ dataset:
   pe_size : 20
   root : 'src/data'
 
+  transform: 
+    largest_cc : True
+    line_graph : True
+    pe_type : 'laplacian'
+    pe_size : 20
+
   simulation:
     n_simulations : 100
     n_nodes : 100
