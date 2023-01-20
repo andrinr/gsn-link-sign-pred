@@ -1,5 +1,5 @@
 model:
-  n_layers : 5
+  hidden_channels : 24
 
 dataset:
   id : 'bscl'

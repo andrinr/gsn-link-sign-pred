@@ -46,9 +46,10 @@ class Training:
             acc = []
             for data in dataset:
                 predictions, target = self.step(data, 0.95)
+                target_class = torch.argmax(target, 1)
                 predicted_class = torch.argmax(predictions, 1)
                 #print(predicted_class)
-                correct = (predicted_class == target).float()
+                correct = (predicted_class == target_class).float()
                 acc.append(correct.sum() / len(correct))
 
             print(f"Test accuracy: {sum(acc) / len(acc)}")
@@ -63,7 +64,6 @@ class Training:
 
         pe = data['pe']
         x = torch.cat([diffused, pe], dim=1)
-        print(x)
         #print(diffused, target )
         #print('noisage', (target == torch.squeeze(diffused)).sum().item() / len(target))
 

@@ -10,16 +10,21 @@ from torch_geometric.utils import add_self_loops
 import torch.nn.functional as F
 
 class SignDenoising2(torch.nn.Module):
-    def __init__(self, hidden_channels, num_features):
+    def __init__(self, input_channels, hidden_channels, output_channels):
         super().__init__()
         torch.manual_seed(1234567)
-        output_channels = 2
-        self.gin = GINConv(
-            Sequential(Linear(num_features, hidden_channels), ReLU(), Linear(hidden_channels, output_channels)),
+
+        self.gin1 = GINConv(
+            Sequential(Linear(input_channels, hidden_channels), ReLU(), Linear(hidden_channels, output_channels)),
+            train_eps=True)
+
+        self.gin2 = GINConv(
+            Sequential(Linear(hidden_channels, hidden_channels), ReLU(), Linear(hidden_channels, output_channels)),
             train_eps=True)
 
     def forward(self, x, edge_index):
-        x = self.gin(x, edge_index)
+        x = self.gin1(x, edge_index)
+        #x = self.gin2(x, edge_index)
         return x
 
 class SignDenoising(torch.nn.Module):
@@ -33,39 +38,50 @@ class SignDenoising(torch.nn.Module):
 
     def forward(self, x, edge_index):
         neighbour_information = self.global_pool(x)
-        print(neighbour_information.shape, x.shape)
         complete_information = torch.cat([x, neighbour_information], dim=0)
-        print(complete_information.shape)
         x = self.conv1(complete_information, edge_index)
         x = F.relu(x)
         x = self.conv2(x, edge_index)
 
-class PointNetLayer(MessagePassing):
+class MP(MessagePassing):
     def __init__(self, in_channels, out_channels):
-        # Message passing with "max" aggregation.
-        super().__init__(aggr='max')
-        
-        # Initialization of the MLP:
-        # Here, the number of input features correspond to the hidden node
-        # dimensionality plus point dimensionality (=3).
-        self.mlp = Sequential(Linear(in_channels + 3, out_channels),
-                              ReLU(),
-                              Linear(out_channels, out_channels))
-        
-    def forward(self, h, pos, edge_index):
-        # Start propagating messages.
-        return self.propagate(edge_index, h=h, pos=pos)
-    
-    def message(self, h_j, pos_j, pos_i):
-        # h_j defines the features of neighboring nodes as shape [num_edges, in_channels]
-        # pos_j defines the position of neighboring nodes as shape [num_edges, 3]
-        # pos_i defines the position of central nodes as shape [num_edges, 3]
+        super().__init__(aggr='add')  # "Add" aggregation (Step 5).
+        self.lin = Linear(in_channels, out_channels, bias=False)
+        self.bias = Parameter(torch.Tensor(out_channels))
 
-        input = pos_j - pos_i  # Compute spatial relation.
+        self.reset_parameters()
 
-        if h_j is not None:
-            # In the first layer, we may not have any hidden node features,
-            # so we only combine them in case they are present.
-            input = torch.cat([h_j, input], dim=-1)
+    def reset_parameters(self):
+        self.lin.reset_parameters()
+        self.bias.data.zero_()
 
-        return self.mlp(input)  # Apply our final MLP.
+    def forward(self, x, edge_index):
+        # x has shape [N, in_channels]
+        # edge_index has shape [2, E]
+
+        # Step 1: Add self-loops to the adjacency matrix.
+        edge_index, _ = add_self_loops(edge_index, num_nodes=x.size(0))
+
+        # Step 2: Linearly transform node feature matrix.
+        x = self.lin(x)
+
+        # Step 3: Compute normalization.
+        row, col = edge_index
+        deg = degree(col, x.size(0), dtype=x.dtype)
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+
+        # Step 4-5: Start propagating messages.
+        out = self.propagate(edge_index, x=x, norm=norm)
+
+        # Step 6: Apply a final bias vector.
+        out += self.bias
+
+        return out
+
+    def message(self, x_j, norm):
+        # x_j has shape [E, out_channels]
+
+        # Step 4: Normalize node features.
+        return norm.view(-1, 1) * x_j

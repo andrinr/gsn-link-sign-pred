@@ -13,7 +13,6 @@ from data import BitcoinOTC
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
 
-    node_attr_size = cfg.dataset.transform.pe_size + 1
 
     # Define the transforms
     transform = []
@@ -61,9 +60,13 @@ def main(cfg : DictConfig) -> None:
         test_dataset = train_dataset
         use_node_mask = cfg.dataset.bitcoin.node_mask
 
+    input_channels = cfg.dataset.transform.pe_size + 2
+    hidden_channels = cfg.model.hidden_channels
+    output_channels = 2
+
     # Define the model 
-    model = SignDenoising(16, node_attr_size)
-    model2 = SignDenoising2(16, node_attr_size)
+    #model = SignDenoising(16, node_attr_size)
+    model2 = SignDenoising2(input_channels, hidden_channels, output_channels)
     training = Training(
         cfg=cfg,
         model=model2)
