@@ -2,19 +2,18 @@ model:
   n_layers : 5
 
 dataset:
-  id : 'bitcoin'
+  id : 'bscl'
   train_size : 0.8
-  pe_size : 20
   root : 'src/data'
 
   transform: 
     largest_cc : True
     line_graph : True
     pe_type : 'laplacian'
-    pe_size : 20
+    pe_size : 10
 
   simulation:
-    n_simulations : 100
+    n_simulations : 20
     n_nodes : 100
     p_positive : 0.5
 

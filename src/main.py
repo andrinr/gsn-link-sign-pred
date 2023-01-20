@@ -13,7 +13,7 @@ from data import BitcoinOTC
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
 
-    node_attr_size = cfg.dataset.pe_size + 1
+    node_attr_size = cfg.dataset.transform.pe_size + 1
 
     # Define the transforms
     transform = []
@@ -36,7 +36,7 @@ def main(cfg : DictConfig) -> None:
         BSCL_graph_kwargs = {
             "degree_generator": degree_generator,
             "p_positive_sign": cfg.dataset.simulation.p_positive,
-            "p_close_triangle": cfg.simuldataset.simulation.BSCL.p_close_triangle,
+            "p_close_triangle": cfg.dataset.simulation.BSCL.p_close_triangle,
             "p_close_for_balance": cfg.dataset.simulation.BSCL.p_close_for_balance,
             "remove_self_loops": cfg.dataset.simulation.BSCL.remove_self_loops
         }

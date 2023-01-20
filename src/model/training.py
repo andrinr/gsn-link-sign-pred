@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from data import node_sign_diffusion
 import numpy as np
 
@@ -10,7 +11,6 @@ class Training:
 
     def train(self, dataset, epochs=20, use_node_mask=False):
 
-        print(dataset[0].x.shape)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
 
@@ -47,7 +47,7 @@ class Training:
             for data in dataset:
                 predictions, target = self.step(data, 0.95)
                 predicted_class = torch.argmax(predictions, 1)
-                print(predicted_class)
+                #print(predicted_class)
                 correct = (predicted_class == target).float()
                 acc.append(correct.sum() / len(correct))
 
@@ -56,10 +56,14 @@ class Training:
     def step(self, data, diffusion_time):
         target = data.x
         diffused = node_sign_diffusion(target, diffusion_time)
-        pe = data['pe']
-        x = torch.cat([diffused, pe], dim=1)
+        diffused = F.one_hot(diffused, num_classes=2).float()
+        diffused = torch.squeeze(diffused)
+        target = F.one_hot(target, num_classes=2).float()
         target = torch.squeeze(target)
 
+        pe = data['pe']
+        x = torch.cat([diffused, pe], dim=1)
+        print(x)
         #print(diffused, target )
         #print('noisage', (target == torch.squeeze(diffused)).sum().item() / len(target))
 

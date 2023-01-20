@@ -4,26 +4,27 @@ from torch_geometric.nn import GATConv
 from torch_geometric.nn import GCNConv
 
 from torch.nn import Sequential, Linear, ReLU
-from torch_geometric.nn import MessagePassing
+from torch_geometric.nn import MessagePassing, aggr
+
+from torch_geometric.utils import add_self_loops
 import torch.nn.functional as F
 
 class SignDenoising(torch.nn.Module):
     def __init__(self, hidden_channels, num_features):
         super().__init__()
         torch.manual_seed(1234567)
-        self.conv1 = GCNConv(num_features, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, 2)
+        self.global_pool = aggr.SoftmaxAggregation(learn=True)
+        self.conv1 = GCNConv(num_features * 2, hidden_channels, add_self_loops=False)
+        self.conv2 = GCNConv(hidden_channels, 2, add_self_loops=False)
 
 
     def forward(self, x, edge_index):
-        x = self.conv1(x, edge_index)
+        neighbour_information = self.global_pool(x)
+        print(neighbour_information.shape, x.shape)
+        complete_information = torch.cat([x, neighbour_information], dim=1)
+        x = self.conv1(complete_information, edge_index)
         x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.conv2(x , edge_index)
-        #x = F.relu(x)
-        #x = F.log_softmax(x, dim=1)
-
-        return x
+        x = self.conv2(x, edge_index)
 
 class PointNetLayer(MessagePassing):
     def __init__(self, in_channels, out_channels):
