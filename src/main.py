@@ -6,7 +6,7 @@ from functools import partial
 import torch_geometric.transforms as T
 # Local dependencies
 from data import SignedDataset, BSCLGraph, even_exponential
-from model import SignDenoising, Training
+from model import SignDenoising, SignDenoising2, Training
 from visualize import visualize
 from data import BitcoinOTC
 
@@ -63,9 +63,10 @@ def main(cfg : DictConfig) -> None:
 
     # Define the model 
     model = SignDenoising(16, node_attr_size)
+    model2 = SignDenoising2(16, node_attr_size)
     training = Training(
         cfg=cfg,
-        model=model)
+        model=model2)
 
     # Train and test
     training.train(dataset=train_dataset, epochs=10, use_node_mask=use_node_mask)
