@@ -43,9 +43,11 @@ class WikiSigned(InMemoryDataset):
 
     def __init__(self, root: str,
                  transform: Optional[Callable] = None,
-                 pre_transform: Optional[Callable] = None):
+                 pre_transform: Optional[Callable] = None,
+                 map_to_zero_one: Optional[bool] = False):
         self.raw_name = 'download.tsv.wikisigned-k2'
         self.names = ['meta.wikisigned-k2', 'out.wikisigned-k2', 'README.wikisigned-k2']
+        self.map_to_zero_one = map_to_zero_one
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -57,7 +59,7 @@ class WikiSigned(InMemoryDataset):
     @property
     def processed_file_names(self) -> str:
         # Returns, e.g., ['LINUX_training.pt', 'LINUX_test.pt']
-        return self.name
+        return 'wikisigned-k2.pt'
         
     def download(self):
         path = download_url(self.url.format(self.raw_name + '.tar.bz2'), self.raw_dir)
@@ -65,6 +67,17 @@ class WikiSigned(InMemoryDataset):
 
     def process(self):
         data = Data()
-        edge_index = torch.tensor(np.loadtxt(self.raw_paths[1], dtype=np.int64).T, dtype=torch.long)
-        print(edge_index)
-        pass
+        raw = np.genfromtxt(self.raw_paths[1], skip_header=1, dtype=np.int64)
+        u = raw[:, 0]
+        v = raw[:, 1]
+        signs = raw[:, 2]
+
+        data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
+        if self.map_to_zero_one:
+            signs = (signs + 1) / 2
+        data.edge_attr = torch.tensor(signs, dtype=torch.float)
+
+        if self.pre_transform is not None:
+            data = self.pre_transform(data)
+
+        torch.save(self.collate([data]), self.processed_paths[0])
