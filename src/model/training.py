@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from data import node_sign_diffusion
 import numpy as np
+from model import generate_embedding
 
 class Training:
     def __init__(self, cfg, model, offset_unbalanced=False):
@@ -11,7 +12,12 @@ class Training:
     def train(self, dataset, epochs=20):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model.to(self.device )
+
+        for data in dataset:
+            z = generate_embedding(self.device, self.cfg.embedding, get_edge_index(data))
+            data.x = torch.cat([data.x, z], dim=1)
+
+        self.model.to(self.device)
 
         if self.cfg.balance_loss:
             negative_fraction = (torch.count_nonzero(dataset[0].x[:,0] == 1) / dataset[0].num_nodes).item()
@@ -34,7 +40,7 @@ class Training:
             for data in dataset:
                 optimizer.zero_grad()
                 time = np.random.random() * np.random.random()
-                predictions, target = self.step(data, time)
+                predictions, target = self.step(data, 0.95)
                 target_class = torch.argmax(target, 1)
                 loss = criterion(predictions, target_class)
                 #print(sign_predictions, d_true_signs)
@@ -68,12 +74,15 @@ class Training:
         # send data to device
         d_x = x.to(self.device)
         # Either select sparse or dense edge index format
-        if not data.edge_index:
-            d_edge_index = data.adj_t.to(self.device)
-        else:
-            d_edge_index = data.edge_index.to(self.device)
+        d_edge_index = get_edge_index(data).to(self.device)
         d_target = target.to(self.device)
 
         # make prediction
         return self.model(d_x, d_edge_index), d_target
+
+def get_edge_index(data):
+    if not data.edge_index:
+        return data.adj_t
+    else:
+        return data.edge_index
         

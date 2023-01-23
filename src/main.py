@@ -85,7 +85,7 @@ def main(cfg : DictConfig) -> None:
         offset_unbalanced=True)
 
     # Train and test
-    training.train(dataset=train_dataset, epochs=50)
+    training.train(dataset=train_dataset, epochs=100)
     training.test(dataset=test_dataset)
 
 if __name__ == "__main__":
