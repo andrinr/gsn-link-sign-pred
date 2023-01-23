@@ -75,7 +75,7 @@ class WikiSigned(InMemoryDataset):
         data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
         if self.map_to_zero_one:
             signs = (signs + 1) / 2
-        data.edge_attr = torch.tensor(signs, dtype=torch.float)
+        data.edge_attr = torch.tensor(signs, dtype=torch.long)
 
         if self.pre_transform is not None:
             data = self.pre_transform(data)

@@ -2,14 +2,14 @@ model:
   hidden_channels : 24
 
 dataset:
-  id : 'bscl'
+  id : 'wiki'
   train_size : 0.8
   root : 'src/data'
 
   transform: 
-    largest_cc : True
+    largest_cc : False
     line_graph : True
-    pe_type : 'laplacian'
+    pe_type : 'none'
     pe_size : 10
 
   simulation:
@@ -25,6 +25,6 @@ dataset:
       remove_self_loops : True
       node_mask : False
 
-  bitcoin:
-    dataset_id : 'bitcoin'
+  wiki:
+    dataset_id : 'wiki'
     node_mask : True

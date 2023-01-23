@@ -13,12 +13,12 @@ def node_sign_diffusion(node_features, fraction : float):
 
     random_signs = np.random.choice(
         np.array([0, 1], dtype=np.int32),
-        size=(n,1),
+        size=n,
         p=[negative_fraction, positive_fraction]
     )
     random_signs = torch.tensor(random_signs, dtype=torch.long)
 
-    mutation_time = np.random.random((n, 1))
+    mutation_time = np.random.random(n)
     mutation_time = torch.tensor(mutation_time, dtype=torch.float32)
 
     diffused_node_features = torch.clone(node_features)

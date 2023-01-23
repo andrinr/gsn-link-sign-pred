@@ -8,11 +8,10 @@ import torch_geometric.transforms as T
 from data import SignedDataset, BSCLGraph, even_exponential
 from model import SignDenoising, SignDenoising2, Training
 from visualize import visualize
-from data import BitcoinOTC
+from data import WikiSigned
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
-
 
     # Define the transforms
     transform = []
@@ -26,6 +25,7 @@ def main(cfg : DictConfig) -> None:
         transform.append(T.AddLaplacianEigenvectorPE(k=cfg.dataset.transform.pe_size, attr_name='pe'))
     elif cfg.dataset.transform.pe_type == "random_walk":
         transform.append(T.AddRandomWalkPE(cfg.dataset.transform.pe_size, attr_name='pe'))
+    transform.append(T.ToSparseTensor())
     transform = T.Compose(transform)
 
     # Define the dataset
@@ -53,14 +53,17 @@ def main(cfg : DictConfig) -> None:
             num_graphs=int(cfg.dataset.simulation.n_simulations * ( 1 - cfg.dataset.train_size)))
         use_node_mask = cfg.dataset.simulation.BSCL.node_mask
 
-    elif cfg.dataset.id == "bitcoin":
+    elif cfg.dataset.id == "wiki":
 
-        train_dataset = BitcoinOTC(root=cfg.dataset.root, transform=transform)
+        train_dataset = WikiSigned(
+            root=cfg.dataset.root,
+            pre_transform=transform,
+            map_to_zero_one=True)
         # in this case node masks are used to split the dataset
         test_dataset = train_dataset
-        use_node_mask = cfg.dataset.bitcoin.node_mask
 
-    input_channels = cfg.dataset.transform.pe_size + 2
+
+    input_channels = 3
     hidden_channels = cfg.model.hidden_channels
     output_channels = 2
 
@@ -69,11 +72,12 @@ def main(cfg : DictConfig) -> None:
     model2 = SignDenoising2(input_channels, hidden_channels, output_channels)
     training = Training(
         cfg=cfg,
-        model=model2)
+        model=model2,
+        offset_unbalanced=True)
 
     # Train and test
-    training.train(dataset=train_dataset, epochs=10, use_node_mask=use_node_mask)
-    training.test(dataset=test_dataset, use_node_mask=use_node_mask)
+    training.train(dataset=train_dataset, epochs=50)
+    training.test(dataset=test_dataset)
 
 if __name__ == "__main__":
     main()
