@@ -7,14 +7,13 @@ class Training:
     def __init__(self, cfg, model, offset_unbalanced=False):
         self.cfg = cfg
         self.model = model
-        self.offset_unbalanced = offset_unbalanced
 
     def train(self, dataset, epochs=20):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
 
-        if self.offset_unbalanced:
+        if self.cfg.balance_loss:
             negative_fraction = (torch.count_nonzero(dataset[0].x == 0) / dataset[0].num_nodes).item()
             positive_fraction = 1.0 - negative_fraction
             weights = torch.Tensor(np.array([
@@ -39,8 +38,10 @@ class Training:
                 optimizer.zero_grad()
                 time = np.random.random() * np.random.random()
                 predictions, target = self.step(data, time)
-                predicted_class = torch.argmax(predictions, 1)
-                loss = criterion(predictions, target)
+                print('target', target)
+                print('predictions', predictions)
+                target_class = torch.argmax(target, 1)
+                loss = criterion(predictions, target_class)
                 #print(sign_predictions, d_true_signs)
                 print('loss', loss.item())
                 loss.backward()
@@ -61,21 +62,12 @@ class Training:
             print(f"Test accuracy: {sum(acc) / len(acc)}")
 
     def step(self, data, diffusion_time):
-        target = data.x
-        
+        target = data.x[:, :2]
+        attibutes = data.x[:, 2:]
+
         diffused = node_sign_diffusion(target, diffusion_time)
-        diffused = F.one_hot(diffused, num_classes=2).float()
-        #diffused = torch.squeeze(diffused)
-        target = F.one_hot(target, num_classes=2).float()
-        target = torch.squeeze(target)
-
-        #pe = data['pe']
-        index = np.linspace(0, len(target)-1, len(target))
-        np.random.shuffle(index)
-        index = torch.tensor(index, dtype=torch.long)
-        index = torch.unsqueeze(index, dim=-1)
-
-        x = torch.cat([diffused, index], dim=1)
+        print('attibutes', attibutes)
+        x = torch.cat([diffused, attibutes], dim=1)
         #print(diffused, target )
         #print('noisage', (target == torch.squeeze(diffused)).sum().item() / len(target))
 

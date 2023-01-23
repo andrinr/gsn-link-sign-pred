@@ -9,6 +9,7 @@ from data import SignedDataset, BSCLGraph, even_exponential
 from model import SignDenoising, SignDenoising2, Training
 from visualize import visualize
 from data import WikiSigned
+#from pyg_nn.models import DGCNN
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
@@ -25,6 +26,7 @@ def main(cfg : DictConfig) -> None:
         transform.append(T.AddLaplacianEigenvectorPE(k=cfg.dataset.transform.pe_size, attr_name='pe'))
     elif cfg.dataset.transform.pe_type == "random_walk":
         transform.append(T.AddRandomWalkPE(cfg.dataset.transform.pe_size, attr_name='pe'))
+    transform.append(T.LocalDegreeProfile())
     transform.append(T.ToSparseTensor())
     transform = T.Compose(transform)
 
@@ -58,20 +60,27 @@ def main(cfg : DictConfig) -> None:
         train_dataset = WikiSigned(
             root=cfg.dataset.root,
             pre_transform=transform,
-            map_to_zero_one=True)
+            one_hot=True)
         # in this case node masks are used to split the dataset
         test_dataset = train_dataset
 
-
-    input_channels = 3
+    input_channels = train_dataset[0].x.shape[1]
     hidden_channels = cfg.model.hidden_channels
     output_channels = 2
+
+    """peModel = DGCNN(emb_size=64)
+
+    training_pe = Training(
+        cfg=cfg,
+        model=peModel,
+        offset_unbalanced=False
+    )"""
 
     # Define the model 
     #model = SignDenoising(16, node_attr_size)
     model2 = SignDenoising2(input_channels, hidden_channels, output_channels)
     training = Training(
-        cfg=cfg,
+        cfg=cfg.model,
         model=model2,
         offset_unbalanced=True)
 

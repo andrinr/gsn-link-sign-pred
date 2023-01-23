@@ -1,5 +1,6 @@
 model:
   hidden_channels : 24
+  balance_loss : False
 
 dataset:
   id : 'wiki'
@@ -10,7 +11,7 @@ dataset:
     largest_cc : False
     line_graph : True
     pe_type : 'none'
-    pe_size : 10
+    pe_size : 4
 
   simulation:
     n_simulations : 20

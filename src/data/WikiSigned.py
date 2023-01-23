@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import torch.nn.functional as F
 from typing import Callable, Optional
 
 import numpy as np
@@ -44,10 +45,10 @@ class WikiSigned(InMemoryDataset):
     def __init__(self, root: str,
                  transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None,
-                 map_to_zero_one: Optional[bool] = False):
+                 one_hot: Optional[bool] = False):
         self.raw_name = 'download.tsv.wikisigned-k2'
         self.names = ['meta.wikisigned-k2', 'out.wikisigned-k2', 'README.wikisigned-k2']
-        self.map_to_zero_one = map_to_zero_one
+        self.one_hot = one_hot
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -73,10 +74,13 @@ class WikiSigned(InMemoryDataset):
         signs = raw[:, 2]
 
         data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
-        if self.map_to_zero_one:
-            signs = (signs + 1) / 2
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
-
+        # convert to 0 and 1
+        data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
+        # convert to one-hot
+        if self.one_hot:
+            data.edge_attr = F.one_hot(data.edge_attr, num_classes=2).float()
+            
         if self.pre_transform is not None:
             data = self.pre_transform(data)
 

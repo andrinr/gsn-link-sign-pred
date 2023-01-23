@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch_geometric.data import Data
+import torch.nn.functional as F
 
 def node_sign_diffusion(node_features, fraction : float):
 
@@ -8,22 +9,23 @@ def node_sign_diffusion(node_features, fraction : float):
         raise ValueError("fraction should be between 0 and 1")
     n = node_features.shape[0]
 
-    negative_fraction = (torch.count_nonzero(node_features == 0) / n).item()
+    negative_fraction = (torch.count_nonzero(node_features[:,0] == 0) / n).item()
     positive_fraction = 1.0 - negative_fraction
 
+    print(negative_fraction, positive_fraction)
     random_signs = np.random.choice(
-        np.array([0, 1], dtype=np.int32),
+        np.array([0, 1], dtype=np.int64),
         size=n,
         p=[negative_fraction, positive_fraction]
     )
-    random_signs = torch.tensor(random_signs, dtype=torch.long)
+    random_signs = F.one_hot(torch.tensor(random_signs), num_classes=2).float()
 
     mutation_time = np.random.random(n)
     mutation_time = torch.tensor(mutation_time, dtype=torch.float32)
 
     diffused_node_features = torch.clone(node_features)
     diffused_node_features[mutation_time < fraction] = random_signs[mutation_time < fraction]
-
+    
     return diffused_node_features
 
 def sign_diffusion(graph, fraction : float):
