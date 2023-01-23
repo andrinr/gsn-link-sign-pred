@@ -11,17 +11,14 @@ class Training:
     def train(self, dataset, epochs=20):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model.to(self.device)
+        self.model.to(self.device )
 
         if self.cfg.balance_loss:
-            negative_fraction = (torch.count_nonzero(dataset[0].x == 0) / dataset[0].num_nodes).item()
+            negative_fraction = (torch.count_nonzero(dataset[0].x[:,0] == 1) / dataset[0].num_nodes).item()
             positive_fraction = 1.0 - negative_fraction
             weights = torch.Tensor(np.array([
-                positive_fraction, 
-                negative_fraction]))
-
-            print(negative_fraction, positive_fraction)
-
+                positive_fraction / negative_fraction, 
+                1]))
             d_weights = weights.to(self.device)
 
             criterion = torch.nn.CrossEntropyLoss(weight=d_weights)
@@ -38,8 +35,6 @@ class Training:
                 optimizer.zero_grad()
                 time = np.random.random() * np.random.random()
                 predictions, target = self.step(data, time)
-                print('target', target)
-                print('predictions', predictions)
                 target_class = torch.argmax(target, 1)
                 loss = criterion(predictions, target_class)
                 #print(sign_predictions, d_true_signs)
@@ -66,7 +61,6 @@ class Training:
         attibutes = data.x[:, 2:]
 
         diffused = node_sign_diffusion(target, diffusion_time)
-        print('attibutes', attibutes)
         x = torch.cat([diffused, attibutes], dim=1)
         #print(diffused, target )
         #print('noisage', (target == torch.squeeze(diffused)).sum().item() / len(target))
