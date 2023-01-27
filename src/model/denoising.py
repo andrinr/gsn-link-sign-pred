@@ -26,6 +26,7 @@ class SignDenoising2(torch.nn.Module):
         x = self.gin1(x, edge_index)
         x = self.gin2(x, edge_index)
         #x = self.gin2(x, edge_index)
+        #x = self.gin2(x, edge_index)
         return x
 
 class SignDenoising(torch.nn.Module):

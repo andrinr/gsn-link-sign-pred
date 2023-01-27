@@ -17,7 +17,11 @@ except ImportError:
 
 EPS = 1e-15
 
+<<<<<<< HEAD
 class Embedding(torch.nn.Module):
+=======
+class Node2Vec(torch.nn.Module):
+>>>>>>> 575938ec92c353b1620effe935986de8c2808464
     r"""The Node2Vec model from the
     `"node2vec: Scalable Feature Learning for Networks"
     <https://arxiv.org/abs/1607.00653>`_ paper where random walks of

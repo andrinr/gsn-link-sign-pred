@@ -9,7 +9,11 @@ def node_sign_diffusion(node_features, fraction : float):
         raise ValueError("fraction should be between 0 and 1")
     n = node_features.shape[0]
 
+<<<<<<< HEAD
     negative_fraction = (torch.count_nonzero(node_features[:,0] == 1) / n).item()
+=======
+    negative_fraction = (torch.count_nonzero(node_features[:,0] == 0) / n).item()
+>>>>>>> 575938ec92c353b1620effe935986de8c2808464
     positive_fraction = 1.0 - negative_fraction
 
     print(negative_fraction, positive_fraction)
