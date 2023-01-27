@@ -34,9 +34,9 @@ class OpinionEmbedding(BaseTransform):
         self.noise = noise
         self.iterations = iterations
         if self.device is None:
-            self.compute_force = MassSpring(self.stiffness, self.damping).to(self.device)
+            self.compute_force = MassSpring(self.stiffness).to(self.device)
         else:
-            self.compute_force = MassSpring(self.stiffness, self.damping)
+            self.compute_force = MassSpring(self.stiffness)
 
     def __call__(self, data: Data) -> Data:
         

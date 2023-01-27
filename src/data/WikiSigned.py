@@ -44,17 +44,10 @@ class WikiSigned(InMemoryDataset):
     def __init__(self, root: str,
                  transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None,
-<<<<<<< HEAD
                  one_hot_signs: Optional[bool] = False):
         self.raw_name = 'download.tsv.wikisigned-k2'
         self.names = ['meta.wikisigned-k2', 'out.wikisigned-k2', 'README.wikisigned-k2']
         self.one_hot_signs = one_hot_signs
-=======
-                 one_hot: Optional[bool] = False):
-        self.raw_name = 'download.tsv.wikisigned-k2'
-        self.names = ['meta.wikisigned-k2', 'out.wikisigned-k2', 'README.wikisigned-k2']
-        self.one_hot = one_hot
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -79,17 +72,10 @@ class WikiSigned(InMemoryDataset):
 
         data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
-<<<<<<< HEAD
         # convert to one-hot
         if self.one_hot_signs:
             # convert to 0 and 1
             data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
-=======
-        # convert to 0 and 1
-        data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
-        # convert to one-hot
-        if self.one_hot:
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
             data.edge_attr = F.one_hot(data.edge_attr, num_classes=2).float()
             
         if self.pre_transform is not None:

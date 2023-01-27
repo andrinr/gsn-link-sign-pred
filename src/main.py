@@ -10,23 +10,14 @@ import torch_geometric.transforms as T
 from torch_geometric.utils import to_networkx
 # Local dependencies
 from data import SignedDataset, BSCLGraph, even_exponential
-<<<<<<< HEAD
 from model import OpinionEmbedding, SignDenoising2, Training
 from data import WikiSigned, Tribes
-=======
-from model import SignDenoising, SignDenoising2, Training
-from visualize import visualize
-from data import WikiSigned
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
 #from pyg_nn.models import DGCNN
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
 
-<<<<<<< HEAD
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-=======
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
     # Define the transforms
     transform = []
     if cfg.dataset.transform.largest_cc:
@@ -37,25 +28,17 @@ def main(cfg : DictConfig) -> None:
   
     transform.append(OpinionEmbedding(
         device=device,
-        embedding_dim=cfg.model.embedding.embedding_dim,
-        time_step=cfg.model.embedding.step_size,
-        stiffness=cfg.model.embedding.stiffness,
-        iterations=cfg.model.embedding.iterations,
-        damping=cfg.model.embedding.damping,
-        friend_distance=cfg.model.embedding.friend_distance,
-        enemy_distance=cfg.model.embedding.enemy_distance,
+        embedding_dim=cfg.model.spring_pe.embedding_dim,
+        time_step=cfg.model.spring_pe.step_size,
+        stiffness=cfg.model.spring_pe.stiffness,
+        iterations=cfg.model.spring_pe.iterations,
+        damping=cfg.model.spring_pe.damping,
+        noise=cfg.model.spring_pe.noise,
+        friend_distance=cfg.model.spring_pe.friend_distance,
+        enemy_distance=cfg.model.spring_pe.enemy_distance,
     ))
 
-<<<<<<< HEAD
     #transform.append(T.ToSparseTensor())
-=======
-    if cfg.dataset.transform.pe_type == "laplacian":
-        transform.append(T.AddLaplacianEigenvectorPE(k=cfg.dataset.transform.pe_size, attr_name='pe'))
-    elif cfg.dataset.transform.pe_type == "random_walk":
-        transform.append(T.AddRandomWalkPE(cfg.dataset.transform.pe_size, attr_name='pe'))
-    transform.append(T.LocalDegreeProfile())
-    transform.append(T.ToSparseTensor())
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
     transform = T.Compose(transform)
 
     # Define the dataset
@@ -88,7 +71,6 @@ def main(cfg : DictConfig) -> None:
         train_dataset = WikiSigned(
             root=cfg.dataset.root,
             pre_transform=transform,
-<<<<<<< HEAD
             one_hot_signs=False)
         # in this case node masks are used to split the dataset
         test_dataset = train_dataset
@@ -102,12 +84,6 @@ def main(cfg : DictConfig) -> None:
         test_dataset = train_dataset
 
     print(train_dataset[0])
-=======
-            one_hot=True)
-        # in this case node masks are used to split the dataset
-        test_dataset = train_dataset
-
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
     input_channels = train_dataset[0].x.shape[1]
     hidden_channels = cfg.model.hidden_channels
     output_channels = 2
@@ -142,17 +118,10 @@ def main(cfg : DictConfig) -> None:
     training = Training(
         cfg=cfg.model,
         model=model2,
-<<<<<<< HEAD
         device=device)
 
     # Train and test
     training.train(dataset=train_dataset, epochs=cfg.model.epochs)
-=======
-        offset_unbalanced=True)
-
-    # Train and test
-    training.train(dataset=train_dataset, epochs=100)
->>>>>>> 575938ec92c353b1620effe935986de8c2808464
     training.test(dataset=test_dataset)
 
 if __name__ == "__main__":
