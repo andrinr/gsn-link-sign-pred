@@ -1,16 +1,27 @@
 model:
-  hidden_channels : 24
+  hidden_channels : 2
+  balance_loss : True
+  epochs : 50
+
+  spring_pe:
+    embedding_dim : 4
+    step_size : 0.02
+    stiffness : 1.0
+    iterations : 1000
+    damping : 0.02
+    friend_distance : 0.1
+    enemy_distance : 10.0
+    noise : 0.003
+    
 
 dataset:
-  id : 'bscl'
+  id : 'tribes'
   train_size : 0.8
   root : 'src/data'
 
   transform: 
-    largest_cc : True
-    line_graph : True
-    pe_type : 'laplacian'
-    pe_size : 10
+    largest_cc : False
+    line_graph : False
 
   simulation:
     n_simulations : 20
@@ -25,6 +36,8 @@ dataset:
       remove_self_loops : True
       node_mask : False
 
-  bitcoin:
-    dataset_id : 'bitcoin'
-    node_mask : True
+  wiki:
+    dataset_id : 'wiki'
+
+  tribes:
+    dataset_id : 'tribes'

@@ -15,7 +15,7 @@ class SignDenoising2(torch.nn.Module):
         torch.manual_seed(1234567)
 
         self.gin1 = GINConv(
-            Sequential(Linear(input_channels, hidden_channels), ReLU(), Linear(hidden_channels, output_channels)),
+            Sequential(Linear(input_channels, hidden_channels), ReLU(), Linear(hidden_channels, hidden_channels)),
             train_eps=True)
 
         self.gin2 = GINConv(
@@ -24,6 +24,7 @@ class SignDenoising2(torch.nn.Module):
 
     def forward(self, x, edge_index):
         x = self.gin1(x, edge_index)
+        x = self.gin2(x, edge_index)
         #x = self.gin2(x, edge_index)
         return x
 

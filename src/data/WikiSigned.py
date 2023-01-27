@@ -1,5 +1,6 @@
 import os
 import os.path as osp
+import torch.nn.functional as F
 from typing import Callable, Optional
 
 import numpy as np
@@ -9,7 +10,6 @@ from torch_geometric.data import (
     Data,
     InMemoryDataset,
     download_url,
-    extract_bz2,
     extract_tar,
 )
 
@@ -44,21 +44,19 @@ class WikiSigned(InMemoryDataset):
     def __init__(self, root: str,
                  transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None,
-                 map_to_zero_one: Optional[bool] = False):
+                 one_hot_signs: Optional[bool] = False):
         self.raw_name = 'download.tsv.wikisigned-k2'
         self.names = ['meta.wikisigned-k2', 'out.wikisigned-k2', 'README.wikisigned-k2']
-        self.map_to_zero_one = map_to_zero_one
+        self.one_hot_signs = one_hot_signs
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self) -> str:
-        # Returns, e.g., ['LINUX/train', 'LINUX/test']
         return [osp.join('wikisigned-k2', s) for s in self.names]
 
     @property
     def processed_file_names(self) -> str:
-        # Returns, e.g., ['LINUX_training.pt', 'LINUX_test.pt']
         return 'wikisigned-k2.pt'
         
     def download(self):
@@ -73,10 +71,13 @@ class WikiSigned(InMemoryDataset):
         signs = raw[:, 2]
 
         data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
-        if self.map_to_zero_one:
-            signs = (signs + 1) / 2
-        data.edge_attr = torch.tensor(signs, dtype=torch.float)
-
+        data.edge_attr = torch.tensor(signs, dtype=torch.long)
+        # convert to one-hot
+        if self.one_hot_signs:
+            # convert to 0 and 1
+            data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
+            data.edge_attr = F.one_hot(data.edge_attr, num_classes=2).float()
+            
         if self.pre_transform is not None:
             data = self.pre_transform(data)
 

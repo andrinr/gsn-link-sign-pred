@@ -4,3 +4,5 @@ from .SignedDataset import SignedDataset
 from .utils.samplers import even_uniform, even_exponential
 from .BitcoinOTC import BitcoinOTC
 from .WikiSigned import WikiSigned
+from .Embedding import Embedding
+from .Tribes import Tribes

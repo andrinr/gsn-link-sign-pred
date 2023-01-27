@@ -1,3 +1,3 @@
-from data import WikiSigned
+from data import Tribes
 
-dataset = WikiSigned('src/data/')
+dataset = Tribes('src/data/')

@@ -1,14 +1,21 @@
-import matplotlib.pyplot as plt
-import networkx as nx
-from torch_geometric.utils import to_networkx
+pos = train_dataset[0].x
+    data = train_dataset[0]
 
-def visualize(data):
-    G = to_networkx(data, to_undirected=True)
+    x = pos[:, 0]
+    y = pos[:, 1]
+    G = to_networkx(data).to_undirected()
 
-    pos = nx.spring_layout(G)
-    nx.draw_networkx_nodes(G, pos, node_size=100)
-    nx.draw_networkx_edges(G, pos, width=1.0, alpha=0.5)
-    nx.draw_networkx_labels(G, pos, font_size=10, font_family='sans-serif')
+    
+    nx_pos = {i:(x[i-1], y[i-1]) for i in G.nodes()}
+    
+    edge_weights = (data.edge_attr + 1).tolist()
 
-    plt.axis('off')
+    # Map edge weights to different colors
+    edge_colors = [plt.cm.jet(w) for w in edge_weights]
+
+    # draw with networkx
+    nx.draw_networkx_nodes(G, nx_pos)
+    nx.draw_networkx_edges(G, nx_pos, edge_color=edge_colors)
     plt.show()
+
+    plt.close('all')
