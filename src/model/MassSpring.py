@@ -10,13 +10,13 @@ class MassSpring(MessagePassing):
         super().__init__(aggr='add') 
         self.stiffness = stiffness
         
-    def forward(self, position, edge_index, relaxed_lengths):
-        return self.propagate(edge_index, position=position, undeformed=relaxed_lengths)
+    def forward(self, position, edge_index, relaxed_lengths, stiffness):
+        return self.propagate(edge_index, position=position, undeformed=relaxed_lengths, stiffness=stiffness)
 
-    def message(self, position_i, position_j, undeformed):
+    def message(self, position_i, position_j, undeformed, stiffness):
         spring = position_j - position_i
         deformed = torch.norm(spring, dim=1, keepdim=False)
-        force = (deformed - undeformed) * self.stiffness *  torch.div(spring.T, deformed + 0.001)
+        force = (deformed - undeformed) * stiffness *  torch.div(spring.T, deformed + 0.001)
         return force.T
 
     def __repr__(self) -> str:

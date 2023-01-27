@@ -6,3 +6,5 @@ from .BitcoinOTC import BitcoinOTC
 from .WikiSigned import WikiSigned
 from .Embedding import Embedding
 from .Tribes import Tribes
+from .Chess import Chess
+from .BitcoinA import BitcoinA

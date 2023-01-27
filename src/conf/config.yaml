@@ -4,18 +4,17 @@ model:
   epochs : 50
 
   spring_pe:
-    embedding_dim : 4
-    step_size : 0.02
+    embedding_dim : 64
+    step_size : 0.01
     stiffness : 1.0
-    iterations : 1000
-    damping : 0.02
-    friend_distance : 0.1
+    iterations : 6000
+    damping : 0.04
+    friend_distance : 1.0
     enemy_distance : 10.0
-    noise : 0.003
+    noise : 0.01
     
-
 dataset:
-  id : 'tribes'
+  id : 'bitcoin'
   train_size : 0.8
   root : 'src/data'
 
@@ -36,8 +35,14 @@ dataset:
       remove_self_loops : True
       node_mask : False
 
+  bitcoin:
+    dataset_id : 'bitcoin'
+
   wiki:
     dataset_id : 'wiki'
 
   tribes:
     dataset_id : 'tribes'
+
+  chess:
+    dataset_id : 'chess'

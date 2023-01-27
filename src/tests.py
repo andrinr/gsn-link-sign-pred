@@ -1,3 +1,3 @@
-from data import Tribes
+from data import Chess
 
-dataset = Tribes('src/data/')
+dataset = Chess('src/data/')
