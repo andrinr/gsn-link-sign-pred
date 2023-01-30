@@ -7,10 +7,10 @@ model:
     embedding_dim : 64
     step_size : 0.01
     stiffness : 1.0
-    iterations : 6000
+    iterations : 2000
     damping : 0.04
     friend_distance : 1.0
-    enemy_distance : 10.0
+    enemy_distance : 15.0
     noise : 0.01
     
 dataset:

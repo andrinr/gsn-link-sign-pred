@@ -49,10 +49,7 @@ class SpringTransform(BaseTransform):
             vel = torch.rand((data.num_nodes, self.embedding_dim))
             
         signs = data.edge_attr
-        stiffness = torch.ones((data.num_edges), device=self.device)
-        stiffness[signs == 1] = 1
-        stiffness[signs == -1] = torch.count_nonzero(signs == 1) / torch.count_nonzero(signs == -1)
-        print(stiffness)
+
         relaxed_lengths = torch.clone(signs).float()
         relaxed_lengths[signs == 1] = self.friend_distance
         relaxed_lengths[signs == -1] = self.enemy_distance
@@ -60,15 +57,15 @@ class SpringTransform(BaseTransform):
 
         for i in tqdm(range(self.iterations)):
             noise = torch.rand((data.num_nodes, self.embedding_dim), device=self.device) * self.noise
-            force = self.compute_force(pos, data.edge_index, relaxed_lengths, stiffness) + noise
+            force = self.compute_force(pos, data.edge_index, relaxed_lengths, signs) + noise
      
             # Symplectic Euler integration
             vel = vel * (1. - self.damping) + self.time_step * force
             pos = pos + self.time_step * vel
             # total force
-            print(torch.norm(force, dim=1).mean())
+            if i % 100 == 0:
+                print(torch.norm(force, dim=1).mean().item())
                 
-
         data.x = pos
         if self.device is None:
             return data
