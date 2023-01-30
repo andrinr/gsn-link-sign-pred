@@ -3,6 +3,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 def log_regression(train_data, test_data):
+
     X_train = torch.ones((len(train_data.edge_index[0]), 2 * train_data.x.shape[1]))
     y_train = torch.ones((len(train_data.edge_index[0]), 1))
     edge_list = train_data.edge_index.t().tolist()

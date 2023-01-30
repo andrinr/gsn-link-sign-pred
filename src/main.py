@@ -14,14 +14,13 @@ from model import SpringTransform, log_regression
 from data import WikiSigned, Tribes, Chess, BitcoinA
 from torch_geometric.transforms import RandomLinkSplit
 
-#from pyg_nn.models import DGCNN
-
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg : DictConfig) -> None:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Define the transforms
     pre_transforms = []
+    pre_transforms.append(T.ToUndirected())
     if cfg.dataset.transform.largest_cc:
         pre_transforms.append(T.LargestConnectedComponents())
 
@@ -71,9 +70,23 @@ def main(cfg : DictConfig) -> None:
         dataset = BitcoinA(
             root=cfg.dataset.root,
             pre_transform=pre_transforms)
-        
-    pre_transforms = RandomLinkSplit(is_undirected=True, num_val=0)
+    
+    pre_transforms = RandomLinkSplit(is_undirected=True, num_val=0.05, num_test=0.2, split_labels=False)
     train_data, val_data, test_data = pre_transforms(dataset[0])
+
+    print(dataset[0])
+    print(train_data.edge_label)
+    print(train_data.edge_label_index)
+    print(train_data)
+    print(test_data)
+    print(val_data)
+
+    print(train_data.edge_attr)
+    print(test_data.edge_attr)
+    print((train_data.edge_index == val_data.edge_index).sum().item())
+    print(dataset[0].edge_index.shape)
+    print(train_data.edge_index.shape)
+    print(test_data.edge_index.shape)
 
     springTransform = SpringTransform(
         device=device,
