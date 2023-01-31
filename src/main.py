@@ -71,22 +71,18 @@ def main(cfg : DictConfig) -> None:
             root=cfg.dataset.root,
             pre_transform=pre_transforms)
     
-    pre_transforms = RandomLinkSplit(is_undirected=True, num_val=0.05, num_test=0.2, split_labels=False)
+    
+    pre_transforms = RandomLinkSplit(is_undirected=True, num_val=0.0, num_test=0.2, split_labels=False)
+    # Here, *_data.edge_index denotes the graph structure used for message passing,
+    # *_data.edge_label_index and *_data.edge_label denote the training/evaluation edges and their corresponding labels. 
     train_data, val_data, test_data = pre_transforms(dataset[0])
+    train_data.edge_index = train_data.edge_label_index
+    train_data.edge_attr = train_data.edge_label
+    test_data.edge_index = test_data.edge_label_index
+    test_data.edge_attr = test_data.edge_label
 
-    print(dataset[0])
-    print(train_data.edge_label)
-    print(train_data.edge_label_index)
     print(train_data)
     print(test_data)
-    print(val_data)
-
-    print(train_data.edge_attr)
-    print(test_data.edge_attr)
-    print((train_data.edge_index == val_data.edge_index).sum().item())
-    print(dataset[0].edge_index.shape)
-    print(train_data.edge_index.shape)
-    print(test_data.edge_index.shape)
 
     springTransform = SpringTransform(
         device=device,
@@ -102,8 +98,9 @@ def main(cfg : DictConfig) -> None:
 
     train_data = springTransform(train_data)
 
-    acc, prec, rec, f1 = log_regression(train_data, test_data)
+    auc, acc, prec, rec, f1 = log_regression(train_data, test_data)
 
+    print(f"AUC: {auc}")
     print(f"Accuracy: {acc}")
     print(f"Precision: {prec}")
     print(f"Recall: {rec}")

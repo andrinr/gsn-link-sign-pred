@@ -56,8 +56,8 @@ class SpringTransform(BaseTransform):
         print(relaxed_lengths)
 
         for i in tqdm(range(self.iterations)):
-            noise = torch.rand((data.num_nodes, self.embedding_dim), device=self.device) * self.noise
-            force = self.compute_force(pos, data.edge_index, relaxed_lengths, signs) + noise
+            #noise = torch.rand((data.num_nodes, self.embedding_dim), device=self.device) * self.noise
+            force = self.compute_force(pos, data.edge_index, relaxed_lengths, signs) #+ noise
      
             # Symplectic Euler integration
             vel = vel * (1. - self.damping) + self.time_step * force

@@ -1,6 +1,7 @@
 import torch
 from torch.nn import Linear, Parameter
 from torch_geometric.nn import MessagePassing
+from torch.nn.functional import relu
 from torch_geometric.utils import add_self_loops, degree
 from torch.nn import Sequential, Linear, ReLU
 
@@ -17,8 +18,8 @@ class MassSpring(MessagePassing):
         spring = position_j - position_i
         length = torch.norm(spring, dim=1, keepdim=False)
         normalized = torch.div(spring.T, length + 0.001)
-        attraction = (length - relaxed_lengths) * self.stiffness * normalized
-        retraction = -torch.nn.functional.relu(relaxed_lengths - length, inplace=True) * self.stiffness * normalized
+        attraction = relu(length - relaxed_lengths) * self.stiffness * normalized
+        retraction = -relu(relaxed_lengths - length, inplace=True) * self.stiffness * normalized
         force = torch.where(sign == 1, attraction, retraction)
         return force.T
 
