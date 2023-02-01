@@ -34,9 +34,17 @@ class SpringTransform(BaseTransform):
         self.noise = noise
         self.iterations = iterations
         if self.device is None:
-            self.compute_force = MassSpring(self.stiffness).to(self.device)
+            self.compute_force = MassSpring(
+                self.stiffness,
+                self.enemy_distance,
+                (self.enemy_distance - self.friend_distance) / 2,
+                self.friend_distance).to(self.device)
         else:
-            self.compute_force = MassSpring(self.stiffness)
+            self.compute_force = MassSpring(
+                self.stiffness,
+                self.enemy_distance,
+                (self.enemy_distance - self.friend_distance) / 2,
+                self.friend_distance)
 
     def __call__(self, data: Data) -> Data:
         
@@ -50,14 +58,8 @@ class SpringTransform(BaseTransform):
             
         signs = data.edge_attr
 
-        relaxed_lengths = torch.clone(signs).float()
-        relaxed_lengths[signs == 1] = self.friend_distance
-        relaxed_lengths[signs == -1] = self.enemy_distance
-        print(relaxed_lengths)
-
         for i in tqdm(range(self.iterations)):
-            #noise = torch.rand((data.num_nodes, self.embedding_dim), device=self.device) * self.noise
-            force = self.compute_force(pos, data.edge_index, relaxed_lengths, signs) #+ noise
+            force = self.compute_force(pos, data.edge_index, signs)
      
             # Symplectic Euler integration
             vel = vel * (1. - self.damping) + self.time_step * force

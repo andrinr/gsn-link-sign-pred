@@ -4,7 +4,7 @@ model:
   epochs : 50
 
   spring_pe:
-    embedding_dim : 32
+    embedding_dim : 64
     step_size : 0.002
     stiffness : 1.0
     iterations : 2000
@@ -15,7 +15,7 @@ model:
     
 dataset:
   id : 'bitcoin'
-  test_size : 0.8
+  test_size : 0.2
   val_size : 0.1
   root : 'src/data'
 

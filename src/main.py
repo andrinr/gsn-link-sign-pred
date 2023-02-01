@@ -6,6 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 # torch imports
 import torch
+import numpy as np
 import torch_geometric.transforms as T
 from torch_geometric.utils import to_networkx
 # Local dependencies
@@ -71,18 +72,23 @@ def main(cfg : DictConfig) -> None:
             root=cfg.dataset.root,
             pre_transform=pre_transforms)
     
-    
-    pre_transforms = RandomLinkSplit(is_undirected=True, num_val=0.0, num_test=0.2, split_labels=False)
-    # Here, *_data.edge_index denotes the graph structure used for message passing,
-    # *_data.edge_label_index and *_data.edge_label denote the training/evaluation edges and their corresponding labels. 
-    train_data, val_data, test_data = pre_transforms(dataset[0])
-    train_data.edge_index = train_data.edge_label_index
-    train_data.edge_attr = train_data.edge_label
-    test_data.edge_index = test_data.edge_label_index
-    test_data.edge_attr = test_data.edge_label
+    n_edges = dataset[0].edge_index.shape[1]
 
-    print(train_data)
-    print(test_data)
+    print(f"Number of edges: {n_edges}")
+    print(f"Number of nodes: {dataset[0].num_nodes}")
+    print(f"Number of positive edges: {dataset[0].edge_attr.sum()}")
+    print(f"Number of negative edges: {n_edges - dataset[0].edge_attr.sum()}")
+    print(f"Ratio of positive edges: {dataset[0].edge_attr.sum() / n_edges}")
+
+    test_mask =\
+        np.random.choice([1, 0], size=n_edges, p=[cfg.dataset.test_size, 1-cfg.dataset.test_size])
+    test_mask = torch.tensor(test_mask)
+
+    train_data = dataset[0].clone()
+    train_data.edge_attr = torch.where(test_mask == 1, 0, train_data.edge_attr)
+    print(f"Ratio of positive edges: {train_data.edge_attr.sum() / n_edges}")
+    print(train_data.edge_attr)
+    test_data = dataset[0].clone()
 
     springTransform = SpringTransform(
         device=device,
@@ -98,7 +104,7 @@ def main(cfg : DictConfig) -> None:
 
     train_data = springTransform(train_data)
 
-    auc, acc, prec, rec, f1 = log_regression(train_data, test_data)
+    auc, acc, prec, rec, f1 = log_regression(train_data, test_data, test_mask )
 
     print(f"AUC: {auc}")
     print(f"Accuracy: {acc}")
