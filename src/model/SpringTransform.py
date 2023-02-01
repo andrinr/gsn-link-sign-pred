@@ -10,6 +10,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm
+from torch_geometric.utils import degree
 
 class SpringTransform(BaseTransform):
     def __init__(
@@ -17,58 +18,64 @@ class SpringTransform(BaseTransform):
         device,
         embedding_dim: int,
         time_step : float,
-        stiffness : float,
         damping : float,
         friend_distance : float,
+        friend_stiffness : float,
+        neutral_distance : float,
+        neutral_stiffness : float,
         enemy_distance : float,
-        noise : float,
+        enemy_stiffness : float,
         iterations : int,
     ):
         self.device = device
         self.embedding_dim = embedding_dim
         self.time_step = time_step
-        self.stiffness = stiffness
         self.damping = damping
         self.friend_distance = friend_distance
+        self.friend_stiffness = friend_stiffness
+        self.neutral_distance = neutral_distance
+        self.neutral_stiffness = neutral_stiffness
         self.enemy_distance = enemy_distance
-        self.noise = noise
+        self.enemy_stiffness = enemy_stiffness
         self.iterations = iterations
         if self.device is None:
             self.compute_force = MassSpring(
-                self.stiffness,
                 self.enemy_distance,
-                (self.enemy_distance - self.friend_distance) / 2,
-                self.friend_distance).to(self.device)
+                self.enemy_stiffness,
+                self.neutral_distance,
+                self.neutral_stiffness,
+                self.friend_distance,
+                self.friend_stiffness).to(self.device)
         else:
             self.compute_force = MassSpring(
-                self.stiffness,
                 self.enemy_distance,
-                (self.enemy_distance - self.friend_distance) / 2,
-                self.friend_distance)
+                self.enemy_stiffness,
+                self.neutral_distance,
+                self.neutral_stiffness,
+                self.friend_distance,
+                self.friend_stiffness)
 
     def __call__(self, data: Data) -> Data:
         
         if self.device is not None:
             data = data.to(self.device)
-            pos = torch.rand((data.num_nodes, self.embedding_dim), device=self.device)
-            vel = torch.rand((data.num_nodes, self.embedding_dim), device=self.device)
+            pos = torch.rand((data.num_nodes, self.embedding_dim), device=self.device) * 2.0 - 1.0
+            vel = torch.zeros((data.num_nodes, self.embedding_dim), device=self.device)
         else:
-            pos = torch.rand((data.num_nodes, self.embedding_dim))
-            vel = torch.rand((data.num_nodes, self.embedding_dim))
-            
+            pos = torch.rand((data.num_nodes, self.embedding_dim)) * 2.0 - 1.0
+            vel = torch.zeros((data.num_nodes, self.embedding_dim))
+        
+        pos *= 2.0
         signs = data.edge_attr
-
+        
         for i in tqdm(range(self.iterations)):
             force = self.compute_force(pos, data.edge_index, signs)
-     
             # Symplectic Euler integration
             vel = vel * (1. - self.damping) + self.time_step * force
             pos = pos + self.time_step * vel
-            # total force
-            if i % 100 == 0:
-                print(torch.norm(force, dim=1).mean().item())
                 
         data.x = pos
+
         if self.device is None:
             return data
         else:

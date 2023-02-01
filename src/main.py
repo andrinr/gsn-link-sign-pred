@@ -72,34 +72,37 @@ def main(cfg : DictConfig) -> None:
             root=cfg.dataset.root,
             pre_transform=pre_transforms)
     
-    n_edges = dataset[0].edge_index.shape[1]
+    data = dataset[0]
+    n_edges = data.edge_index.shape[1]
 
     print(f"Number of edges: {n_edges}")
-    print(f"Number of nodes: {dataset[0].num_nodes}")
-    print(f"Number of positive edges: {dataset[0].edge_attr.sum()}")
-    print(f"Number of negative edges: {n_edges - dataset[0].edge_attr.sum()}")
-    print(f"Ratio of positive edges: {dataset[0].edge_attr.sum() / n_edges}")
+    print(f"Number of nodes: {data.num_nodes}")
+    print(f"Number of positive edges: {data.edge_attr.sum()}")
+    print(f"Number of negative edges: {n_edges - data.edge_attr.sum()}")
+    print(f"Ratio of positive edges: {data.edge_attr.sum() / n_edges}")
 
+    # Create train and test datasets
+    train_data = dataset[0].clone()
+    test_data = dataset[0].clone()
     test_mask =\
         np.random.choice([1, 0], size=n_edges, p=[cfg.dataset.test_size, 1-cfg.dataset.test_size])
     test_mask = torch.tensor(test_mask)
 
-    train_data = dataset[0].clone()
-    train_data.edge_attr = torch.where(test_mask == 1, 0, train_data.edge_attr)
-    print(f"Ratio of positive edges: {train_data.edge_attr.sum() / n_edges}")
-    print(train_data.edge_attr)
-    test_data = dataset[0].clone()
+    train_data.edge_attr = torch.where(test_mask == 1, 0, dataset[0].edge_attr)
+    test_data.edge_attr = torch.where(test_mask == 0, 0, dataset[0].edge_attr)
 
     springTransform = SpringTransform(
         device=device,
         embedding_dim=cfg.model.spring_pe.embedding_dim,
         time_step=cfg.model.spring_pe.step_size,
-        stiffness=cfg.model.spring_pe.stiffness,
         iterations=cfg.model.spring_pe.iterations,
         damping=cfg.model.spring_pe.damping,
-        noise=cfg.model.spring_pe.noise,
         friend_distance=cfg.model.spring_pe.friend_distance,
+        friend_stiffness=cfg.model.spring_pe.friend_stiffness,
+        neutral_distance=cfg.model.spring_pe.neutral_distance,
+        neutral_stiffness=cfg.model.spring_pe.neutral_stiffness,
         enemy_distance=cfg.model.spring_pe.enemy_distance,
+        enemy_stiffness=cfg.model.spring_pe.enemy_stiffness,
     )
 
     train_data = springTransform(train_data)

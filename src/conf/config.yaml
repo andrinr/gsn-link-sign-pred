@@ -5,14 +5,17 @@ model:
 
   spring_pe:
     embedding_dim : 64
-    step_size : 0.002
+    step_size : 0.003
     stiffness : 1.0
-    iterations : 2000
+    iterations : 1000
     damping : 0.02
     friend_distance : 0.1
-    enemy_distance : 10.0
-    noise : 0.0
-    
+    friend_stiffness : 1.0
+    neutral_distance : 12.0
+    neutral_stiffness : 0.5
+    enemy_distance : 20.0
+    enemy_stiffness : 6.0
+
 dataset:
   id : 'bitcoin'
   test_size : 0.2

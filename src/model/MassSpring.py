@@ -1,22 +1,23 @@
 import torch
-from torch.nn import Linear, Parameter
 from torch_geometric.nn import MessagePassing
 from torch.nn.functional import relu
-from torch_geometric.utils import add_self_loops, degree
-from torch.nn import Sequential, Linear, ReLU
 
 class MassSpring(MessagePassing):
     def __init__(self, 
-        stiffness : float,
-        far : float,
-        medium : float,
-        close : float):
+        enemy_distance : float,
+        enemy_stiffness : float,
+        neutral_distance : float,
+        neutral_stiffness : float,
+        friend_distance : float,
+        friend_stiffness : float):
         super().__init__(aggr='add') 
-        self.stiffness = stiffness
-        self.far = far
-        self.medium = 6.0
-        self.close = close
-        print(f"MassSpring: stiffness={stiffness}, far={far}, medium={medium}, close={close}")
+        self.enemy_distance = enemy_distance
+        self.enemy_stiffness = enemy_stiffness
+        self.neutral_distance = neutral_distance
+        self.neutral_stiffness = neutral_stiffness
+        self.friend_distance = friend_distance
+        self.friend_stiffness = friend_stiffness
+        print(f"MassSpring: far={enemy_distance}, medium={neutral_distance}, close={friend_distance}")
         
     def forward(self, position, edge_index, sign):
         return self.propagate(edge_index, position=position, sign=sign)
@@ -25,12 +26,12 @@ class MassSpring(MessagePassing):
         spring = position_j - position_i
         length = torch.norm(spring, dim=1, keepdim=False)
         normalized = torch.div(spring.T, length + 0.001)
-        attraction = relu(length - self.close) * self.stiffness * normalized
-        regular = (length - self.medium) * self.stiffness * normalized * 0.1
-        retraction = -relu(self.far - length, inplace=True) * self.stiffness * normalized
+        attraction = relu(length - self.friend_distance) * self.friend_stiffness * normalized
+        regular = (length - self.neutral_distance) * self.neutral_stiffness * normalized
+        retraction = -relu(self.enemy_distance - length, inplace=True) * self.enemy_stiffness * normalized
         
         force = torch.where(sign == 1, attraction, retraction)
-        force = torch.where(sign == 0, 0, force)
+        force = torch.where(sign == 0, regular, force)
         return force.T
 
     def __repr__(self) -> str:
