@@ -1,14 +1,7 @@
 import torch
-import torch.nn.functional as F
 from torch_geometric.data import Data
-from torch_geometric.data.datapipes import functional_transform
 from torch_geometric.transforms import BaseTransform
-from torch_geometric.nn.models import Node2Vec
 from model import MassSpring
-from torch_geometric.utils import to_networkx
-import networkx as nx
-import matplotlib.pyplot as plt
-import time
 from tqdm import tqdm
 from torch_geometric.utils import degree
 
@@ -26,6 +19,7 @@ class SpringTransform(BaseTransform):
         enemy_distance : float,
         enemy_stiffness : float,
         iterations : int,
+        seed : int = 1
     ):
         self.device = device
         self.embedding_dim = embedding_dim
@@ -38,25 +32,22 @@ class SpringTransform(BaseTransform):
         self.enemy_distance = enemy_distance
         self.enemy_stiffness = enemy_stiffness
         self.iterations = iterations
-        if self.device is None:
-            self.compute_force = MassSpring(
-                self.enemy_distance,
-                self.enemy_stiffness,
-                self.neutral_distance,
-                self.neutral_stiffness,
-                self.friend_distance,
-                self.friend_stiffness).to(self.device)
-        else:
-            self.compute_force = MassSpring(
-                self.enemy_distance,
-                self.enemy_stiffness,
-                self.neutral_distance,
-                self.neutral_stiffness,
-                self.friend_distance,
-                self.friend_stiffness)
-
-    def __call__(self, data: Data) -> Data:
+        self.seed = seed
         
+        self.compute_force = MassSpring(
+            self.enemy_distance,
+            self.enemy_stiffness,
+            self.neutral_distance,
+            self.neutral_stiffness,
+            self.friend_distance,
+            self.friend_stiffness)
+
+        if self.device is not None:
+            self.compute_force = self.compute_force.to(device)
+            
+    def __call__(self, data: Data) -> Data:
+
+        torch.manual_seed(self.seed)
         if self.device is not None:
             data = data.to(self.device)
             pos = torch.rand((data.num_nodes, self.embedding_dim), device=self.device) * 2.0 - 1.0
@@ -68,7 +59,8 @@ class SpringTransform(BaseTransform):
         pos *= 2.0
         signs = data.edge_attr
         
-        for i in tqdm(range(self.iterations)):
+        pbar = tqdm(range(self.iterations))
+        for i in pbar:
             force = self.compute_force(pos, data.edge_index, signs)
             # Symplectic Euler integration
             vel = vel * (1. - self.damping) + self.time_step * force

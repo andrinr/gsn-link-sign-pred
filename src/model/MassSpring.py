@@ -17,8 +17,7 @@ class MassSpring(MessagePassing):
         self.neutral_stiffness = neutral_stiffness
         self.friend_distance = friend_distance
         self.friend_stiffness = friend_stiffness
-        print(f"MassSpring: far={enemy_distance}, medium={neutral_distance}, close={friend_distance}")
-        
+
     def forward(self, position, edge_index, sign):
         return self.propagate(edge_index, position=position, sign=sign)
 

@@ -1,52 +1,16 @@
-model:
-  hidden_channels : 2
-  balance_loss : True
-  epochs : 50
+# SpringE
+embedding_dim : 64
+time_step : 0.003
+iterations : 300
+damping : 0.01
+friend_distance : 2.0
+friend_stiffness : 1.0
+neutral_distance : 2.0
+neutral_stiffness : 0.1
+enemy_distance : 10.0
+enemy_stiffness : 6.0
 
-  spring_pe:
-    embedding_dim : 64
-    step_size : 0.003
-    stiffness : 1.0
-    iterations : 1000
-    damping : 0.02
-    friend_distance : 0.1
-    friend_stiffness : 1.0
-    neutral_distance : 12.0
-    neutral_stiffness : 0.5
-    enemy_distance : 20.0
-    enemy_stiffness : 6.0
-
-dataset:
-  id : 'bitcoin'
-  test_size : 0.2
-  val_size : 0.1
-  root : 'src/data'
-
-  transform: 
-    largest_cc : False
-    line_graph : False
-
-  simulation:
-    n_simulations : 20
-    n_nodes : 100
-    p_positive : 0.5
-
-    BSCL:
-      dataset_id : 'bscl'
-      sampling_method : 'exp'
-      p_close_triangle : 0.1
-      p_close_for_balance : 0.8
-      remove_self_loops : True
-      node_mask : False
-
-  bitcoin:
-    dataset_id : 'bitcoin'
-
-  wiki:
-    dataset_id : 'wiki'
-
-  tribes:
-    dataset_id : 'tribes'
-
-  chess:
-    dataset_id : 'chess'
+# dataset
+id : 'bitcoin'
+root : 'src/data'
+test_size : 0.2

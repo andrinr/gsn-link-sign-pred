@@ -1,0 +1,1 @@
+python src/main hydra/sweeper=nevergrad --cfg hydra -p hydra.sweeper
