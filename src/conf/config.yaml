@@ -1,8 +1,8 @@
 # SpringE
 embedding_dim : 64
-time_step : 0.003
-iterations : 300
-damping : 0.01
+time_step : 0.005
+iterations : 500
+damping : 0.02
 friend_distance : 2.0
 friend_stiffness : 1.0
 neutral_distance : 2.0

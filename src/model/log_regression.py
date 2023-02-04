@@ -14,11 +14,9 @@ def log_regression(train_data, test_data, test_mask):
     y_test = torch.zeros(n_test)
 
     l = 0
-    train_indices = set()
     for k in range(n_total):
         if train_data.edge_attr[k] == 0:
             continue
-        train_indices.add(k)
         i = train_data.edge_index[0, k]
         j = train_data.edge_index[1, k]
         pos_i = train_data.x[i]
@@ -35,8 +33,6 @@ def log_regression(train_data, test_data, test_mask):
     for k in range(n_total):
         if test_data.edge_attr[k] == 0:
             continue
-        if k in train_indices:
-            print("This should not happen")
         i = test_data.edge_index[0, k]
         j = test_data.edge_index[1, k]
         # The node features are not available in the test data
@@ -50,16 +46,17 @@ def log_regression(train_data, test_data, test_mask):
     y_pred = clf.predict(X_test)
     y_pred = y_pred / 2 + 0.5
     y_test = y_test / 2 + 0.5
-    #y_pred = np.full(len(y_pred), -1)
-    #print(y_pred)
     y_pred_prob = clf.predict_proba(X_test)
-
+    print(y_train)
+    print(X_test)
+    print(y_test)
+    print(y_pred_prob)
     # evaluate the performance of the classifier
     auc_score = roc_auc_score(y_test, y_pred_prob[:, 1])
     acc = accuracy_score(y_test, y_pred)
     prec = precision_score(y_test, y_pred, average='binary', pos_label=0)
     rec = recall_score(y_test, y_pred, average='binary', pos_label=0)
-    f1 = f1_score(y_test, y_pred, average='binary', pos_label=0)
+    f1 = f1_score(y_test, y_pred, average='weighted', pos_label=0)
 
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
     print('True negatives: ', tn, '\nFalse positives: ', fp, '\nFalse negatives: ', fn, '\nTrue Positives: ', tp)

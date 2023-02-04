@@ -1,0 +1,6 @@
+enemy_distance: 10.05
+enemy_stiffness: 4.05
+friend_distance: 10.05
+friend_stiffness: 4.05
+neutral_distance: 10.05
+neutral_stiffness: 4.05

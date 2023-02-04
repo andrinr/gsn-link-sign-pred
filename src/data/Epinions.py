@@ -16,7 +16,7 @@ from torch_geometric.data import (
 
 from torch_geometric.utils import coalesce
 
-class BitcoinA(InMemoryDataset):
+class Epinions(InMemoryDataset):
     r"""
     This undirected signed network contains interpreted interactions between the users of the English Wikipedia that have edited pages about politics. 
     Each interaction, such as text editing, reverts, restores and votes are given a positive or negative value. 
@@ -46,21 +46,21 @@ class BitcoinA(InMemoryDataset):
                  transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None):
 
-        self.raw_name = 'soc-sign-bitcoinalpha'
-        self.names = ['meta.chess', 'out.chess', 'README.chess']
+        self.raw_name = 'soc-Epinions1'
+        self.names = ['meta.Epinions1', 'out.Epinions1', 'README.Epinions1']
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self) -> str:
-        return 'soc-sign-bitcoinalpha.csv'
+        return 'soc-Epinions1.txt'
 
     @property
     def processed_file_names(self) -> str:
-        return 'soc-sign-bitcoinalpha.pt'
+        return 'soc-Epinions1.pt'
         
     def download(self):
-        path = download_url(self.url.format(self.raw_name + '.csv.gz'), self.raw_dir)
+        path = download_url(self.url.format(self.raw_name + '.txt.gz'), self.raw_dir)
         extract_gz(path, self.raw_dir)
 
     def process(self):

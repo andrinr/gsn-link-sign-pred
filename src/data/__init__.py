@@ -6,3 +6,5 @@ from .WikiSigned import WikiSigned
 from .Tribes import Tribes
 from .Chess import Chess
 from .BitcoinA import BitcoinA
+from .Epinions import Epinions
+from .WikiEdits import WikiEdits

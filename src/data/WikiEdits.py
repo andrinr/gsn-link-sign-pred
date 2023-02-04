@@ -11,12 +11,11 @@ from torch_geometric.data import (
     InMemoryDataset,
     download_url,
     extract_tar,
-    extract_gz
 )
 
 from torch_geometric.utils import coalesce
 
-class BitcoinA(InMemoryDataset):
+class WikiEdits(InMemoryDataset):
     r"""
     This undirected signed network contains interpreted interactions between the users of the English Wikipedia that have edited pages about politics. 
     Each interaction, such as text editing, reverts, restores and votes are given a positive or negative value. 
@@ -40,44 +39,47 @@ class BitcoinA(InMemoryDataset):
 
     """
 
-    url = 'https://snap.stanford.edu/data/{}'
+    url = 'http://konect.cc/files/{}'
 
     def __init__(self, root: str,
                  transform: Optional[Callable] = None,
-                 pre_transform: Optional[Callable] = None):
+                 pre_transform: Optional[Callable] = None,
+                 one_hot_signs: Optional[bool] = False):
 
-        self.raw_name = 'soc-sign-bitcoinalpha'
-        self.names = ['meta.chess', 'out.chess', 'README.chess']
+        self.raw_name = 'download.tsv.wikiconflict'
+        self.names = ['meta.wikiconflict', 'out.wikiconflict', 'README.wikiconflict']
+        self.one_hot_signs = one_hot_signs
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self) -> str:
-        return 'soc-sign-bitcoinalpha.csv'
+        return [osp.join('wikiconflict', s) for s in self.names]
 
     @property
     def processed_file_names(self) -> str:
-        return 'soc-sign-bitcoinalpha.pt'
+        return 'wikiconflict.pt'
         
     def download(self):
-        path = download_url(self.url.format(self.raw_name + '.csv.gz'), self.raw_dir)
-        extract_gz(path, self.raw_dir)
+        path = download_url(self.url.format(self.raw_name + '.tar.bz2'), self.raw_dir)
+        extract_tar(path, self.raw_dir, "r:bz2")
 
     def process(self):
         data = Data()
-        raw = np.genfromtxt(self.raw_paths[0], skip_header=1, dtype=np.int64, delimiter=',')
-        print(raw.shape)
+        raw = np.genfromtxt(self.raw_paths[1], skip_header=1, dtype=np.int64)
+        u = raw[:, 0]
+        v = raw[:, 1]
         signs = raw[:, 2]
-
-        signs[signs > 0] = 1
-        signs[signs < 0] = -1
 
         data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
-        print(data.edge_attr)
-
+        # convert to one-hot
+        if self.one_hot_signs:
+            # convert to 0 and 1
+            data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
+            data.edge_attr = F.one_hot(data.edge_attr, num_classes=2).float()
+            
         if self.pre_transform is not None:
             data = self.pre_transform(data)
 
-        print(data.edge_attr)
         torch.save(self.collate([data]), self.processed_paths[0])
