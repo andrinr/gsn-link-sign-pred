@@ -47,7 +47,7 @@ class BitcoinOTC(InMemoryDataset):
 
     @property
     def processed_file_names(self) -> str:
-        return 'data.pt'
+        return 'bitcoinOTC.pt'
 
     @property
     def num_nodes(self) -> int:
@@ -96,6 +96,9 @@ class BitcoinOTC(InMemoryDataset):
 
         if self.pre_transform is not None:
             data_list = [self.pre_transform(d) for d in data_list]
-
         data, slices = self.collate(data_list)
+
+        data.edge_attr[data.edge_attr > 0] = 1
+        data.edge_attr[data.edge_attr < 0] = -1
+
         torch.save((data, slices), self.processed_paths[0])

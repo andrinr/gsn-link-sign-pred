@@ -6,22 +6,37 @@ import numpy as np
 import torch_geometric.transforms as T
 from torch_geometric.utils import is_undirected
 import yaml
+import inquirer
 # Local dependencies
 from model import Training
-from data import WikiSigned, Tribes, Chess, BitcoinA, Epinions, WikiEdits
+from data import WikiSigned, Slashdot, BitcoinO, BitcoinA, Tribes, WikiRFA
 
 def main(argv) -> None:
     embedding_dim = 64
     iterations = 500
     time_step =  0.005
     damping = 0.02
-    dataset_name = 'bitcoin'
     root = 'src/data/'
     test_size = 0.2
 
+    questions = [
+    inquirer.List('dataset',
+                    message="Choose a dataset",
+                    choices=[
+                        'Bitcoin_Alpha', 
+                        'BitcoinOTC', 
+                        'WikiRFA', 
+                        'Slashdot',
+                        'Tribes'],
+                ),
+    ]
+    answers = inquirer.prompt(questions)
+    dataset_name = answers['dataset']
+
+
     optimizer_iterations = 0
     opts, args = getopt.getopt(argv,"s:h:d:i:o:",
-        ["embedding_size=","time_step=", "damping=", "iterations=", "optimze="])
+        ["embedding_size=","time_step=", "damping=", "iterations=", "optimize="])
     for opt, arg in opts:
         if opt == '-s':
             embedding_dim = int(arg)
@@ -35,7 +50,7 @@ def main(argv) -> None:
             optimizer_iterations = int(arg)
 
     if optimizer_iterations == 0 :
-        stream = open("src/conf/params.yaml", 'r')
+        stream = open("src/params.yaml", 'r')
         params = yaml.load(stream, Loader=yaml.FullLoader)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -51,42 +66,45 @@ def main(argv) -> None:
             pre_transform=pre_transforms,
             one_hot_signs=False)
 
-    elif dataset_name == "tribes":
+    elif dataset_name == 'Tribes':
         dataset = Tribes(
-            root= root,
-            pre_transform=pre_transforms,
-            one_hot_signs=False)
+            root= root
+        )
 
-    elif dataset_name == "chess":
-        dataset = Chess(
+    elif dataset_name == "BitcoinOTC":
+        dataset = BitcoinO(
             root= root,
-            pre_transform=pre_transforms,
-            one_hot_signs=False)
+            pre_transform=pre_transforms)
 
-    elif dataset_name == "bitcoin":
+    elif dataset_name == "Bitcoin_Alpha":
         dataset = BitcoinA(
             root= root,
             pre_transform=pre_transforms)
     
-    elif dataset_name == "epinions":
-        dataset = Epinions(
+    elif dataset_name == "Slashdot":
+        dataset = Slashdot(
             root= root,
             pre_transform=pre_transforms)
     
-    elif dataset_name == "wikiedits":
-        dataset = WikiEdits(
+    elif dataset_name == "WikiRFA":
+        dataset = WikiRFA(
             root= root,
             pre_transform=pre_transforms)
 
     data = dataset[0]
-    n_edges = data.edge_index.shape[1]
+    if not is_undirected(data.edge_index):
+        print("is directed")
+        # transform to directed graph
+        #transform = T.ToUndirected(reduce="mean")
+        #data = transform(data)
+
+    n_edges = data.edge_attr.shape[0]
 
     print(f"Number of edges: {n_edges}")
     print(f"Number of nodes: {data.num_nodes}")
-    print("is directed", not is_undirected(data.edge_index))
     # Create train and test datasets
-    train_data = dataset[0].clone()
-    test_data = dataset[0].clone()
+    train_data = data.clone()
+    test_data = data.clone()
     test_mask =\
         np.random.choice([1, 0], size=n_edges, p=[ test_size, 1- test_size])
     test_mask = torch.tensor(test_mask)
@@ -94,7 +112,6 @@ def main(argv) -> None:
     train_data.edge_attr = torch.where(test_mask == 1, 0, train_data.edge_attr)
     test_data.edge_attr = torch.where(test_mask == 0, 0,  test_data.edge_attr)
 
-    print(train_data.edge_attr)
     training = Training(
         device=device,
         train_data=train_data,
@@ -103,14 +120,14 @@ def main(argv) -> None:
         embedding_dim= embedding_dim,
         time_step= time_step,
         iterations= iterations,
-        damping= damping)
+        damping= damping,
+        friend_distance=5.0,
+        friend_stiffness=5.0)
 
     if optimizer_iterations > 0:
         # Instrumentation class is used for functions with multiple inputs
         # (positional and/or keywords)
         parametrization = ng.p.Instrumentation(
-            friend_distance=ng.p.Scalar(lower=0.1, upper=20.0),
-            friend_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
             neutral_distance=ng.p.Scalar(lower=0.1, upper=20.0),
             neutral_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
             enemy_distance=ng.p.Scalar(lower=0.1, upper=20),
@@ -124,14 +141,15 @@ def main(argv) -> None:
         # convert to dict
         recommendation = dict(recommendation.kwargs)
         print(recommendation)
-        
-        with open('src/conf/params.yaml', 'w') as outfile:
-            yaml.dump(recommendation, outfile, default_flow_style=False)
+
+        user_input = input('Do you want to store the preferences? (y/n) ')
+
+        if user_input.lower() == 'y':
+            with open('src/params.yaml', 'w') as outfile:
+                yaml.dump(recommendation, outfile, default_flow_style=False)
 
     else:
         training(
-            friend_distance= params['friend_distance'],
-            friend_stiffness= params['friend_stiffness'],
             neutral_distance= params['neutral_distance'],
             neutral_stiffness= params['neutral_stiffness'],
             enemy_distance= params['enemy_distance'],

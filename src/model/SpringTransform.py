@@ -59,8 +59,6 @@ class SpringTransform(BaseTransform):
         pos *= 2.0
         signs = data.edge_attr
 
-        print(signs)
-        
         pbar = tqdm(range(self.iterations))
         for i in pbar:
             force = self.compute_force(pos, data.edge_index, signs)

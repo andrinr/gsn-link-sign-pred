@@ -53,12 +53,13 @@ def log_regression(train_data, test_data, test_mask):
     print(y_pred_prob)
     # evaluate the performance of the classifier
     auc_score = roc_auc_score(y_test, y_pred_prob[:, 1])
-    acc = accuracy_score(y_test, y_pred)
-    prec = precision_score(y_test, y_pred, average='binary', pos_label=0)
-    rec = recall_score(y_test, y_pred, average='binary', pos_label=0)
-    f1 = f1_score(y_test, y_pred, average='weighted', pos_label=0)
+
+    f1_binary = f1_score(y_test, y_pred, average='binary', pos_label=1)
+    f1_micro = f1_score(y_test, y_pred, average='micro', pos_label=1)
+    f1_macro = f1_score(y_test, y_pred, average='macro', pos_label=1)
+
 
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
     print('True negatives: ', tn, '\nFalse positives: ', fp, '\nFalse negatives: ', fn, '\nTrue Positives: ', tp)
 
-    return auc_score, acc, prec, rec, f1
+    return auc_score, f1_binary, f1_micro, f1_macro
