@@ -3,6 +3,9 @@ from timeit import default_timer as timer
 import torch
 
 class Training:
+    """
+    Training
+    """
     def __init__(self, 
         device, 
         train_data, 
@@ -28,6 +31,7 @@ class Training:
 
         self.ratio = torch.count_nonzero(self.train_data.edge_attr ==1) / torch.count_nonzero(self.train_data.edge_attr == -1)
         print(f"Ratio: {self.ratio}")
+        
     def __call__(self, 
         neutral_distance, 
         neutral_stiffness, 

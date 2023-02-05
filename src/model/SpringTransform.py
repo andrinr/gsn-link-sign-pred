@@ -6,6 +6,30 @@ from tqdm import tqdm
 from torch_geometric.utils import degree
 
 class SpringTransform(BaseTransform):
+    """
+    SpringTransform
+
+    Parameters:
+    ----------
+    - device : torch.device
+        Device to use
+    - embedding_dim : int
+        Embedding dimension
+    - time_step : float
+        Time step
+    - damping : float
+        Damping
+    - friend_distance : float 
+        Friend distance
+    - friend_stiffness : float
+        Friend stiffness
+    - neutral_distance : float
+        Neutral distance
+    - neutral_stiffness : float
+        Neutral stiffness
+    - enemy_distance : float
+        Enemy distance
+    """
     def __init__(
         self,
         device,

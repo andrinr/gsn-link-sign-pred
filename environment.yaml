@@ -148,4 +148,3 @@ dependencies:
   - yaml=0.2.5=h7b6447c_0
   - zlib=1.2.13=h5eee18b_0
   - zstd=1.5.2=ha4553b6_0
-prefix: /home/ar/miniconda3/envs/gnn

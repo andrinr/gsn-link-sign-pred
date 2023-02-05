@@ -11,6 +11,22 @@ import inquirer
 from model import Training
 from data import WikiSigned, Slashdot, BitcoinO, BitcoinA, Tribes, WikiRFA
 def main(argv) -> None:
+    """
+    Main function
+
+    Parameters:
+    ----------
+    -s : int (default=64)
+        Embedding dimension
+    -h : float (default=0.005)
+        Time step
+    -d : float (default=0.02)
+        Damping
+    -i : int (default=500)
+        Number of iterations
+    -o : int (default=0)
+        Number of iterations for the optimizer
+    """
     embedding_dim = 64
     iterations = 500
     time_step =  0.005
