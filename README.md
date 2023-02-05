@@ -13,6 +13,10 @@ standard numerical integration methods for ODE.
 
 ## Requirements
 
+You can try to install to setup the environment using the ```environment.yaml``` file. To do so run ```conda env create -f environment.yaml```. ( You need to have conda or conda-mini installed.)
+
+If that does not work, you can install the following packages manually:
+
 - tqdm
 - numpy
 - scipy
@@ -28,13 +32,13 @@ In order to use the GPU, you need to install CUDA and PyTorch with CUDA support.
 
 ## Running the code
 
-Run ```python src/main.py``` where additional arguments can be passed to the script. 
+Run ```python src/main.py``` where the following arguments can opionally be passed to the script. 
 
-- ```-i <value>``` sets the number of iterations for the spring network simulation
-- ```-d <value>``` sets the damping factor for the spring network simulation
-- ```-h <value>``` sets the size of a timestep for the spring network simulation
-- ```-s <value>``` sets the dimensionality of the node embeddings
-- ```-o <value>``` if set starts the nevergrad optimization with the given number of iterations. The recommendations can then be stored as the new default parameters in the ```params.yaml``` file.
+- ```-i <value>``` sets the number of iterations for the spring network simulation. Default is 1000.
+- ```-d <value>``` sets the damping factor for the spring network simulation. Default is  0.02.
+- ```-h <value>``` sets the size of a timestep for the spring network simulation. Default is 0.005.
+- ```-s <value>``` sets the dimensionality of the node embeddings. Default is 64.
+- ```-o <value>``` if set starts the nevergrad optimization with the given number of iterations. The recommendations can then be stored as the new default parameters in the ```params.yaml``` file. Recommended is around 30 iterations.
 
 The script asks the user to select a dataset in the terminal after execution.
 
