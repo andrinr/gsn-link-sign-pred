@@ -18,15 +18,12 @@ def main(argv) -> None:
     root = 'src/data/'
     test_size = 0.2
 
+    dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA']
     questions = [
-    inquirer.List('dataset',
-                    message="Choose a dataset",
-                    choices=[
-                        'Bitcoin_Alpha', 
-                        'BitcoinOTC', 
-                        'WikiRFA', 
-                        'Tribes'],
-                ),
+        inquirer.List('dataset',
+            message="Choose a dataset",
+            choices=dataset_names,
+        ),
     ]
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
@@ -58,18 +55,7 @@ def main(argv) -> None:
     #transform.append(T.ToSparseTensor())
     pre_transforms = T.Compose(pre_transforms)
 
-    if dataset_name == "wiki":
-        dataset = WikiSigned(
-            root= root,
-            pre_transform=pre_transforms,
-            one_hot_signs=False)
-
-    elif dataset_name == 'Tribes':
-        dataset = Tribes(
-            root= root
-        )
-
-    elif dataset_name == "BitcoinOTC":
+    if dataset_name == "BitcoinOTC":
         dataset = BitcoinO(
             root= root,
             pre_transform=pre_transforms)
@@ -121,9 +107,9 @@ def main(argv) -> None:
         # Instrumentation class is used for functions with multiple inputs
         # (positional and/or keywords)
         parametrization = ng.p.Instrumentation(
-            neutral_distance=ng.p.Scalar(lower=0.1, upper=20.0),
+            neutral_distance=ng.p.Scalar(lower=0.1, upper=30.0),
             neutral_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
-            enemy_distance=ng.p.Scalar(lower=0.1, upper=20),
+            enemy_distance=ng.p.Scalar(lower=0.1, upper=30),
             enemy_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
         )
 

@@ -1,5 +1,6 @@
 from model import SpringTransform, log_regression
 from timeit import default_timer as timer
+import torch
 
 class Training:
     def __init__(self, 
@@ -25,6 +26,8 @@ class Training:
         self.friend_distance = friend_distance
         self.friend_stiffness = friend_stiffness
 
+        self.ratio = torch.count_nonzero(self.train_data.edge_attr ==1) / torch.count_nonzero(self.train_data.edge_attr == -1)
+        print(f"Ratio: {self.ratio}")
     def __call__(self, 
         neutral_distance, 
         neutral_stiffness, 
@@ -57,4 +60,4 @@ class Training:
         print(f"F1 Micro: {f1_micro}")
         print(f"F1 Macro: {f1_macro}")
 
-        return 1 / auc
+        return 1 / f1_macro

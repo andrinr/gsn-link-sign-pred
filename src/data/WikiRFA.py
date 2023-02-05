@@ -49,7 +49,6 @@ class WikiRFA(InMemoryDataset):
                  pre_transform: Optional[Callable] = None,
                  one_hot_signs: Optional[bool] = False):
         self.raw_name = 'wiki-RfA'
-        self.names = ['meta.wikisigned-k2', 'out.wikisigned-k2', 'README.wikisigned-k2']
         self.one_hot_signs = one_hot_signs
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
@@ -79,30 +78,25 @@ class WikiRFA(InMemoryDataset):
             src = df_raw[i, 0].split(":")
             tgt = df_raw[i+1, 0].split(":")
             vot = df_raw[i+2, 0].split(":")
-
+            if vot[1] == '0':
+                continue
             u.append(src[1])
             v.append(tgt[1])
             signs.append(vot[1])
 
-            if i > 10000:
-                break
-                
+        le = LabelEncoder()
+        u = le.fit_transform(u)
+        v = le.fit_transform(v)
         #le = LabelEncoder()
         #le.fit_transform(y_train
         u = np.array(u)
         v = np.array(v)
-        signs = np.array(signs)
-
-        """
-        data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
+        signs = np.array(signs, dtype=np.int32)
+        
+        data.edge_index = torch.tensor(np.array([u, v]), dtype=torch.long)
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
-        # convert to one-hot
-        if self.one_hot_signs:
-            # convert to 0 and 1
-            data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
-            data.edge_attr = F.one_hot(data.edge_attr, num_classes=2).float()
-            
+
         if self.pre_transform is not None:
             data = self.pre_transform(data)
 
-        torch.save(self.collate([data]), self.processed_paths[0])"""
+        torch.save(self.collate([data]), self.processed_paths[0])
