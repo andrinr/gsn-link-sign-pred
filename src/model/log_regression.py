@@ -47,10 +47,7 @@ def log_regression(train_data, test_data, test_mask):
     y_pred = y_pred / 2 + 0.5
     y_test = y_test / 2 + 0.5
     y_pred_prob = clf.predict_proba(X_test)
-    print(y_train)
-    print(X_test)
-    print(y_test)
-    print(y_pred_prob)
+
     # evaluate the performance of the classifier
     auc_score = roc_auc_score(y_test, y_pred_prob[:, 1])
 

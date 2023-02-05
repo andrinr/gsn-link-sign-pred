@@ -5,6 +5,9 @@ from typing import Callable, Optional
 
 import numpy as np
 import torch
+import itertools
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder  
 
 from torch_geometric.data import (
     Data,
@@ -65,11 +68,32 @@ class WikiRFA(InMemoryDataset):
 
     def process(self):
         data = Data()
-        raw = np.genfromtxt(self.raw_paths[1], skip_header=1, dtype=np.int64)
-        u = raw[:, 0]
-        v = raw[:, 1]
-        signs = raw[:, 2]
+       # Read in file
+        df_raw = pd.read_csv(self.raw_paths[0], sep='\t', header=None)
+        df_raw = df_raw.to_numpy()
 
+        u = []
+        v = []
+        signs = []
+        for i in range(0, df_raw.shape[0], 7):
+            src = df_raw[i, 0].split(":")
+            tgt = df_raw[i+1, 0].split(":")
+            vot = df_raw[i+2, 0].split(":")
+
+            u.append(src[1])
+            v.append(tgt[1])
+            signs.append(vot[1])
+
+            if i > 10000:
+                break
+                
+        #le = LabelEncoder()
+        #le.fit_transform(y_train
+        u = np.array(u)
+        v = np.array(v)
+        signs = np.array(signs)
+
+        """
         data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
         # convert to one-hot
@@ -81,4 +105,4 @@ class WikiRFA(InMemoryDataset):
         if self.pre_transform is not None:
             data = self.pre_transform(data)
 
-        torch.save(self.collate([data]), self.processed_paths[0])
+        torch.save(self.collate([data]), self.processed_paths[0])"""

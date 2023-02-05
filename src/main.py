@@ -10,7 +10,6 @@ import inquirer
 # Local dependencies
 from model import Training
 from data import WikiSigned, Slashdot, BitcoinO, BitcoinA, Tribes, WikiRFA
-
 def main(argv) -> None:
     embedding_dim = 64
     iterations = 500
@@ -26,7 +25,6 @@ def main(argv) -> None:
                         'Bitcoin_Alpha', 
                         'BitcoinOTC', 
                         'WikiRFA', 
-                        'Slashdot',
                         'Tribes'],
                 ),
     ]
@@ -78,11 +76,6 @@ def main(argv) -> None:
 
     elif dataset_name == "Bitcoin_Alpha":
         dataset = BitcoinA(
-            root= root,
-            pre_transform=pre_transforms)
-    
-    elif dataset_name == "Slashdot":
-        dataset = Slashdot(
             root= root,
             pre_transform=pre_transforms)
     
@@ -149,13 +142,13 @@ def main(argv) -> None:
                 yaml.dump(recommendation, outfile, default_flow_style=False)
 
     else:
+        
         training(
             neutral_distance= params['neutral_distance'],
             neutral_stiffness= params['neutral_stiffness'],
             enemy_distance= params['enemy_distance'],
             enemy_stiffness= params['enemy_stiffness'],
         )
-        
 
 if __name__ == "__main__":
     main(sys.argv[1:])

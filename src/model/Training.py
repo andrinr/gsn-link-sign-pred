@@ -1,4 +1,5 @@
 from model import SpringTransform, log_regression
+from timeit import default_timer as timer
 
 class Training:
     def __init__(self, 
@@ -30,7 +31,6 @@ class Training:
         enemy_distance, 
         enemy_stiffness) -> float:
 
-        print(f"neutral_distance: {neutral_distance}, neutral_stiffness: {neutral_stiffness}, enemy_distance: {enemy_distance}, enemy_stiffness: {enemy_stiffness}")
         transform = SpringTransform(
             device=self.device,
             embedding_dim=self.embedding_dim,
@@ -45,8 +45,11 @@ class Training:
             enemy_stiffness=enemy_stiffness,
         )
 
+        start = timer()
         self.train_data = transform(self.train_data)
-
+        end = timer()
+        print(f"Time: {end - start}")
+        
         auc, f1_binary, f1_micro, f1_macro = log_regression(self.train_data, self.test_data, self.test_mask)
 
         print(f"AUC: {auc}")
