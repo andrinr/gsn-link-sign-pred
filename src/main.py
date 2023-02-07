@@ -44,9 +44,10 @@ def main(argv) -> None:
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
 
+    plot_stats = False
 
     optimizer_iterations = 0
-    opts, args = getopt.getopt(argv,"s:h:d:i:o:",
+    opts, args = getopt.getopt(argv,"s:h:d:i:o:p:",
         ["embedding_size=","time_step=", "damping=", "iterations=", "optimize="])
     for opt, arg in opts:
         if opt == '-s':
@@ -59,6 +60,8 @@ def main(argv) -> None:
             iterations = int(arg)
         elif opt == '-o':
             optimizer_iterations = int(arg)
+        elif opt == '-p':
+            plot_stats = True
 
     if optimizer_iterations == 0 :
         stream = open("src/params.yaml", 'r')
