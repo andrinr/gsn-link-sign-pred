@@ -23,14 +23,22 @@ class Triplets:
             neighs_u = set(helpers.get_neighbors(self.data, u))
             neighs_v = set(helpers.get_neighbors(self.data, v))
 
+            neighs_u = neighs_u - {v}
+            neighs_v = neighs_v - {u}
+
             # find a neighbor of u that is not a neighbor of v
-            neighs_u_not_v = neighs_u - neighs_v
-            if len(neighs_u_not_v) == 0:
+            neighs_u_and_v = neighs_u.union(neighs_v)
+            if len(neighs_u_and_v) == 0:
                 continue
 
-            w = np.random.choice(list(neighs_u_not_v))
+            w = np.random.choice(list(neighs_u_and_v))
 
-            self.triplets.append((e1, helpers.get_edge_index(self.data, v, u), helpers.get_edge_index(self.data, u, w)))
+            e2 = helpers.get_edge_index(self.data, u, w) 
+            e3 = helpers.get_edge_index(self.data, v, w)
+
+            print(e1, e2, e3)
+
+            self.triplets.append((e1, e2, e3))
 
             n_found += 1
 

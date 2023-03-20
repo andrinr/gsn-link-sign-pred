@@ -27,4 +27,5 @@ def get_edge_index(data, u, v):
     node_edges = src == u
     node_edges &= dst == v
     index = np.where(node_edges)[0]
+
     return index
