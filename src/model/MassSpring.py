@@ -27,7 +27,7 @@ class MassSpring(MessagePassing):
         normalized = torch.div(spring.T, length + 0.001)
         attraction = relu(length - self.friend_distance) * self.friend_stiffness * normalized
         regular = (length - self.neutral_distance) * self.neutral_stiffness * normalized
-        retraction = -relu(self.enemy_distance - length, inplace=True) * self.enemy_stiffness * normalized
+        retraction = -relu(self.enemy_distance - length) * self.enemy_stiffness * normalized
         
         force = torch.where(sign == 1, attraction, retraction)
         force = torch.where(sign == 0, regular, force)

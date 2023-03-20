@@ -5,12 +5,15 @@ from typing import Callable, Optional
 
 import numpy as np
 import torch
+import itertools
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder  
 
 from torch_geometric.data import (
     Data,
     InMemoryDataset,
     download_url,
-    extract_tar,
+    extract_gz,
 )
 
 from torch_geometric.utils import coalesce
@@ -39,49 +42,52 @@ class Slashdot(InMemoryDataset):
 
     """
 
-    url = 'http://konect.cc/files/{}'
+    url = 'https://snap.stanford.edu/data/{}'
 
     def __init__(self, root: str,
                  transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None,
                  one_hot_signs: Optional[bool] = False):
-
-        self.raw_name = 'download.tsv.slashdot-threads'
-        self.names = ['meta.slashdot-threads', 'out.slashdot-threads', 'README.slashdot-threads']
+        
+        self.raw_name = 'soc-sign-Slashdot090221'
         self.one_hot_signs = one_hot_signs
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self) -> str:
-        return [osp.join('slashdot-threads', s) for s in self.names]
+        return "soc-sign-Slashdot090221.txt"
 
     @property
     def processed_file_names(self) -> str:
-        return 'slashdot-threads.pt'
+        return 'soc-sign-Slashdot090221.pt'
         
     def download(self):
-        path = download_url(self.url.format(self.raw_name + '.tar.bz2'), self.raw_dir)
-        extract_tar(path, self.raw_dir, "r:bz2")
+        path = download_url(self.url.format(self.raw_name + '.txt.gz'), self.raw_dir)
+        extract_gz(path, self.raw_dir)
 
     def process(self):
         data = Data()
-        raw = np.genfromtxt(self.raw_paths[1], skip_header=2, dtype=np.int64)
-        u = raw[:, 0]
-        v = raw[:, 1]
-        signs = raw[:, 2]
+       # Read in file
+        df_raw = pd.read_csv(self.raw_paths[0], sep='\t', header=4)
+        df_raw = df_raw.to_numpy()
+        u = df_raw[:, 0]
+        v = df_raw[:, 1]
+        signs = df_raw[:, 2]
 
-        data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
+        le = LabelEncoder()
+        u = le.fit_transform(u)
+        v = le.fit_transform(v)
+        #le = LabelEncoder()
+        #le.fit_transform(y_train
+        u = np.array(u)
+        v = np.array(v)
+        signs = np.array(signs, dtype=np.int32)
+        
+        data.edge_index = torch.tensor(np.array([u, v]), dtype=torch.long)
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
-        # convert to one-hot
-        if self.one_hot_signs:
-            # convert to 0 and 1
-            data.edge_attr = torch.div(data.edge_attr + 1, 2, rounding_mode='trunc')
-            data.edge_attr = F.one_hot(data.edge_attr, num_classes=2).float()
-            
+
         if self.pre_transform is not None:
             data = self.pre_transform(data)
 
-        #data.num_nodes = 51083
-        #data.num_edges = 140778
         torch.save(self.collate([data]), self.processed_paths[0])

@@ -80,7 +80,7 @@ class SpringTransform(BaseTransform):
             pos = torch.rand((data.num_nodes, self.embedding_dim)) * 2.0 - 1.0
             vel = torch.zeros((data.num_nodes, self.embedding_dim))
         
-        pos *= 2.0
+        pos *= 5.0
         signs = data.edge_attr
 
         pbar = tqdm(range(self.iterations))

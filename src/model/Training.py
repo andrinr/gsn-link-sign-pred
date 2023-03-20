@@ -35,7 +35,7 @@ class Training:
     def __call__(self, 
         neutral_distance, 
         neutral_stiffness, 
-        enemy_distance, 
+        enemy_distance,     
         enemy_stiffness) -> float:
 
         transform = SpringTransform(

@@ -9,7 +9,8 @@ import yaml
 import inquirer
 # Local dependencies
 from model import Training
-from data import WikiSigned, Slashdot, BitcoinO, BitcoinA, Tribes, WikiRFA
+from data import WikiSigned, Slashdot, BitcoinO, BitcoinA, Tribes, WikiRFA, Epinions
+from stats import Triplets
 def main(argv) -> None:
     """
     Main function
@@ -34,7 +35,7 @@ def main(argv) -> None:
     root = 'src/data/'
     test_size = 0.2
 
-    dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA']
+    dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
         inquirer.List('dataset',
             message="Choose a dataset",
@@ -88,6 +89,16 @@ def main(argv) -> None:
         dataset = WikiRFA(
             root= root,
             pre_transform=pre_transforms)
+        
+    elif dataset_name == "Slashdot":
+        dataset = Slashdot(
+            root= root,
+            pre_transform=pre_transforms)
+        
+    elif dataset_name == "Epinions":
+        dataset = Epinions(
+            root= root,
+            pre_transform=pre_transforms)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
@@ -95,6 +106,11 @@ def main(argv) -> None:
         # transform to directed graph
         #transform = T.ToUndirected(reduce="mean")
         #data = transform(data)
+
+    stats = Triplets(data)
+    stats.sample(1000)
+    stats.sign_stats()
+    print(stats.n_balanced, stats.n_unbalanced)
 
     n_edges = data.edge_attr.shape[0]
 

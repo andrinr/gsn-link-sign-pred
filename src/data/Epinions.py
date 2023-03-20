@@ -2,6 +2,7 @@ import os
 import os.path as osp
 import torch.nn.functional as F
 from typing import Callable, Optional
+import pandas as pd
 
 import numpy as np
 import torch
@@ -46,18 +47,18 @@ class Epinions(InMemoryDataset):
                  transform: Optional[Callable] = None,
                  pre_transform: Optional[Callable] = None):
 
-        self.raw_name = 'soc-Epinions1'
+        self.raw_name = 'soc-sign-epinions'
         self.names = ['meta.Epinions1', 'out.Epinions1', 'README.Epinions1']
         super().__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
     def raw_file_names(self) -> str:
-        return 'soc-Epinions1.txt'
+        return 'soc-sign-epinions.txt'
 
     @property
     def processed_file_names(self) -> str:
-        return 'soc-Epinions1.pt'
+        return 'soc-sign-epinions.pt'
         
     def download(self):
         path = download_url(self.url.format(self.raw_name + '.txt.gz'), self.raw_dir)
@@ -65,14 +66,17 @@ class Epinions(InMemoryDataset):
 
     def process(self):
         data = Data()
-        raw = np.genfromtxt(self.raw_paths[0], skip_header=1, dtype=np.int64, delimiter=',')
-        print(raw.shape)
-        signs = raw[:, 2]
+        df_raw = pd.read_csv(self.raw_paths[0], sep='\t', header=4)
+        df_raw = df_raw.to_numpy()
+        
+        print(df_raw)
+
+        signs = df_raw[:, 2]
 
         signs[signs > 0] = 1
         signs[signs < 0] = -1
 
-        data.edge_index = torch.tensor(np.array(raw[:,:2].T), dtype=torch.long)
+        data.edge_index = torch.tensor(np.array(df_raw[:,:2].T), dtype=torch.long)
         data.edge_attr = torch.tensor(signs, dtype=torch.long)
         print(data.edge_attr)
 
