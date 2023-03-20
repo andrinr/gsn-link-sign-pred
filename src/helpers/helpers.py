@@ -20,3 +20,11 @@ def get_neighbors(data : Data, u : int):
     src, dst = data.edge_index
     node_edges = src == u
     return dst[node_edges]
+
+def get_edge_index(data, u, v):
+    edge_index = data.edge_index
+    src, dst = edge_index
+    node_edges = src == u
+    node_edges &= dst == v
+    index = np.where(node_edges)[0]
+    return index

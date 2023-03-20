@@ -1,6 +1,7 @@
 from torch_geometric.data import Data
 from torch_geometric.nn import functional as F
 import numpy as np
+import helpers
 
 class Triplets:
     def __init__(self, data: Data):
@@ -17,18 +18,21 @@ class Triplets:
          # sample 1000 triplets
         while n_found < n_triplets:
             e1 = np.random.randint(n_edges, size=1)[0]
+            u, v = self.data.edge_index[:, e1]
 
-            def two_hop_walk(data, u):
-        neighbors = get_neighbors(data, u)
-        if len(neighbors) == 0:
-            return None
-        v = np.random.choice(neighbors)
-        neighbors = get_neighbors(data, v)
-        if len(neighbors) == 0:
-            return None
-        w = np.random.choice(neighbors)
-        return v, w
+            neighs_u = set(helpers.get_neighbors(self.data, u))
+            neighs_v = set(helpers.get_neighbors(self.data, v))
 
+            # find a neighbor of u that is not a neighbor of v
+            neighs_u_not_v = neighs_u - neighs_v
+            if len(neighs_u_not_v) == 0:
+                continue
+
+            w = np.random.choice(list(neighs_u_not_v))
+
+            self.triplets.append((e1, helpers.get_edge_index(self.data, v, u), helpers.get_edge_index(self.data, u, w)))
+
+            n_found += 1
 
         return self
 
@@ -41,13 +45,15 @@ class Triplets:
             vu = triplet[1]
             uw = triplet[2]
 
+            print(uv, vu, uw)
+
             uv_sign = self.data.edge_attr[uv]
             vu_sign = self.data.edge_attr[vu]
             uw_sign = self.data.edge_attr[uw]
 
             sign = uv_sign * vu_sign * uw_sign
-            print(sign)
-            if sign == 1:
+            print(sign.item())
+            if sign.item() == 1:
                 self.n_balanced += 1
             else:
                 self.n_unbalanced += 1
