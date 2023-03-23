@@ -53,7 +53,7 @@ class Triplets:
             vu = triplet[1]
             uw = triplet[2]
 
-            print(uv, vu, uw)
+            #print(uv, vu, uw)
 
             uv_sign = self.data.edge_attr[uv]
             vu_sign = self.data.edge_attr[vu]

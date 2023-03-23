@@ -13,7 +13,6 @@ def random_hop(data : Data, u : int):
     if len(neighbors) == 0:
         return None
     v = np.random.choice(neighbors)
-
     return v
 
 def get_neighbors(data : Data, u : int):
