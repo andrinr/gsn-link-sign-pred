@@ -8,8 +8,8 @@ class Triplets:
         self.data = data
 
 
-    def sample(self, n_triplets : int = 1000, seed: int = 1):
-        np.random.seed(seed)
+    def sample(self, n_triplets : int = 1000, seed: int = None):
+        if seed : np.random.seed(seed)
         self.triplets = []
         n_edges = self.data.num_edges
 
@@ -20,14 +20,14 @@ class Triplets:
             e1 = np.random.randint(n_edges, size=1)[0]
             u, v = self.data.edge_index[:, e1]
 
-            neighs_u = set(helpers.get_neighbors(self.data, u))
-            neighs_v = set(helpers.get_neighbors(self.data, v))
+            neighs_u = set(helpers.get_neighbors(self.data, u).tolist())
+            neighs_v = set(helpers.get_neighbors(self.data, v).tolist())
 
             neighs_u = neighs_u - {v}
             neighs_v = neighs_v - {u}
 
             # find a neighbor of u that is not a neighbor of v
-            neighs_u_and_v = neighs_u.union(neighs_v)
+            neighs_u_and_v = neighs_u.intersection(neighs_v)
             if len(neighs_u_and_v) == 0:
                 continue
 
@@ -36,8 +36,6 @@ class Triplets:
             e2 = helpers.get_edge_index(self.data, u, w) 
             e3 = helpers.get_edge_index(self.data, v, w)
 
-            print(e1, e2, e3)
-
             self.triplets.append((e1, e2, e3))
 
             n_found += 1
@@ -45,25 +43,26 @@ class Triplets:
         return self
 
     def sign_stats(self):
-        self.n_balanced = 0
-        self.n_unbalanced = 0
+        n_balanced = 0
+        n_unbalanced = 0
 
         for triplet in self.triplets:
             uv = triplet[0]
             vu = triplet[1]
             uw = triplet[2]
 
-            #print(uv, vu, uw)
-
             uv_sign = self.data.edge_attr[uv]
             vu_sign = self.data.edge_attr[vu]
             uw_sign = self.data.edge_attr[uw]
 
             sign = uv_sign * vu_sign * uw_sign
-            print(sign.item())
             if sign.item() == 1:
-                self.n_balanced += 1
+                n_balanced += 1
             else:
-                self.n_unbalanced += 1
+                n_unbalanced += 1
+
+        n = len(self.triplets)
+
+        self.p_balanced = n_balanced / n
 
         return self

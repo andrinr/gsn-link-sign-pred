@@ -2,6 +2,7 @@ from torch_geometric.data import Data
 import torch
 from torch_geometric.transforms import ToUndirected
 import stats
+import numpy as np
 
 def gen_graph() ->  Data:
     edge_index = torch.tensor([
@@ -21,8 +22,7 @@ def gen_graph() ->  Data:
 def test_triples():
     data = gen_graph()
     assert not data.is_directed()
-    triplets = stats.Triplets(data).sample(n_triplets=1000, seed=1)
+    triplets = stats.Triplets(data).sample(n_triplets=300)
     triplets.sign_stats()
-
-    assert triplets.n_balanced == 2
-    assert triplets.n_unbalanced == 1
+    print(triplets.p_balanced)
+    assert np.abs(triplets.p_balanced - 0.66) < 0.05
