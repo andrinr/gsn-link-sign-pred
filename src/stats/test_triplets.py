@@ -1,6 +1,5 @@
 from torch_geometric.data import Data
 import torch
-from torch_geometric.transforms import ToUndirected
 import stats
 import numpy as np
 
@@ -22,7 +21,7 @@ def gen_graph() ->  Data:
 def test_triples():
     data = gen_graph()
     assert not data.is_directed()
-    triplets = stats.Triplets(data).sample(n_triplets=300)
-    triplets.sign_stats()
-    print(triplets.p_balanced)
-    assert np.abs(triplets.p_balanced - 0.66) < 0.05
+    triplets_stats = stats.Triplets(data).sample(n_triplets=300)
+    triplets_stats.generate()
+    print(triplets_stats.p_balanced)
+    assert np.abs(triplets_stats.p_balanced - 0.66) < 0.05

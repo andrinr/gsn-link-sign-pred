@@ -109,7 +109,7 @@ def main(argv) -> None:
 
     stats = Triplets(data)
     stats.sample(1000)
-    stats.sign_stats()
+    stats.generate()
     print(f"p_balanced: {stats.p_balanced}")
 
     n_edges = data.edge_attr.shape[0]

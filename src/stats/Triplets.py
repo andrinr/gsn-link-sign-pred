@@ -7,7 +7,6 @@ class Triplets:
     def __init__(self, data: Data):
         self.data = data
 
-
     def sample(self, n_triplets : int = 1000, seed: int = None):
         if seed : np.random.seed(seed)
         self.triplets = []
@@ -42,7 +41,7 @@ class Triplets:
 
         return self
 
-    def sign_stats(self):
+    def generate(self):
         n_balanced = 0
         n_unbalanced = 0
 
