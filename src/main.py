@@ -103,14 +103,14 @@ def main(argv) -> None:
     data = dataset[0]
     if not is_undirected(data.edge_index):
         print("is directed")
-        # transform to directed graph
-        #transform = T.ToUndirected(reduce="mean")
-        #data = transform(data)
+        #transform to directed graph
+        transform = T.ToUndirected(reduce="min")
+        data = transform(data)
 
     stats = Triplets(data)
     stats.sample(1000)
     stats.sign_stats()
-    print(stats.n_balanced, stats.n_unbalanced)
+    print(f"p_balanced: {stats.p_balanced}")
 
     n_edges = data.edge_attr.shape[0]
 
