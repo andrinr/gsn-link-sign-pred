@@ -57,6 +57,9 @@ class Training:
         
         auc, f1_binary, f1_micro, f1_macro, y_test, y_pred =\
             log_regression(self.train_data, self.test_data)
+        
+        self.y_test = y_pred
+        self.y_pred = y_pred
 
         print(f"AUC: {auc}")
         print(f"F1 Binary: {f1_binary}")

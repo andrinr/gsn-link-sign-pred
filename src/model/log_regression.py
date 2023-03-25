@@ -30,6 +30,7 @@ def log_regression(train_data, test_data):
     clf = LogisticRegression()
     clf.fit(X_train, y_train)
 
+    # TODO: return aligned y_pred 
     l = 0
     for k in range(n_total):
         if test_data.edge_attr[k] == 0:
