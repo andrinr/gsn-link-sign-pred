@@ -11,6 +11,7 @@ def train_test_split(
     num_test = int(test_percentage * data.num_edges)
 
     assert num_train + num_test == data.num_edges
+    assert data.edge_attr is not None
 
     perm = torch.randperm(data.num_edges, device=data.edge_index.device)
     perm = perm[data.edge_index[0] <= data.edge_index[1]]

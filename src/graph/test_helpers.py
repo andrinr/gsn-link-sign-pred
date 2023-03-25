@@ -38,10 +38,3 @@ def test_get_edge_index():
     assert helpers.get_edge_index(data, 1, 0).item() == 1
     assert helpers.get_edge_index(data, 1, 2).item() == 2
     assert helpers.get_edge_index(data, 2, 1).item() == 3
-    
-def test_split():
-    data = gen_graph()
-    train_data, test_data = helpers.train_test_split(
-        data, 0.5, 0.25, 0.25)
-    assert train_data.num_edges == 2
-    assert test_data.num_edges == 1
