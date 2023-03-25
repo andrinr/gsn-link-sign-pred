@@ -1,7 +1,7 @@
 from torch_geometric.data import Data
 from torch_geometric.nn import functional as F
 import numpy as np
-import helpers
+import graph
 
 class Triplets:
     def __init__(self, data: Data):
@@ -19,8 +19,8 @@ class Triplets:
             e1 = np.random.randint(n_edges, size=1)[0]
             u, v = self.data.edge_index[:, e1]
 
-            neighs_u = set(helpers.get_neighbors(self.data, u).tolist())
-            neighs_v = set(helpers.get_neighbors(self.data, v).tolist())
+            neighs_u = set(graph.get_neighbors(self.data, u).tolist())
+            neighs_v = set(graph.get_neighbors(self.data, v).tolist())
 
             neighs_u = neighs_u - {v}
             neighs_v = neighs_v - {u}
@@ -32,8 +32,8 @@ class Triplets:
 
             w = np.random.choice(list(neighs_u_and_v))
 
-            e2 = helpers.get_edge_index(self.data, u, w) 
-            e3 = helpers.get_edge_index(self.data, v, w)
+            e2 = graph.get_edge_index(self.data, u, w) 
+            e3 = graph.get_edge_index(self.data, v, w)
 
             self.triplets.append((e1, e2, e3))
 

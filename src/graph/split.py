@@ -4,29 +4,46 @@ import torch
 
 def train_test_split(
         data : Data, 
-        train_percentage : float, 
-        test_percentage : float):
+        train_percentage : float):
+    """
+    Sets the edge_attr of the test edges to 0. 
 
-    num_train = int(train_percentage * data.num_edges)
-    num_test = int(test_percentage * data.num_edges)
+    Parameters
+    ----------
+    data : Data
+        Un undirected signed graph.
+    train_percentage : float
+        The percentage of edges to use for training.
+    test_percentage : float
+        The percentage of edges to use for testing.
+    """
 
-    assert num_train + num_test == data.num_edges
+    num_train = int(train_percentage * data.num_edges / 2)
+    num_total = int(data.num_edges / 2)
+    num_test = num_total - num_train
+
+    assert data.is_undirected()
     assert data.edge_attr is not None
 
     perm = torch.randperm(data.num_edges, device=data.edge_index.device)
     perm = perm[data.edge_index[0] <= data.edge_index[1]]
     edge_index = data.edge_index[:, perm]
+    edge_index = torch.cat([edge_index, edge_index.flip([0])], dim=-1)
 
-    train_edges = perm[:num_train]
-    test_edges = perm[num_train:num_train + num_test]
+    edge_attr = data.edge_attr[perm, :]
+    edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
 
-    train_edge_attr = data.edge_attr.clone()
-    train_edge_attr[test_edges] = 0
+    train_edge_attr = edge_attr.clone()
+    print(train_edge_attr.shape)
+    print(num_train, num_total)
+    train_edge_attr[:num_train,:] = 0
+    train_edge_attr[num_total:num_train+num_total,:] = 0
 
-    test_edge_attr = data.edge_attr.clone()
-    test_edge_attr[train_edges] = 0
-
-    train_data = Data(
+    test_edge_attr = edge_attr.clone()
+    test_edge_attr[num_train:num_total,:] = 0
+    test_edge_attr[num_total+num_train:,:] = 0
+    
+    train_data = Data(  
         edge_index=edge_index, 
         num_nodes=data.num_nodes,
         edge_attr=train_edge_attr)
