@@ -10,7 +10,6 @@ class Training:
         device, 
         train_data, 
         test_data, 
-        test_mask, 
         embedding_dim, 
         time_step, 
         iterations, 
@@ -21,7 +20,6 @@ class Training:
         self.device = device
         self.train_data = train_data
         self.test_data = test_data
-        self.test_mask = test_mask
         self.embedding_dim = embedding_dim
         self.time_step = time_step
         self.iterations = iterations
@@ -57,7 +55,8 @@ class Training:
         end = timer()
         print(f"Time: {end - start}")
         
-        auc, f1_binary, f1_micro, f1_macro = log_regression(self.train_data, self.test_data, self.test_mask)
+        auc, f1_binary, f1_micro, f1_macro, y_test, y_pred =\
+            log_regression(self.train_data, self.test_data)
 
         print(f"AUC: {auc}")
         print(f"F1 Binary: {f1_binary}")

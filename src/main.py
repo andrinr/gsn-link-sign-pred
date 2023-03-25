@@ -9,8 +9,10 @@ import yaml
 import inquirer
 # Local dependencies
 from model import Training
-from data import WikiSigned, Slashdot, BitcoinO, BitcoinA, Tribes, WikiRFA, Epinions
+from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from stats import Triplets
+from graph import train_test_split
+
 def main(argv) -> None:
     """
     Main function
@@ -69,41 +71,24 @@ def main(argv) -> None:
         params = yaml.load(stream, Loader=yaml.FullLoader)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # Define the transforms
-    pre_transforms = []
-    #pre_transforms.append(T.ToUndirected(reduce="mean"))
-    #transform.append(T.ToSparseTensor())
-    pre_transforms = T.Compose(pre_transforms)
 
     if dataset_name == "BitcoinOTC":
-        dataset = BitcoinO(
-            root= root,
-            pre_transform=pre_transforms)
+        dataset = BitcoinO(root= root)
 
     elif dataset_name == "Bitcoin_Alpha":
-        dataset = BitcoinA(
-            root= root,
-            pre_transform=pre_transforms)
+        dataset = BitcoinA(root= root)
     
     elif dataset_name == "WikiRFA":
-        dataset = WikiRFA(
-            root= root,
-            pre_transform=pre_transforms)
+        dataset = WikiRFA(root= root)
         
     elif dataset_name == "Slashdot":
-        dataset = Slashdot(
-            root= root,
-            pre_transform=pre_transforms)
+        dataset = Slashdot(root= root)
         
     elif dataset_name == "Epinions":
-        dataset = Epinions(
-            root= root,
-            pre_transform=pre_transforms)
+        dataset = Epinions(root= root)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
-        print("is directed")
-        #transform to directed graph
         transform = T.ToUndirected(reduce="min")
         data = transform(data)
 
@@ -117,20 +102,12 @@ def main(argv) -> None:
     print(f"Number of edges: {n_edges}")
     print(f"Number of nodes: {data.num_nodes}")
     # Create train and test datasets
-    train_data = data.clone()
-    test_data = data.clone()
-    test_mask =\
-        np.random.choice([1, 0], size=n_edges, p=[ test_size, 1- test_size])
-    test_mask = torch.tensor(test_mask)
-
-    train_data.edge_attr = torch.where(test_mask == 1, 0, train_data.edge_attr)
-    test_data.edge_attr = torch.where(test_mask == 0, 0,  test_data.edge_attr)
+    train_data, test_data = train_test_split(data, 0.8)
 
     training = Training(
         device=device,
         train_data=train_data,
         test_data=test_data,
-        test_mask=test_mask,
         embedding_dim= embedding_dim,
         time_step= time_step,
         iterations= iterations,

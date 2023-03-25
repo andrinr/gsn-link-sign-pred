@@ -3,7 +3,8 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 
-def log_regression(train_data, test_data, test_mask):
+def log_regression(train_data, test_data):
+    test_mask = test_data.edge_attr != 0
     n_train = torch.count_nonzero(test_mask == 0).item()
     n_test = torch.count_nonzero(test_mask == 1).item()
     n_total = n_train + n_test
@@ -44,19 +45,18 @@ def log_regression(train_data, test_data, test_mask):
 
     X_test = torch.unsqueeze(X_test, 1)
     y_pred = clf.predict(X_test)
-    y_pred = y_pred / 2 + 0.5
-    y_test = y_test / 2 + 0.5
+    y_pred_norm = y_pred / 2 + 0.5
+    y_test_norm = y_test / 2 + 0.5
     y_pred_prob = clf.predict_proba(X_test)
 
     # evaluate the performance of the classifier
-    auc_score = roc_auc_score(y_test, y_pred_prob[:, 1])
+    auc_score = roc_auc_score(y_test_norm, y_pred_prob[:, 1])
 
-    f1_binary = f1_score(y_test, y_pred, average='binary', pos_label=1)
-    f1_micro = f1_score(y_test, y_pred, average='micro', pos_label=1)
-    f1_macro = f1_score(y_test, y_pred, average='macro', pos_label=1)
+    f1_binary = f1_score(y_test_norm, y_pred_norm, average='binary', pos_label=1)
+    f1_micro = f1_score(y_test_norm, y_pred_norm, average='micro', pos_label=1)
+    f1_macro = f1_score(y_test_norm, y_pred_norm, average='macro', pos_label=1)
 
-
-    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
+    tn, fp, fn, tp = confusion_matrix(y_test_norm, y_pred_norm).ravel()
     print('True negatives: ', tn, '\nFalse positives: ', fp, '\nFalse negatives: ', fn, '\nTrue Positives: ', tp)
 
-    return auc_score, f1_binary, f1_micro, f1_macro
+    return auc_score, f1_binary, f1_micro, f1_macro, y_test, y_pred
