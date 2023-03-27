@@ -33,7 +33,11 @@ class Triplets:
             w = np.random.choice(list(neighs_u_and_v))
 
             e2 = graph.get_edge_index(self.data, u, w) 
+            if len(e2) > 1:
+                e2 = e2[0]
             e3 = graph.get_edge_index(self.data, v, w)
+            if len(e3) > 1:
+                e3 = e3[0]
 
             self.triplets.append((e1, e2, e3))
 
@@ -41,11 +45,13 @@ class Triplets:
 
         return self
 
-    def generate(self):
+    def stats(self):
         n_balanced = 0
         n_unbalanced = 0
 
         self.edge_signs = []
+
+        print(self.data.edge_attr)
 
         for triplet in self.triplets:
             uv = triplet[0]
@@ -57,9 +63,10 @@ class Triplets:
             uw_sign = self.data.edge_attr[uw]
 
             sign = uv_sign * vu_sign * uw_sign
+
             self.edge_signs.append(sign)
 
-            if sign.item() == 1:
+            if sign == 1:
                 n_balanced += 1
             else:
                 n_unbalanced += 1
@@ -70,23 +77,59 @@ class Triplets:
 
         return self
     
-    def compare(self, predictions):
+    def compare(self, predictions, test_mask):
         if self.edge_signs is None:
             raise Exception("Call generate() first")
         
         n = len(self.triplets)
-        n_correct = 0
+
+
+        n_single_balanced = 0
+        n_single_unbalanced = 0
+
+        n_double_balanced = 0
+        n_double_unbalanced = 0
+
+        n_single_balanced_correct = 0
+        n_single_unbalanced_correct = 0
+
+        n_double_balanced_correct = 0
+        n_double_unbalanced_correct = 0
 
         for i in range(n):
             e1, e2, e3 = self.triplets[i]
 
-            s1 = predictions[e1]
-            s2 = predictions[e2]
-            s3 = predictions[e3]
+            t1 = test_mask[e1]
+            t2 = test_mask[e2]
+            t3 = test_mask[e3]
 
-            sign = s1 * s2 * s3
+            s1 = predictions[e1] if t1 else self.data.edge_attr[e1]
+            s2 = predictions[e2] if t2 else self.data.edge_attr[e2]
+            s3 = predictions[e3] if t3 else self.data.edge_attr[e3]
 
-            if self.edge_signs[i] == sign:
-                n_correct += 1
+            predicted = s1 * s2 * s3
+            actual = self.edge_signs[i]
 
-        return n_correct / n
+            n_neutral = int(t1.item()) + int(t2.item()) + int(t3.item())
+
+            if n_neutral == 0:
+                continue
+
+            if n_neutral == 1:
+                n_single_balanced_correct += 1 if predicted == actual and actual == 1 else 0
+                n_single_unbalanced_correct += 1 if predicted == actual and actual == -1 else 0
+
+                n_single_balanced += 1 if actual == 1 else 0
+                n_single_unbalanced += 1 if actual == -1 else 0
+
+            if n_neutral == 2:
+                n_double_balanced_correct += 1 if predicted == actual and actual == 1 else 0
+                n_double_unbalanced_correct += 1 if predicted == actual and actual == -1 else 0
+
+                n_double_balanced += 1 if actual == 1 else 0
+                n_double_unbalanced += 1 if actual == -1 else 0
+
+        return n_single_balanced_correct / n_single_balanced, \
+            n_single_unbalanced_correct / n_single_unbalanced, \
+            n_double_balanced_correct / n_double_balanced, \
+            n_double_unbalanced_correct / n_double_unbalanced

@@ -95,10 +95,12 @@ def main(argv) -> None:
     data, training_data, test_data = train_test_split(
         data = data, 
         train_percentage=0.8)
+    
+    assert data.is_undirected()
 
     stats = Triplets(data)
     stats.sample(1000)
-    stats.generate()
+    stats.stats()
     print(f"p_balanced: {stats.p_balanced}")
 
     n_edges = data.edge_attr.shape[0]
@@ -150,7 +152,13 @@ def main(argv) -> None:
             enemy_stiffness= params['enemy_stiffness'],
         )
 
-    print("percentage of correct signs: ", stats.compare(training.y_pred_raw))
+    test_mask = training_data.edge_attr == 0
+    sbc, suc, dbc, duc = stats.compare(training.y_pred, test_mask)
+    
+    print(f"Single balanced correct: {sbc}")
+    print(f"Single unbalanced correct: {suc}")
+    print(f"Double balanced correct: {dbc}")
+    print(f"Double unbalanced correct: {duc}")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

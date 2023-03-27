@@ -47,8 +47,9 @@ def log_regression(train_data, test_data):
         l += 1
 
     X_test = torch.unsqueeze(X_test, 1)
-    y_pred_raw = clf.predict(X_test)
-    y_pred = y_pred_raw / 2 + 0.5
+    y_pred = clf.predict(X_test)
+    y_pred_sparse[test_mask] = torch.tensor(y_pred)
+    y_pred = y_pred / 2 + 0.5
     y_test = y_test / 2 + 0.5
     y_pred_prob = clf.predict_proba(X_test)
 
@@ -62,4 +63,4 @@ def log_regression(train_data, test_data):
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
     print('True negatives: ', tn, '\nFalse positives: ', fp, '\nFalse negatives: ', fn, '\nTrue Positives: ', tp)
 
-    return auc_score, f1_binary, f1_micro, f1_macro, y_pred_raw
+    return auc_score, f1_binary, f1_micro, f1_macro, y_pred_sparse
