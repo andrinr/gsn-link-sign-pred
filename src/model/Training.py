@@ -55,11 +55,10 @@ class Training:
         end = timer()
         print(f"Time: {end - start}")
         
-        auc, f1_binary, f1_micro, f1_macro, y_test, y_pred =\
+        auc, f1_binary, f1_micro, f1_macro, y_pred_raw =\
             log_regression(self.train_data, self.test_data)
         
-        self.y_test = y_pred
-        self.y_pred = y_pred
+        self.y_pred_raw = y_pred_raw
 
         print(f"AUC: {auc}")
         print(f"F1 Binary: {f1_binary}")

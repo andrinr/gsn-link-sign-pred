@@ -2,6 +2,25 @@ from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 import torch
 
+def order_shuffle(data : Data):
+    num_total = int(data.num_edges / 2)
+
+    assert data.is_undirected()
+    assert data.edge_attr is not None
+
+    edge_index = data.edge_index[:, data.edge_index[0] <= data.edge_index[1]]
+    edge_attr = data.edge_attr[data.edge_index[0] <= data.edge_index[1]]
+
+    perm = torch.randperm(num_total, device=data.edge_index.device)
+
+    edge_index = edge_index[:, perm]
+    edge_attr = edge_attr[perm]
+    
+    edge_index = torch.cat([edge_index, edge_index.flip([0])], dim=-1)
+    edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
+
+    return edge_index, edge_attr
+
 def train_test_split(
         data : Data, 
         train_percentage : float):
@@ -25,17 +44,13 @@ def train_test_split(
     assert data.is_undirected()
     assert data.edge_attr is not None
 
-    edge_index = data.edge_index[:, data.edge_index[0] <= data.edge_index[1]]
-    edge_attr = data.edge_attr[data.edge_index[0] <= data.edge_index[1]]
+    edge_index = data.edge_index[:, :num_total]
+    edge_attr = data.edge_attr[:num_total]
 
-    perm = torch.randperm(num_total, device=data.edge_index.device)
-
-    edge_index = edge_index[:, perm]
-    edge_attr = edge_attr[perm]
+    edge_index, edge_attr = order_shuffle(data)
+    data.edge_index = edge_index
+    data.edge_attr = edge_attr
     
-    edge_index = torch.cat([edge_index, edge_index.flip([0])], dim=-1)
-    edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
-
     train_edge_attr = edge_attr.clone()
     train_edge_attr[:num_test] = 0
     train_edge_attr[num_total:num_test+num_total] = 0
@@ -44,14 +59,14 @@ def train_test_split(
     test_edge_attr[num_test:num_total] = 0
     test_edge_attr[num_total+num_test::] = 0
     
-    train_data = Data(  
-        edge_index=edge_index, 
-        num_nodes=data.num_nodes,
-        edge_attr=train_edge_attr)
+    training_data = Data(
+        edge_index=edge_index,
+        edge_attr=train_edge_attr,
+        num_nodes=data.num_nodes)
     
     test_data = Data(
         edge_index=edge_index,
-        num_nodes=data.num_nodes,
-        edge_attr=test_edge_attr)
+        edge_attr=test_edge_attr,
+        num_nodes=data.num_nodes)
     
-    return train_data, test_data
+    return data, training_data, test_data

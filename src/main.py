@@ -11,7 +11,7 @@ import inquirer
 from model import Training
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from stats import Triplets
-from graph import train_test_split
+from graph import train_test_split, order_shuffle
 
 def main(argv) -> None:
     """
@@ -35,7 +35,6 @@ def main(argv) -> None:
     time_step =  0.005
     damping = 0.02
     root = 'src/data/'
-    test_size = 0.2
 
     dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
@@ -92,6 +91,11 @@ def main(argv) -> None:
         transform = T.ToUndirected(reduce="min")
         data = transform(data)
 
+    # Create train and test datasets
+    data, training_data, test_data = train_test_split(
+        data = data, 
+        train_percentage=0.8)
+
     stats = Triplets(data)
     stats.sample(1000)
     stats.generate()
@@ -101,12 +105,10 @@ def main(argv) -> None:
 
     print(f"Number of edges: {n_edges}")
     print(f"Number of nodes: {data.num_nodes}")
-    # Create train and test datasets
-    train_data, test_data = train_test_split(data, 0.8)
 
     training = Training(
         device=device,
-        train_data=train_data,
+        train_data=training_data,
         test_data=test_data,
         embedding_dim= embedding_dim,
         time_step= time_step,
@@ -148,5 +150,8 @@ def main(argv) -> None:
             enemy_stiffness= params['enemy_stiffness'],
         )
 
+    print("percentage of correct signs: ", stats.compare(training.y_pred_raw))
+
 if __name__ == "__main__":
     main(sys.argv[1:])
+    

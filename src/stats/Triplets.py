@@ -45,6 +45,8 @@ class Triplets:
         n_balanced = 0
         n_unbalanced = 0
 
+        self.edge_signs = []
+
         for triplet in self.triplets:
             uv = triplet[0]
             vu = triplet[1]
@@ -55,6 +57,8 @@ class Triplets:
             uw_sign = self.data.edge_attr[uw]
 
             sign = uv_sign * vu_sign * uw_sign
+            self.edge_signs.append(sign)
+
             if sign.item() == 1:
                 n_balanced += 1
             else:
@@ -65,3 +69,24 @@ class Triplets:
         self.p_balanced = n_balanced / n
 
         return self
+    
+    def compare(self, predictions):
+        if self.edge_signs is None:
+            raise Exception("Call generate() first")
+        
+        n = len(self.triplets)
+        n_correct = 0
+
+        for i in range(n):
+            e1, e2, e3 = self.triplets[i]
+
+            s1 = predictions[e1]
+            s2 = predictions[e2]
+            s3 = predictions[e3]
+
+            sign = s1 * s2 * s3
+
+            if self.edge_signs[i] == sign:
+                n_correct += 1
+
+        return n_correct / n

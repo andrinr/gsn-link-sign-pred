@@ -14,6 +14,8 @@ def log_regression(train_data, test_data):
     X_test = torch.zeros(n_test)
     y_test = torch.zeros(n_test)
 
+    y_pred_sparse = torch.zeros(n_total)
+
     l = 0
     for k in range(n_total):
         if train_data.edge_attr[k] == 0:
@@ -45,19 +47,19 @@ def log_regression(train_data, test_data):
         l += 1
 
     X_test = torch.unsqueeze(X_test, 1)
-    y_pred = clf.predict(X_test)
-    y_pred_norm = y_pred / 2 + 0.5
-    y_test_norm = y_test / 2 + 0.5
+    y_pred_raw = clf.predict(X_test)
+    y_pred = y_pred_raw / 2 + 0.5
+    y_test = y_test / 2 + 0.5
     y_pred_prob = clf.predict_proba(X_test)
 
     # evaluate the performance of the classifier
-    auc_score = roc_auc_score(y_test_norm, y_pred_prob[:, 1])
+    auc_score = roc_auc_score(y_test, y_pred_prob[:, 1])
 
-    f1_binary = f1_score(y_test_norm, y_pred_norm, average='binary', pos_label=1)
-    f1_micro = f1_score(y_test_norm, y_pred_norm, average='micro', pos_label=1)
-    f1_macro = f1_score(y_test_norm, y_pred_norm, average='macro', pos_label=1)
+    f1_binary = f1_score(y_test, y_pred, average='binary', pos_label=1)
+    f1_micro = f1_score(y_test, y_pred, average='micro', pos_label=1)
+    f1_macro = f1_score(y_test, y_pred, average='macro', pos_label=1)
 
-    tn, fp, fn, tp = confusion_matrix(y_test_norm, y_pred_norm).ravel()
+    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
     print('True negatives: ', tn, '\nFalse positives: ', fp, '\nFalse negatives: ', fn, '\nTrue Positives: ', tp)
 
-    return auc_score, f1_binary, f1_micro, f1_macro, y_test, y_pred
+    return auc_score, f1_binary, f1_micro, f1_macro, y_pred_raw
