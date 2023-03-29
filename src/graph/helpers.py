@@ -28,3 +28,14 @@ def get_edge_index(data, u, v):
     index = np.where(node_edges)[0]
 
     return index
+
+def to_directed(data):
+    assert data.is_undirected()
+    data.edge_index = data.edge_index[:, data.edge_index[0] <= data.edge_index[1]]
+
+    if data.edge_attr is not None:
+        data.edge_attr = data.edge_attr[data.edge_index[0] <= data.edge_index[1]]
+
+    return data
+
+    

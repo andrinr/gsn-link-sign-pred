@@ -87,9 +87,9 @@ def main(argv) -> None:
         dataset = Epinions(root= root)
 
     data = dataset[0]
-    if not is_undirected(data.edge_index):
-        transform = T.ToUndirected(reduce="min")
-        data = transform(data)
+    # if not is_undirected(data.edge_index):
+    #     transform = T.ToUndirected(reduce="min")
+    #     data = transform(data)
 
     # Create train and test datasets
     data, training_data, test_data = train_test_split(
