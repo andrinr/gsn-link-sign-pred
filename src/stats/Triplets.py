@@ -1,10 +1,7 @@
 from torch_geometric.data import Data
-from torch_geometric.nn import functional as F
-from torch_geometric.utils import to_networkx
+from torch_geometric.utils import degree
 import numpy as np
 import graph
-import networkx as nx
-import torch
 
 class Triplets:
     def __init__(self, data: Data):
@@ -14,13 +11,6 @@ class Triplets:
         if seed : np.random.seed(seed)
         self.triplets = []
         n_edges = self.data.num_edges
-
-        G = to_networkx(self.data)
-        print("Searching for cycles")
-        
-        cycles = list(nx.algorithms.cycles.simple_cycles(G, length_bound=5))
-        print(f"Found {len(cycles)} cycles")
-        print(cycles)
 
         n_found = 0
 
@@ -93,17 +83,11 @@ class Triplets:
         
         n = len(self.triplets)
 
-        n_single_balanced = 0
-        n_single_unbalanced = 0
+        total_balanced = np.zeros(3)
+        correct_balanced = np.zeros(3)
 
-        n_double_balanced = 0
-        n_double_unbalanced = 0
-
-        n_single_balanced_correct = 0
-        n_single_unbalanced_correct = 0
-
-        n_double_balanced_correct = 0
-        n_double_unbalanced_correct = 0
+        total_unbalanced = np.zeros(3)
+        correct_unbalanced = np.zeros(3)
 
         for i in range(n):
             e1, e2, e3 = self.triplets[i]
@@ -121,24 +105,13 @@ class Triplets:
 
             n_neutral = int(t1.item()) + int(t2.item()) + int(t3.item())
 
-            if n_neutral == 0:
-                continue
-
-            if n_neutral == 1:
-                n_single_balanced_correct += 1 if predicted == actual and actual == 1 else 0
-                n_single_unbalanced_correct += 1 if predicted == actual and actual == -1 else 0
-
-                n_single_balanced += 1 if actual == 1 else 0
-                n_single_unbalanced += 1 if actual == -1 else 0
-
-            if n_neutral == 2:
-                n_double_balanced_correct += 1 if predicted == actual and actual == 1 else 0
-                n_double_unbalanced_correct += 1 if predicted == actual and actual == -1 else 0
-
-                n_double_balanced += 1 if actual == 1 else 0
-                n_double_unbalanced += 1 if actual == -1 else 0
-
-        return n_single_balanced_correct / n_single_balanced, \
-            n_single_unbalanced_correct / n_single_unbalanced, \
-            n_double_balanced_correct / n_double_balanced, \
-            n_double_unbalanced_correct / n_double_unbalanced
+            for j in range(3):
+                if n_neutral == j + 1:
+                    if actual == 1:
+                        total_balanced[j] += 1
+                        correct_balanced[j] += 1 if predicted == actual else 0
+                    else:
+                        total_unbalanced[j] += 1
+                        correct_unbalanced[j] += 1 if predicted == actual else 0
+        
+        return total_balanced, correct_balanced, total_unbalanced, correct_unbalanced

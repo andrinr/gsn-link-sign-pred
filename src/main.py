@@ -7,6 +7,10 @@ import torch_geometric.transforms as T
 from torch_geometric.utils import is_undirected
 import yaml
 import inquirer
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+
 # Local dependencies
 from model import Training
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
@@ -67,20 +71,17 @@ def main(argv) -> None:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    if dataset_name == "BitcoinOTC":
-        dataset = BitcoinO(root= root)
-
-    elif dataset_name == "Bitcoin_Alpha":
-        dataset = BitcoinA(root= root)
-    
-    elif dataset_name == "WikiRFA":
-        dataset = WikiRFA(root= root)
-        
-    elif dataset_name == "Slashdot":
-        dataset = Slashdot(root= root)
-        
-    elif dataset_name == "Epinions":
-        dataset = Epinions(root= root)
+    match dataset_name:
+        case "BitcoinOTC":
+            dataset = BitcoinO(root= root)
+        case "Bitcoin_Alpha":
+            dataset = BitcoinA(root= root)
+        case "WikiRFA":
+            dataset = WikiRFA(root= root)
+        case "Slashdot":
+            dataset = Slashdot(root= root)
+        case "Epinions":
+            dataset = Epinions(root= root)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
@@ -92,17 +93,9 @@ def main(argv) -> None:
         data = data, 
         train_percentage=0.8)
     
-    assert data.is_undirected()
-
     stats = Triplets(data)
-    stats.sample(1000)
+    stats.sample(6000)
     stats.stats()
-    print(f"p_balanced: {stats.p_balanced}")
-
-    n_edges = data.edge_attr.shape[0]
-
-    print(f"Number of edges: {n_edges}")
-    print(f"Number of nodes: {data.num_nodes}")
 
     training = Training(
         device=device,
@@ -116,8 +109,6 @@ def main(argv) -> None:
         friend_stiffness=5.0)
 
     if optimizer_iterations > 0:
-        # Instrumentation class is used for functions with multiple inputs
-        # (positional and/or keywords)
         parametrization = ng.p.Instrumentation(
             neutral_distance=ng.p.Scalar(lower=0.1, upper=30.0),
             neutral_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
@@ -128,19 +119,15 @@ def main(argv) -> None:
         optimizer = ng.optimizers.NGOpt(parametrization=parametrization, budget=optimizer_iterations, num_workers=1)
 
         recommendation = optimizer.minimize(training)
-
-        # convert to dict
         recommendation = dict(recommendation.kwargs)
         print(recommendation)
 
         user_input = input('Do you want to store the preferences? (y/n) ')
-
         if user_input.lower() == 'y':
             with open('src/params.yaml', 'w') as outfile:
                 yaml.dump(recommendation, outfile, default_flow_style=False)
 
     else:
-        
         training(
             neutral_distance= params['neutral_distance'],
             neutral_stiffness= params['neutral_stiffness'],
@@ -149,12 +136,21 @@ def main(argv) -> None:
         )
 
     test_mask = training_data.edge_attr == 0
-    sbc, suc, dbc, duc = stats.compare(training.y_pred, test_mask)
+    total_balanced, correct_balanced, total_unbalanced, correct_unbalanced =\
+        stats.compare(training.y_pred, test_mask)
+
+    correct = np.concatenate((correct_balanced / total_balanced , correct_unbalanced / total_unbalanced))
+    df = pd.DataFrame({
+        'neutral': [1, 2, 3, 1, 2, 3],
+        'balanced': [1, 1, 1, 0, 0, 0],
+        'correct': correct
+    })
     
-    print(f"Single balanced correct: {sbc}")
-    print(f"Single unbalanced correct: {suc}")
-    print(f"Double balanced correct: {dbc}")
-    print(f"Double unbalanced correct: {duc}")
+    sns.catplot(
+        data=df, kind="bar",
+        x="neutral", y="correct", hue="balanced"
+    )
+    plt.show()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
