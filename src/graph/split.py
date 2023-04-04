@@ -1,7 +1,6 @@
 from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 import torch
-from graph import shuffle
 
 def train_test_split(
         data : Data, 
@@ -26,28 +25,33 @@ def train_test_split(
     assert data.is_undirected()
     assert data.edge_attr is not None
 
-    edge_index = data.edge_index[:, :num_total]
-    edge_attr = data.edge_attr[:num_total]
+    mask = data.edge_index[0] < data.edge_index[1]
+    data.edge_index = data.edge_index[:, mask]
+    data.edge_attr = data.edge_attr[mask]
 
-    edge_index, edge_attr = shuffle(edge_index, edge_attr)
-    data.edge_index = edge_index
-    data.edge_attr = edge_attr
+    perm = torch.randperm(num_total, device=data.edge_index.device)
+
+    data.edge_index = data.edge_index[:, perm]
+    data.edge_attr = data.edge_attr[perm]
     
-    train_edge_attr = edge_attr.clone()
+    data.edge_index = torch.cat([data.edge_index, data.edge_index.flip([0])], dim=-1)
+    data.edge_attr = torch.cat([data.edge_attr, data.edge_attr], dim=0)
+    
+    train_edge_attr = data.edge_attr.clone()
     train_edge_attr[:num_test] = 0
     train_edge_attr[num_total:num_test+num_total] = 0
 
-    test_edge_attr = edge_attr.clone()
+    test_edge_attr = data.edge_attr.clone()
     test_edge_attr[num_test:num_total] = 0
     test_edge_attr[num_total+num_test::] = 0
     
     training_data = Data(
-        edge_index=edge_index,
+        edge_index=data.edge_index,
         edge_attr=train_edge_attr,
         num_nodes=data.num_nodes)
     
     test_data = Data(
-        edge_index=edge_index,
+        edge_index=data.edge_index,
         edge_attr=test_edge_attr,
         num_nodes=data.num_nodes)
     

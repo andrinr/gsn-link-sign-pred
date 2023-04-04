@@ -1,7 +1,10 @@
 from torch_geometric.data import Data
 from torch_geometric.nn import functional as F
+from torch_geometric.utils import to_networkx
 import numpy as np
 import graph
+import networkx as nx
+import torch
 
 class Triplets:
     def __init__(self, data: Data):
@@ -11,6 +14,13 @@ class Triplets:
         if seed : np.random.seed(seed)
         self.triplets = []
         n_edges = self.data.num_edges
+
+        G = to_networkx(self.data)
+        print("Searching for cycles")
+        
+        cycles = list(nx.algorithms.cycles.simple_cycles(G, length_bound=5))
+        print(f"Found {len(cycles)} cycles")
+        print(cycles)
 
         n_found = 0
 
@@ -82,7 +92,6 @@ class Triplets:
             raise Exception("Call generate() first")
         
         n = len(self.triplets)
-
 
         n_single_balanced = 0
         n_single_unbalanced = 0

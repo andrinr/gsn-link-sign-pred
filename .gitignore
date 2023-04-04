@@ -4,3 +4,5 @@
 **/raw/
 *.py[cod]
 *$py.class
+
+lib

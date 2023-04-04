@@ -11,7 +11,7 @@ import inquirer
 from model import Training
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from stats import Triplets
-from graph import train_test_split, order_shuffle
+from graph import train_test_split
 
 def main(argv) -> None:
     """
@@ -46,8 +46,6 @@ def main(argv) -> None:
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
 
-    plot_stats = False
-
     optimizer_iterations = 0
     opts, args = getopt.getopt(argv,"s:h:d:i:o:p:",
         ["embedding_size=","time_step=", "damping=", "iterations=", "optimize="])
@@ -62,8 +60,6 @@ def main(argv) -> None:
             iterations = int(arg)
         elif opt == '-o':
             optimizer_iterations = int(arg)
-        elif opt == '-p':
-            plot_stats = True
 
     if optimizer_iterations == 0 :
         stream = open("src/params.yaml", 'r')
@@ -87,9 +83,9 @@ def main(argv) -> None:
         dataset = Epinions(root= root)
 
     data = dataset[0]
-    # if not is_undirected(data.edge_index):
-    #     transform = T.ToUndirected(reduce="min")
-    #     data = transform(data)
+    if not is_undirected(data.edge_index):
+        transform = T.ToUndirected(reduce="min")
+        data = transform(data)
 
     # Create train and test datasets
     data, training_data, test_data = train_test_split(
