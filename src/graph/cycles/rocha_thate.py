@@ -8,17 +8,17 @@ from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.aggr import Aggregation
 
 class RochaThateAggregation(Aggregation):
-    
     def forward(self, x: Tensor, index: Optional[Tensor] = None,
                 ptr: Optional[Tensor] = None, dim_size: Optional[int] = None,
                 dim: int = -2) -> Tensor:
-        return super().forward(x, index, ptr, dim_size, dim)
+        
+        print("x", x)
+        return x
     
-
 class RochaThate(MessagePassing):
     def __init__(self,
         collect_attributes: bool = True):
-        super().__init__(aggr='add')
+        super().__init__(aggr=RochaThateAggregation())
 
     def forward(self, edge_index, index, sign):
         return self.propagate(edge_index, index=index, sign=sign)
@@ -26,7 +26,7 @@ class RochaThate(MessagePassing):
     def message(self, index_i, index_j, sign):
         return torch.cat((index_i, index_j, sign), 1)
 
-class SpringTransform(BaseTransform):
+class RochaThateCycles(BaseTransform):
     # implement this
     # https://en.wikipedia.org/wiki/Rocha%E2%80%93Thatte_cycle_detection_algorithm
 
