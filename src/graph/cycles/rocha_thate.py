@@ -50,11 +50,15 @@ class RochaThateCycles(BaseTransform):
 
         pos = pos.unsqueeze(1)
 
-        print("pos", pos)
+        print(pos.shape)
+        print(data.edge_index)
+        print(data.num_nodes)
 
         for i in range(self.max_cycles):
             pos = self.iteration(
                 edge_index = data.edge_index, 
                 position = pos, sign = data.edge_attr)
+            
+            print(pos.shape)
 
         pass

@@ -1,7 +1,7 @@
 import graph.cycles.rocha_thate as rocha_thate
 import torch
 from torch_geometric.data import Data
-from torch_geometric.utils import to_networkx
+from torch_geometric.utils import to_networkx, remove_self_loops
 from torch_geometric.transforms import ToUndirected
 from networkx.algorithms.cycles import simple_cycles
 import graph.cycles as cycles
@@ -9,9 +9,10 @@ import graph.cycles as cycles
 def gen_graph() -> Data:
     n_nodes = 10
     n_edges = 15
-    edge_index = torch.randint(0, 100, (2, 1000), dtype=torch.long)
+    edge_index = torch.randint(0, n_nodes, (2, n_edges), dtype=torch.long)
+    edge_index, _ = remove_self_loops(edge_index)
+    data = Data(edge_index=edge_index, num_nodes=n_nodes)
 
-    data = Data(edge_index=edge_index)
     transform = ToUndirected()
     data = transform(data)
 
