@@ -11,13 +11,14 @@ If that does not work, you can install the following packages manually:
 - tqdm
 - numpy
 - scipy
-- networkx
 - pyg-nightly (Many unreleased features are used, so you need to install the nightly version)
 - skikit-learn
 - torch
 - pyyaml
 - pandas
 - matplotlib
+- nevergrad
+- networkx (Install direclty from source as unreleased features are used.)
 
 In order to use the GPU, you need to install CUDA and PyTorch with CUDA support.
 
@@ -32,4 +33,9 @@ Run ```python src/main.py``` where the following arguments can opionally be pass
 - ```-o <value>``` if set starts the nevergrad optimization with the given number of iterations. The recommendations can then be stored as the new default parameters in the ```params.yaml``` file. Recommended is around 30 iterations.
 
 The script asks the user to select a dataset in the terminal after execution.
+
+## Testing the code
+
+run ```pytest``` in the ```src``` folder.
+
 
