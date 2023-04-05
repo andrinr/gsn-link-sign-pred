@@ -7,8 +7,8 @@ from networkx.algorithms.cycles import simple_cycles
 import graph.cycles as cycles
 
 def gen_graph() -> Data:
-    n_nodes = 100
-    n_edges = 1000
+    n_nodes = 10
+    n_edges = 15
     edge_index = torch.randint(0, 100, (2, 1000), dtype=torch.long)
 
     data = Data(edge_index=edge_index)
@@ -21,7 +21,7 @@ def test_find_cycles():
     length_bound = 4
     data = gen_graph()
     G = to_networkx(data)
-    cycles = sorted(simple_cycles(G, length_bound=length_bound))
+    nx_cycles = sorted(simple_cycles(G, length_bound=length_bound))
 
     transform = cycles.RochaThateCycles(max_cycles=length_bound, collect_attributes = False)
     data = transform(data)

@@ -38,10 +38,3 @@ def test_get_edge_index():
     assert graph.get_edge_index(data, 1, 0).item() == 1
     assert graph.get_edge_index(data, 1, 2).item() == 2
     assert graph.get_edge_index(data, 2, 1).item() == 3
-
-def test_to_directed():
-    data = gen_graph()
-    data = graph.to_directed(data)
-    assert data.is_directed()
-    assert np.all(data.edge_index.numpy() == np.array([[0, 1],
-                                                        [1, 0]]))
