@@ -12,6 +12,7 @@ class RochaThateAggregation(Aggregation):
                 ptr: Optional[Tensor] = None, dim_size: Optional[int] = None,
                 dim: int = -2) -> Tensor:
         
+        print(self.reduce(x, index, ptr, dim_size, dim, reduce='sum'))
         print("x", x)
         return x
     
@@ -21,9 +22,13 @@ class RochaThateIteration(MessagePassing):
         super().__init__(aggr=RochaThateAggregation())
 
     def forward(self, edge_index, position, sign):
+        print("edge_index", edge_index)
+        print("position", position)
+        print("sign", sign)
         return self.propagate(edge_index, position=position, sign=sign)
     
     def message(self, position_i, position_j, sign):
+        print("position_i", position_i)
         vector = position_j - position_i
         return position_j + vector
 
@@ -48,17 +53,15 @@ class RochaThateCycles(BaseTransform):
             (data.num_nodes, self.dimensions), 
             device=data.edge_index.device) * 2.0 - 1.0
 
-        pos = pos.unsqueeze(1)
-
-        print(pos.shape)
-        print(data.edge_index)
-        print(data.num_nodes)
-
         for i in range(self.max_cycles):
+            print("Iteration", i)
             pos = self.iteration(
                 edge_index = data.edge_index, 
                 position = pos, sign = data.edge_attr)
             
+            # get all zero position indices
+            zeros = torch.where(torch.all(pos == 0, dim=1))
+            
             print(pos.shape)
 
-        pass
+        return data

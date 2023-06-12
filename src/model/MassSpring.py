@@ -32,6 +32,3 @@ class MassSpring(MessagePassing):
         force = torch.where(sign == 1, attraction, retraction)
         force = torch.where(sign == 0, regular, force)
         return force.T
-
-    def __repr__(self) -> str:
-        return super().__repr__() + f'({self.stiffness})'
