@@ -52,6 +52,8 @@ class RochaThateCycles(BaseTransform):
         pos = torch.rand(
             (data.num_nodes, self.dimensions), 
             device=data.edge_index.device) * 2.0 - 1.0
+        
+        cycles = 
 
         for i in range(self.max_cycles):
             print("Iteration", i)
