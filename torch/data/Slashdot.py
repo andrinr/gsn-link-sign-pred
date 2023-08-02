@@ -68,7 +68,7 @@ class Slashdot(InMemoryDataset):
 
     def process(self):
         data = Data()
-       # Read in file
+        # Read in file
         df_raw = pd.read_csv(self.raw_paths[0], sep='\t', header=4)
         df_raw = df_raw.to_numpy()
         u = df_raw[:, 0]
