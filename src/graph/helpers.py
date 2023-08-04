@@ -38,13 +38,19 @@ def get_cycles(data : Data, degree : int):
     # get signs of cycles
     cycles = list(cycles)
     cycle_signs = []
-    node_attr = np.
+    # init list of lists
+    node_cycles = [[] for _ in range(data.num_nodes)]
 
     for cycle in cycles:
         sign = 1
-        for i in range(len(cycle)):
+        deg = len(cycle)
+        for i in range(deg):
             u = cycle[i]
             v = cycle[(i+1) % len(cycle)]
             index = get_edge_index(data, u, v)
             sign *= data.edge_attr[index]
         
+        node_cycles[u].append((deg, sign))
+        node_cycles[v].append((deg, sign))
+
+    return node_cycles
