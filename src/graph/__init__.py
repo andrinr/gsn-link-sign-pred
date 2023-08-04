@@ -1,3 +1,3 @@
 from .helpers import *
 from .split import *
-from .cycles.rocha_thate import *
+from .cycles.rocha_thatte import *

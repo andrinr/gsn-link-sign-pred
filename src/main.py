@@ -10,6 +10,8 @@ import inquirer
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+from torch_geometric.utils import to_networkx
+from networkx.algorithms.cycles import simple_cycles
 
 # Local dependencies
 from model import Training
@@ -92,6 +94,12 @@ def main(argv) -> None:
     data, training_data, test_data = train_test_split(
         data = data, 
         train_percentage=0.8)
+    
+    print("Generating networkx graph")
+    nx_data = to_networkx(data)
+    print("Counting cycles")
+    nx_cycles = sorted(simple_cycles(nx_data, length_bound=5))
+    print("Found cycles", nx_cycles)
     
     stats = Triplets(data)
     stats.sample(6000)

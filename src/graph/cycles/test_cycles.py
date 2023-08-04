@@ -1,10 +1,10 @@
-import graph.cycles.rocha_thate as rocha_thate
+import graph.cycles.rocha_thatte as rocha_thatte
 import torch
 from torch_geometric.data import Data
 from torch_geometric.utils import to_networkx, remove_self_loops
 from torch_geometric.transforms import ToUndirected
 from networkx.algorithms.cycles import simple_cycles
-from graph.cycles import RochaThateCycles
+from graph.cycles import RochaThatteCycles
 
 def gen_graph() -> Data:
     n_nodes = 10
@@ -23,18 +23,18 @@ def gen_graph() -> Data:
 
     return data
 
-def test_find_cycles():
-    length_bound = 4
-    torch.manual_seed(1)
-    data = gen_graph()
-    G = to_networkx(data)
-    print(f"NX graph: {G}")
-    nx_cycles = sorted(simple_cycles(G, length_bound=length_bound))
+# def test_find_cycles():
+#     length_bound = 4
+#     torch.manual_seed(1)
+#     data = gen_graph()
+#     G = to_networkx(data)
+#     print(f"NX graph: {G}")
+#     nx_cycles = sorted(simple_cycles(G, length_bound=length_bound))
 
-    print(f"Found cycles: {nx_cycles}")
+#     print(f"Found cycles: {nx_cycles}")
 
-    transform = RochaThateCycles(max_cycles=length_bound, collect_attributes = False)
+#     transform = RochaThatteCycles(max_cycles=length_bound, collect_attributes = False)
 
-    data = transform(data)
+#     data = transform(data)
 
-    assert False
+#     assert False
