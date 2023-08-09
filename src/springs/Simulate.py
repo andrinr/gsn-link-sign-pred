@@ -1,4 +1,4 @@
-from model import SpringTransform, log_regression
+from springs import SpringTransform, log_regression
 from timeit import default_timer as timer
 import torch
 

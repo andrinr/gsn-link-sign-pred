@@ -7,6 +7,11 @@ class Triplets:
     def __init__(self, data: Data):
         self.data = data
 
+    def __call__(self, n_triplets : int = 1000, seed: int = None):
+        self.sample(n_triplets, seed)
+        self.stats()
+        return self
+
     def sample(self, n_triplets : int = 1000, seed: int = None):
         if seed : np.random.seed(seed)
         self.triplets = []
@@ -14,7 +19,7 @@ class Triplets:
 
         n_found = 0
 
-         # sample 1000 triplets
+        # repeat until correct number of triplets is found
         while n_found < n_triplets:
             e1 = np.random.randint(n_edges, size=1)[0]
             u, v = self.data.edge_index[:, e1]
@@ -25,11 +30,10 @@ class Triplets:
             neighs_u = neighs_u - {v}
             neighs_v = neighs_v - {u}
 
-            # find a neighbor of u that is not a neighbor of v
+            # find a neighbor of u that is also a neighbor of v
             neighs_u_and_v = neighs_u.intersection(neighs_v)
-            if len(neighs_u_and_v) == 0:
-                continue
 
+            # pick a random neighbor of u that is also a neighbor of v
             w = np.random.choice(list(neighs_u_and_v))
 
             e2 = graph.get_edge_index(self.data, u, w) 
@@ -39,11 +43,12 @@ class Triplets:
             if len(e3) > 1:
                 e3 = e3[0]
 
-            self.triplets.append((e1, e2, e3))
+            triangle = frozenset([e1, e2, e3])
 
-            n_found += 1
+            if triangle not in self.triplets:
+                self.triplets.append(triangle)
+                n_found += 1
 
-        return self
 
     def stats(self):
         n_balanced = 0
@@ -79,7 +84,7 @@ class Triplets:
     
     def compare(self, predictions, test_mask):
         if self.edge_signs is None:
-            raise Exception("Call generate() first")
+            raise Exception("Call() first")
         
         n = len(self.triplets)
 

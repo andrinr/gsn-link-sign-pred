@@ -1,7 +1,7 @@
 import torch
 from torch_geometric.data import Data
 from torch_geometric.transforms import BaseTransform
-from model import MassSpring
+from springs import MassSpring
 from tqdm import tqdm
 from torch_geometric.utils import degree
 

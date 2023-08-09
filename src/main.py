@@ -14,10 +14,10 @@ from torch_geometric.utils import to_networkx
 from networkx.algorithms.cycles import simple_cycles
 
 # Local dependencies
-from model import Training
+from springs import Training
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from stats import Triplets
-from graph import train_test_split
+from graph import CycleTransform, train_test_split
 
 def main(argv) -> None:
     """
@@ -73,17 +73,21 @@ def main(argv) -> None:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    pre_transform = T.Compose([
+        CycleTransform(max_degree=8)
+    ])
+
     match dataset_name:
         case "BitcoinOTC":
-            dataset = BitcoinO(root= root)
+            dataset = BitcoinO(root= root, pre_transform=pre_transform)
         case "Bitcoin_Alpha":
-            dataset = BitcoinA(root= root)
+            dataset = BitcoinA(root= root, pre_transform=pre_transform)
         case "WikiRFA":
-            dataset = WikiRFA(root= root)
+            dataset = WikiRFA(root= root, pre_transform=pre_transform)
         case "Slashdot":
-            dataset = Slashdot(root= root)
+            dataset = Slashdot(root= root, pre_transform=pre_transform)
         case "Epinions":
-            dataset = Epinions(root= root)
+            dataset = Epinions(root= root, pre_transform=pre_transform)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
@@ -95,16 +99,9 @@ def main(argv) -> None:
         data = data, 
         train_percentage=0.8)
     
-    print("Generating networkx graph")
-    nx_data = to_networkx(data)
-    print("Counting cycles")
-    nx_cycles = sorted(simple_cycles(nx_data, length_bound=5))
-    print("Found cycles", nx_cycles)
+    triplets = Triplets(data)
+    triplets(1000)
     
-    stats = Triplets(data)
-    stats.sample(6000)
-    stats.stats()
-
     training = Training(
         device=device,
         train_data=training_data,
@@ -145,7 +142,7 @@ def main(argv) -> None:
 
     test_mask = training_data.edge_attr == 0
     total_balanced, correct_balanced, total_unbalanced, correct_unbalanced =\
-        stats.compare(training.y_pred, test_mask)
+        triplets.compare(training.y_pred, test_mask)
 
     correct = np.concatenate((correct_balanced / total_balanced , correct_unbalanced / total_unbalanced))
     df = pd.DataFrame({

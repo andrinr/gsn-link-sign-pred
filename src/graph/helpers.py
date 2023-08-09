@@ -2,6 +2,7 @@ from torch_geometric.data import Data
 import numpy as np
 from torch_geometric.utils import to_networkx, remove_self_loops
 from networkx.algorithms.cycles import simple_cycles
+from tqdm import tqdm
 
 def check_edge_exists(data : Data, u : int, v : int):
     edge_index = data.edge_index
@@ -32,18 +33,24 @@ def get_edge_index(data : Data, u, v):
     return index
 
 def get_cycles(data : Data, degree : int):
+
     G = to_networkx(data)
     cycles = simple_cycles(G, length_bound=degree)
     
     # get signs of cycles
     cycles = list(cycles)
-    cycle_signs = []
+    print("cycles", cycles)
+
     # init list of lists
     node_cycles = [[] for _ in range(data.num_nodes)]
 
-    for cycle in cycles:
+    pbar = tqdm(cycles)
+    for cycle in pbar:
         sign = 1
         deg = len(cycle)
+        if deg == 2:
+            continue
+
         for i in range(deg):
             u = cycle[i]
             v = cycle[(i+1) % len(cycle)]
