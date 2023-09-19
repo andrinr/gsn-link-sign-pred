@@ -117,12 +117,13 @@ class SpringTransform(BaseTransform):
             energy = torch.sqrt(torch.norm(self.vel, dim=1, keepdim=False)) + torch.norm(force, dim=1, keepdim=False)
             self.energy_total = torch.sum(energy)
 
-
             pbar.set_description(f"Energy: {self.energy_total.item():.2f}")
           
             self.vel = self.vel * (1.0 - self.damping * (i / self.iterations))
 
         data.x = self.pos
+
+        return data
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}()'

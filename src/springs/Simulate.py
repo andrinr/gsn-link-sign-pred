@@ -71,10 +71,10 @@ class Training:
             f1_macros.append(f1_macro)
             energies.append(transform.energy_total)
 
+            print(f"Iteration: {i * iterations_interval}")
+
         end = timer()
         print(f"Time: {end - start}")
-
-        self.energies = transform.energies
 
         self.y_pred = y_pred
 
