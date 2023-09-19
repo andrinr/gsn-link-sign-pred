@@ -70,4 +70,5 @@ where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$,
 
 The method generally performs well for Bitcoin_Alpha, BitcoinOTC and WikiRFA but not so well for Slashdot and Epinions. 
 
+![Results](energy_score_corr.png)
 ![Results](ratio_energy.png)

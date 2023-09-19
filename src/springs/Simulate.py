@@ -35,7 +35,7 @@ class Training:
         enemy_distance,     
         enemy_stiffness) -> float:
 
-        iterations_interval = 100
+        iterations_interval = 50
         num_intervals = self.iterations // iterations_interval
 
         transform = SpringTransform(
@@ -57,7 +57,7 @@ class Training:
         f1_binaries = []
         f1_micros = []
         f1_macros = []
-        energies = []
+        energies = torch.zeros(num_intervals)
 
         for i in range(num_intervals):
             self.train_data = transform(self.train_data)
@@ -69,7 +69,7 @@ class Training:
             f1_binaries.append(f1_binary)
             f1_micros.append(f1_micro)
             f1_macros.append(f1_macro)
-            energies.append(transform.energy_total)
+            energies[i] = (transform.energy_total)
 
             print(f"Iteration: {i * iterations_interval}")
 
@@ -83,9 +83,18 @@ class Training:
         plt.plot(f1_binaries, label='F1 binary')
         plt.plot(f1_micros, label='F1 micro')
         plt.plot(f1_macros, label='F1 macro')
-        plt.plot(energies, label='Energy')
+        # put energy on another y axis, log scale
+        ax = plt.gca()
+        ax2 = ax.twinx()
+        ax2.set_yscale('log')
+        ax2.plot(energies, label='Energy', color='black')
+        ax2.set_ylabel('Energy')
+        ax2.legend(loc='upper right')
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('Measure')
+        ax.legend(loc='lower right')
+        
 
-        plt.legend()
         plt.show()
 
         return 1 / f1_macro

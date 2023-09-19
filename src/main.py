@@ -37,7 +37,7 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 32
-    iterations = 1000
+    iterations = 400
     time_step =  0.01
     damping = 0.05
     root = 'src/data/'
