@@ -8,7 +8,6 @@ class Training:
     Training
     """
     def __init__(self, 
-        device, 
         train_data, 
         test_data, 
         embedding_dim, 
@@ -18,7 +17,6 @@ class Training:
         friend_distance,
         friend_stiffness):
 
-        self.device = device
         self.train_data = train_data
         self.test_data = test_data
         self.embedding_dim = embedding_dim
@@ -37,11 +35,13 @@ class Training:
         enemy_distance,     
         enemy_stiffness) -> float:
 
+        iterations_interval = 100
+        num_intervals = self.iterations // iterations_interval
+
         transform = SpringTransform(
-            device=self.device,
             embedding_dim=self.embedding_dim,
             time_step=self.time_step,
-            iterations=self.iterations,
+            iterations=iterations_interval,
             damping=self.damping,
             friend_distance=self.friend_distance,
             friend_stiffness=self.friend_stiffness,
@@ -52,26 +52,40 @@ class Training:
         )
 
         start = timer()
-        self.train_data = transform(self.train_data)
+
+        aucs = []
+        f1_binaries = []
+        f1_micros = []
+        f1_macros = []
+        energies = []
+
+        for i in range(num_intervals):
+            self.train_data = transform(self.train_data)
+
+            auc, f1_binary, f1_micro, f1_macro, y_pred =\
+                log_regression(self.train_data, self.test_data)
+            
+            aucs.append(auc)
+            f1_binaries.append(f1_binary)
+            f1_micros.append(f1_micro)
+            f1_macros.append(f1_macro)
+            energies.append(transform.energy_total)
+
         end = timer()
         print(f"Time: {end - start}")
 
         self.energies = transform.energies
 
-        self.final_per_node_energy = transform.final_per_node_energy.cpu()
-        self.final_per_node_vel = transform.final_per_node_vel.cpu()
-        self.final_per_node_force = transform.final_per_node_force.cpu()
-        self.final_per_node_pos = transform.final_per_node_pos.cpu()
-
-        
-        auc, f1_binary, f1_micro, f1_macro, y_pred =\
-            log_regression(self.train_data, self.test_data)
-        
         self.y_pred = y_pred
 
-        print(f"AUC: {auc}")
-        print(f"F1 Binary: {f1_binary}")
-        print(f"F1 Micro: {f1_micro}")
-        print(f"F1 Macro: {f1_macro}")
+        # plot measures and energy
+        plt.plot(aucs, label='AUC')
+        plt.plot(f1_binaries, label='F1 binary')
+        plt.plot(f1_micros, label='F1 micro')
+        plt.plot(f1_macros, label='F1 macro')
+        plt.plot(energies, label='Energy')
+
+        plt.legend()
+        plt.show()
 
         return 1 / f1_macro

@@ -24,11 +24,12 @@ class MassSpring(MessagePassing):
     def message(self, position_i, position_j, sign):
         spring = position_j - position_i
         length = torch.norm(spring, dim=1, keepdim=False)
+
         normalized = torch.div(spring.T, length + 0.001)
         attraction = relu(length - self.friend_distance) * self.friend_stiffness * normalized
-        regular = (length - self.neutral_distance) * self.neutral_stiffness * normalized
+        neutral = (length - self.neutral_distance) * self.neutral_stiffness * normalized
         retraction = -relu(self.enemy_distance - length) * self.enemy_stiffness * normalized
         
         force = torch.where(sign == 1, attraction, retraction)
-        force = torch.where(sign == 0, regular, force)
+        force = torch.where(sign == 0, neutral, force)
         return force.T

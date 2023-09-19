@@ -37,8 +37,8 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 32
-    iterations = 500
-    time_step =  0.005
+    iterations = 1000
+    time_step =  0.01
     damping = 0.05
     root = 'src/data/'
 
@@ -103,9 +103,10 @@ def main(argv) -> None:
     
     # edge_sampling = Edges(data, n_edges=3000, mask=test_mask)
     # edge_sampling()
+    training_data = training_data.to(device)
+    test_data = test_data.to(device)
     
     training = Training(
-        device=device,
         train_data=training_data,
         test_data=test_data,
         embedding_dim= embedding_dim,
@@ -141,64 +142,6 @@ def main(argv) -> None:
             enemy_distance= params['enemy_distance'],
             enemy_stiffness= params['enemy_stiffness'],
         )
-
-    # find number of correct and incorrect edges per node
-    test_mask = training_data.edge_attr == 0
-    correct_edges = data.edge_attr == training.y_pred
-    incorrect_edges = data.edge_attr != training.y_pred
-
-    correct_edges[~test_mask] = True
-
-    correct_edges_per_node = torch.zeros(training_data.num_nodes)
-    incorrect_edges_per_node = torch.zeros(training_data.num_nodes)
-    n_edges_per_node = torch.zeros(training_data.num_nodes)
-
-    for i in range(training_data.num_nodes):
-        edge_indices = torch.where(training_data.edge_index[0] == i)[0]
-        correct_edges_per_node[i] = correct_edges[edge_indices].sum()
-
-        incorrect_edges_per_node[i] = incorrect_edges[edge_indices].sum()
-
-        n_edges_per_node[i] = len(edge_indices)
-
-    # 4 subplots
-    fig, axs = plt.subplots(2, 2)
-
-    ratio = correct_edges_per_node / (incorrect_edges_per_node + correct_edges_per_node)
-    
-    axs[0, 0].scatter(
-        ratio,
-        training.final_per_node_force,
-        s=n_edges_per_node)
-    
-    axs[0, 0].set_xlabel('Percentage of correct edges')
-    axs[0, 0].set_ylabel('Force')
-
-    axs[0, 1].scatter(
-        ratio,
-        training.final_per_node_energy,
-        s=n_edges_per_node)
-    
-    axs[0, 1].set_xlabel('Percentage of correct edges')
-    axs[0, 1].set_ylabel('Energy')
-
-    axs[1, 0].scatter(
-        ratio,
-        training.final_per_node_vel,
-        s=n_edges_per_node)
-    
-    axs[1, 0].set_xlabel('Percentage of correct edges')
-    axs[1, 0].set_ylabel('Velocity')
-
-    axs[1, 1].scatter(
-        ratio,
-        training.final_per_node_pos,
-        s=n_edges_per_node)
-    
-    axs[1, 1].set_xlabel('Percentage of correct edges')
-    axs[1, 1].set_ylabel('Position')
-
-    plt.show()
 
     # confusion_matrix, part_of_balanced, part_of_unbalanced = edge_sampling.compare(training.y_pred)
 
