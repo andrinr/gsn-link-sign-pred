@@ -1,6 +1,7 @@
 from springs import SpringTransform, log_regression
 from timeit import default_timer as timer
 import torch
+import matplotlib.pyplot as plt
 
 class Training:
     """
@@ -54,6 +55,14 @@ class Training:
         self.train_data = transform(self.train_data)
         end = timer()
         print(f"Time: {end - start}")
+
+        self.energies = transform.energies
+
+        self.final_per_node_energy = transform.final_per_node_energy.cpu()
+        self.final_per_node_vel = transform.final_per_node_vel.cpu()
+        self.final_per_node_force = transform.final_per_node_force.cpu()
+        self.final_per_node_pos = transform.final_per_node_pos.cpu()
+
         
         auc, f1_binary, f1_micro, f1_macro, y_pred =\
             log_regression(self.train_data, self.test_data)

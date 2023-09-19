@@ -66,4 +66,8 @@ $ f^{+}_{i,j} = \alpha^{+} \times max(l^{+} - L_i, 0) \frac{X_j - X_i}{\|{ X_j -
 
 where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$, $l^{0}$ and $l^{+}$ are the thresholds for the negative, neutral and positive force respectively. $\alpha^{-}$, $\alpha^{0}$ and $\alpha^{+}$ are the scaling factors for the negative, neutral and positive force respectively.
 
-### 
+## Results
+
+The method generally performs well for Bitcoin_Alpha, BitcoinOTC and WikiRFA but not so well for Slashdot and Epinions. 
+
+![Results](ratio_energy.png)
