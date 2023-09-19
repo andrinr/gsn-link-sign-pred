@@ -16,7 +16,7 @@ from networkx.algorithms.cycles import simple_cycles
 # Local dependencies
 from springs import Training
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
-from stats import Triplets
+from stats import Edges
 from graph import CycleTransform, train_test_split
 
 def main(argv) -> None:
@@ -74,7 +74,7 @@ def main(argv) -> None:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     pre_transform = T.Compose([
-        CycleTransform(max_degree=8)
+        #CycleTransform(max_degree=8)
     ])
 
     match dataset_name:
@@ -99,8 +99,10 @@ def main(argv) -> None:
         data = data, 
         train_percentage=0.8)
     
-    triplets = Triplets(data)
-    triplets(1000)
+    test_mask = training_data.edge_attr == 0
+    
+    edge_sampling = Edges(data, n_edges=3000, mask=test_mask)
+    edge_sampling()
     
     training = Training(
         device=device,
@@ -140,22 +142,14 @@ def main(argv) -> None:
             enemy_stiffness= params['enemy_stiffness'],
         )
 
-    test_mask = training_data.edge_attr == 0
-    total_balanced, correct_balanced, total_unbalanced, correct_unbalanced =\
-        triplets.compare(training.y_pred, test_mask)
+    confusion_matrix, part_of_balanced, part_of_unbalanced = edge_sampling.compare(training.y_pred)
 
-    correct = np.concatenate((correct_balanced / total_balanced , correct_unbalanced / total_unbalanced))
-    df = pd.DataFrame({
-        'neutral': [1, 2, 3, 1, 2, 3],
-        'balanced': [1, 1, 1, 0, 0, 0],
-        'correct': correct
-    })
-    
-    sns.catplot(
-        data=df, kind="bar",
-        x="neutral", y="correct", hue="balanced"
-    )
-    plt.show()
+    print("Confusion matrix")
+    print(confusion_matrix)
+    print("Part of balanced")
+    print(part_of_balanced)
+    print("Part of unbalanced")
+    print(part_of_unbalanced)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

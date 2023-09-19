@@ -4,25 +4,28 @@ import numpy as np
 import graph
 
 class Edges:
-    def __init__(self, data: Data):
+    def __init__(self, data: Data, n_edges : int = 10000, mask = np.ndarray, seed : int = None):
         self.data = data
+        self.n_edges = n_edges
+        self.mask = mask
+        self.seed = seed
 
-    def __call__(self, n_edges : int = 10000, seed: int = None):
-        self.sample(n_edges, seed)
-        self.stats()
-    
-    def sample(self, n_edges : int = 10000, seed: int = None):
-        if seed : np.random.seed(seed)
+    def __call__(self):
+        if self.seed : np.random.seed(self.seed)
 
         self.n_balanced = 0
         self.n_unbalanced = 0
        
-        indices = np.random.choice(self.data.num_edges, n_edges, replace=False)
+        indices = np.arange(self.data.num_edges)
+        if self.mask is not None:
+            indices = indices[self.mask]
+
+        indices_sampled = np.random.choice(indices, self.n_edges, replace=False)
 
         self.edges = []
 
-        for e1 in indices:
-            edge = Edge(self.data, e1)
+        for e1 in indices_sampled:
+            edge = Edge(self.data, self.mask, e1)
 
             self.n_balanced += edge.n_balanced
             self.n_unbalanced += edge.n_unbalanced
@@ -32,57 +35,58 @@ class Edges:
         total = self.n_balanced + self.n_unbalanced
         self.p_balanced = self.n_balanced / total
     
-    def compare(self, predictions, test_mask):
-        if self.edge_signs is None:
-            raise Exception("Call generate() first")
+    def compare(self, predictions):
+        if self.edges is None:
+            raise Exception("Call() first")
         
-        n = len(self.triplets)
+        n = len(self.edges)
 
-        total_balanced = np.zeros(3)
-        correct_balanced = np.zeros(3)
-
-        total_unbalanced = np.zeros(3)
-        correct_unbalanced = np.zeros(3)
+        confusion_matrix = np.zeros((2, 2), dtype=int)
+        part_of_balanced = np.zeros((2, 2, 10), dtype=int)
+        part_of_unbalanced = np.zeros((2, 2, 10), dtype=int)
 
         for i in range(n):
-            e1, e2, e3 = self.triplets[i]
+            edge = self.edges[i]
+            actual = int(edge.sign.item()/ 2 + 1)
+            prediction = int(predictions[i].item() / 2 + 1)
 
-            t1 = test_mask[e1]
-            t2 = test_mask[e2]
-            t3 = test_mask[e3]
+            confusion_matrix[actual, prediction] += 1
 
-            s1 = predictions[e1] if t1 else self.data.edge_attr[e1]
-            s2 = predictions[e2] if t2 else self.data.edge_attr[e2]
-            s3 = predictions[e3] if t3 else self.data.edge_attr[e3]
+            n_balanced = edge.n_balanced
+            n_unbalanced = edge.n_unbalanced
+            for triangle in edge.triangles:
+                if triangle.sign == 1:
+                    n_balanced += 1
+                else:
+                    n_unbalanced += 1
 
-            predicted = s1 * s2 * s3
-            actual = self.edge_signs[i]
+            # because of the way the triangles are counted, we have to divide by 2
+            n_balanced = int(n_balanced / 2)
+            n_unbalanced = int(n_unbalanced / 2)
 
-            n_neutral = int(t1.item()) + int(t2.item()) + int(t3.item())
+            max = 10
+            n_balanced = min(n_balanced, 9)
+            n_unbalanced = min(n_unbalanced, 9)
 
-            for j in range(3):
-                if n_neutral == j + 1:
-                    if actual == 1:
-                        total_balanced[j] += 1
-                        correct_balanced[j] += 1 if predicted == actual else 0
-                    else:
-                        total_unbalanced[j] += 1
-                        correct_unbalanced[j] += 1 if predicted == actual else 0
-        
-        return total_balanced, correct_balanced, total_unbalanced, correct_unbalanced
+            part_of_balanced[actual, prediction, n_balanced] += 1
+            
+            part_of_unbalanced[actual, prediction, n_unbalanced] += 1
 
+        return confusion_matrix, part_of_balanced, part_of_unbalanced
+            
 class Edge:
-    def __init__(self, data : Data, uv : int):
+    def __init__(self, data : Data, mask : np.ndarray, uv : int):
 
         self.index = uv
         self.triangles = []
         self.n_balanced = 0
         self.n_unbalanced = 0
+        self.sign = data.edge_attr[uv]
 
-        u, v = self.data.edge_index[:, uv]
+        u, v = data.edge_index[:, uv]
 
-        neighs_u = set(graph.get_neighbors(self.data, u).tolist())
-        neighs_v = set(graph.get_neighbors(self.data, v).tolist())
+        neighs_u = set(graph.get_neighbors(data, u).tolist())
+        neighs_v = set(graph.get_neighbors(data, v).tolist())
     
         neighs_u = neighs_u - {u}
         neighs_v = neighs_v - {v}
@@ -92,12 +96,16 @@ class Edge:
         
         for w in neighs_u_and_v:
 
-            uw = graph.get_edge_index(self.data, u, w) 
+            uw = graph.get_edge_index(data, u, w) 
             if len(uw) > 1:
                 uw = uw[0]
-            vw = graph.get_edge_index(self.data, v, w)
+            vw = graph.get_edge_index(data, v, w)
             if len(vw) > 1:
                 vw = vw[0]
+
+            # ignore triangles with neutral edges
+            if mask[uw] or mask[vw]:
+                continue
 
             triangle = Triangle(data, uv, vw, uw)
 
@@ -114,8 +122,8 @@ class Triangle:
         self.vw = vw
         self.uw = uw
 
-        self.uv_sign = self.data.edge_attr[uv]
-        self.vu_sign = self.data.edge_attr[vw]
-        self.uw_sign = self.data.edge_attr[uw]
+        self.uv_sign = data.edge_attr[uv]
+        self.vu_sign = data.edge_attr[vw]
+        self.uw_sign = data.edge_attr[uw]
 
         self.sign = self.uv_sign * self.vu_sign * self.uw_sign
