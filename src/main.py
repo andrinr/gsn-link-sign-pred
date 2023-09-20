@@ -36,7 +36,7 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
-    embedding_dim = 32
+    embedding_dim = 64
     iterations = 400
     time_step =  0.01
     damping = 0.05

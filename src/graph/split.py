@@ -18,16 +18,16 @@ def train_test_split(
         The percentage of edges to use for testing.
     """
 
-    num_train = int(train_percentage * data.num_edges / 2)
-    num_total = int(data.num_edges / 2)
-    num_test = num_total - num_train
-
     assert data.is_undirected()
     assert data.edge_attr is not None
 
     mask = data.edge_index[0] < data.edge_index[1]
     data.edge_index = data.edge_index[:, mask]
     data.edge_attr = data.edge_attr[mask]
+
+    num_total = data.edge_attr.shape[0]
+    num_train = int(train_percentage * num_total)
+    num_test = num_total - num_train
 
     perm = torch.randperm(num_total, device=data.edge_index.device)
 

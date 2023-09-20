@@ -122,7 +122,7 @@ class SpringTransform(BaseTransform):
 
             pbar.set_description(f"Searching energy minima. Current E: {self.energy_total.item():.2f}")
 
-            damping_factor = (i / self.iterations) * (self.degrees)
+            damping_factor = (i / self.iterations) * (1.0 - self.degrees)
           
             self.vel = torch.mul((1.0 - self.damping * damping_factor), self.vel)
 
