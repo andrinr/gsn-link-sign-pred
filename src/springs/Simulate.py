@@ -35,8 +35,10 @@ class Training:
         enemy_distance,     
         enemy_stiffness) -> float:
 
-        iterations_interval = 50
-        num_intervals = self.iterations // iterations_interval
+        num_intervals = 1
+        
+        iterations_interval = self.iterations // num_intervals
+
 
         transform = SpringTransform(
             embedding_dim=self.embedding_dim,
@@ -78,22 +80,29 @@ class Training:
 
         self.y_pred = y_pred
 
-        # plot measures and energy
-        plt.plot(aucs, label='AUC')
-        plt.plot(f1_binaries, label='F1 binary')
-        plt.plot(f1_micros, label='F1 micro')
-        plt.plot(f1_macros, label='F1 macro')
-        # put energy on another y axis, log scale
-        ax = plt.gca()
-        ax2 = ax.twinx()
-        ax2.set_yscale('log')
-        ax2.plot(energies, label='Energy', color='black')
-        ax2.set_ylabel('Energy')
-        ax2.legend(loc='upper right')
-        ax.set_xlabel('Iteration')
-        ax.set_ylabel('Measure')
-        ax.legend(loc='lower right')
-        
+        if (num_intervals > 1):
+            # plot measures and energy
+            plt.plot(aucs, label='AUC')
+            plt.plot(f1_binaries, label='F1 binary')
+            plt.plot(f1_micros, label='F1 micro')
+            plt.plot(f1_macros, label='F1 macro')
+            # put energy on another y axis, log scale
+            ax = plt.gca()
+            ax2 = ax.twinx()
+            ax2.set_yscale('log')
+            ax2.plot(energies, label='Energy', color='black')
+            ax2.set_ylabel('Energy')
+            ax2.legend(loc='upper right')
+            ax.set_xlabel('Iteration')
+            ax.set_ylabel('Measure')
+            ax.legend(loc='lower right')
+
+        else:
+            print(f"AUC: {aucs[0]}")
+            print(f"F1 binary: {f1_binaries[0]}")
+            print(f"F1 micro: {f1_micros[0]}")
+            print(f"F1 macro: {f1_macros[0]}")
+            print(f"Energy: {energies[0]}")
 
         plt.show()
 

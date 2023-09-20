@@ -80,6 +80,9 @@ class SpringTransform(BaseTransform):
 
             self.started = True
 
+            self.degrees = degree(data.edge_index[0], data.num_nodes)
+            self.degrees = torch.unsqueeze(self.degrees, dim=1) / torch.max(self.degrees).item()
+
         self.start_iteration = 0
 
         signs = data.edge_attr
@@ -117,9 +120,11 @@ class SpringTransform(BaseTransform):
             energy = torch.sqrt(torch.norm(self.vel, dim=1, keepdim=False)) + torch.norm(force, dim=1, keepdim=False)
             self.energy_total = torch.sum(energy)
 
-            pbar.set_description(f"Energy: {self.energy_total.item():.2f}")
+            pbar.set_description(f"Searching energy minima. Current E: {self.energy_total.item():.2f}")
+
+            damping_factor = (i / self.iterations) * (self.degrees)
           
-            self.vel = self.vel * (1.0 - self.damping * (i / self.iterations))
+            self.vel = torch.mul((1.0 - self.damping * damping_factor), self.vel)
 
         data.x = self.pos
 

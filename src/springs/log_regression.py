@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+from tqdm import tqdm
 
 def log_regression(train_data, test_data):
     test_mask = test_data.edge_attr != 0
@@ -17,9 +18,12 @@ def log_regression(train_data, test_data):
     y_pred_sparse = torch.zeros(n_total)
 
     l = 0
-    for k in range(n_total):
-        if train_data.edge_attr[k] == 0:
-            continue
+    indices = torch.arange(n_total)
+    indices = indices[train_data.edge_attr != 0]
+    pbar = tqdm(indices)
+    pbar.set_description("Prepare Log regression training data")
+
+    for k in pbar:
         i = train_data.edge_index[0, k]
         j = train_data.edge_index[1, k]
         pos_i = train_data.x[i]
@@ -32,11 +36,12 @@ def log_regression(train_data, test_data):
     clf = LogisticRegression()
     clf.fit(X_train, y_train)
 
-    # TODO: return aligned y_pred 
+    indices = torch.arange(n_total)
+    indices = indices[test_data.edge_attr != 0]
+    pbar = tqdm(indices)
+    pbar.set_description("Log regression test data")
     l = 0
-    for k in range(n_total):
-        if test_data.edge_attr[k] == 0:
-            continue
+    for k in pbar:
         i = test_data.edge_index[0, k]
         j = test_data.edge_index[1, k]
         # The node features are not available in the test data
