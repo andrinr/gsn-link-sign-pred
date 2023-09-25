@@ -21,7 +21,7 @@ def log_regression(train_data, test_data):
     indices = torch.arange(n_total)
     indices = indices[train_data.edge_attr != 0]
     pbar = tqdm(indices)
-    pbar.set_description("Prepare Log regression training data")
+    pbar.set_description("Prepare log regression training data")
 
     for k in pbar:
         i = train_data.edge_index[0, k]
@@ -39,7 +39,7 @@ def log_regression(train_data, test_data):
     indices = torch.arange(n_total)
     indices = indices[test_data.edge_attr != 0]
     pbar = tqdm(indices)
-    pbar.set_description("Log regression test data")
+    pbar.set_description("Prepare log regression test data")
     l = 0
     for k in pbar:
         i = test_data.edge_index[0, k]
