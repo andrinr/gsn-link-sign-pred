@@ -8,6 +8,7 @@ class Training:
     Training
     """
     def __init__(self, 
+        dataset_name,
         train_data, 
         test_data, 
         embedding_dim, 
@@ -17,6 +18,7 @@ class Training:
         friend_distance,
         friend_stiffness):
 
+        self.dataset_name = dataset_name
         self.train_data = train_data
         self.test_data = test_data
         self.embedding_dim = embedding_dim
@@ -77,6 +79,32 @@ class Training:
 
         end = timer()
         print(f"Time: {end - start}")
+
+        # open file results.txt, delete existing row and write results as new line
+        f = open("results.txt", "a+")
+        # check weather dataset row already exists and delete it
+        f.seek(0)
+        for line in f:
+            if self.dataset_name in line:
+                f.truncate(0)
+                break
+
+        # make sure header is written. If not write to top of file
+        f.seek(0)
+        if not "Dataset\tAUC\tF1 binary\tF1 micro\tF1 macro\tEnergy\n" in f:
+            # write header
+            f.seek(0)
+            content = f.read()
+            f.seek(0)
+            f.write("Dataset\tAUC\tF1 binary\tF1 micro\tF1 macro\tEnergy\n" + content)
+
+
+        # write results
+        f.write(f"{self.dataset_name}\t{aucs[0]}\t{f1_binaries[0]}\t{f1_micros[0]}\t{f1_macros[0]}\t{energies[0]}\n")
+        
+        f.close()
+
+        
 
         self.y_pred = y_pred
 

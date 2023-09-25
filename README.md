@@ -68,7 +68,14 @@ where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$,
 
 ## Results
 
-The method generally performs well for Bitcoin_Alpha, BitcoinOTC and WikiRFA but not so well for Slashdot and Epinions. 
+### Comparison to other previous best method
+
+### Energy minima and score corrlations
+
+Generally a decrease in energy in the system correlates with a better performance of the method. However the effect is much more pronounced in the beginning of the method.
 
 ![Results](energy_score_corr.png)
+
+
+### Correlation between energy 
 ![Results](ratio_energy.png)

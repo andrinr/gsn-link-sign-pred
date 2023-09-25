@@ -16,7 +16,7 @@ from networkx.algorithms.cycles import simple_cycles
 # Local dependencies
 from springs import Training
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
-from stats import Edges
+from stats import Edges, Section
 from graph import CycleTransform, train_test_split
 
 def main(argv) -> None:
@@ -107,6 +107,7 @@ def main(argv) -> None:
     test_data = test_data.to(device)
     
     training = Training(
+        dataset_name=dataset_name,
         train_data=training_data,
         test_data=test_data,
         embedding_dim= embedding_dim,

@@ -16,23 +16,31 @@ class Section:
         m = self.data.num_edges
         n = self.data.num_nodes
 
-        current = np.random.randint(0, m)
+        degs = degree(self.data.edge_index[0], n)
+
+        current = np.random.randint(0, n)
         nodes = [current]
 
-        degs = degree(self.data.edge_index[0], n)
+        all_nodes = [current]
+
+        while (degs[current] < 2):
+            current = np.random.randint(0, n)
         
         visited = set()
         visited.add(current)
 
         for i in range(self.distance):
 
+            print("i", i)
+
             new_nodes = []
             for node in nodes:
                 visited.add(node)
-                neighbors = get_neighbors(node)
+                neighbors = get_neighbors(self.data, node)
                 for neighbor in neighbors:
                     if neighbor not in visited:
                         new_nodes.append(neighbor)
+                        all_nodes.append(neighbor)
 
             nodes = new_nodes
 
@@ -44,11 +52,24 @@ class Section:
         xs = []
         ys = []
 
-        for node in nodes:
-            xs.append(self.data.node_attr[node])
-            ys.append(self.data.node_attr[node])
+        self.data = self.data.to("cpu")
+
+        for node in all_nodes:
+            print(node)
+            xs.append(self.data.x[node, 0])
+            ys.append(self.data.x[node, 1])
 
         plt.scatter(xs, ys, color="black")
+
+        # plot edges
+
+        for node in all_nodes:
+            neighbors = get_neighbors(self.data, node)
+            for neighbor in neighbors:
+                if neighbor in nodes:
+                    plt.plot([node, neighbor], [node, neighbor], color="black")
+
+        plt.show()
 
 
 
