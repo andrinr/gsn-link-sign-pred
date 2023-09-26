@@ -2,6 +2,7 @@ from torch_geometric.data import Data
 from torch_geometric.utils import degree
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
 
 from graph import get_neighbors
 
@@ -25,16 +26,16 @@ class Section:
 
         while (degs[current] < 2):
             current = np.random.randint(0, n)
+
+        print("degs[current]", degs[current])
         
         visited = set()
         visited.add(current)
 
         for i in range(self.distance):
-
-            print("i", i)
-
             new_nodes = []
             for node in nodes:
+                print("node", node)
                 visited.add(node)
                 neighbors = get_neighbors(self.data, node)
                 for neighbor in neighbors:
@@ -44,37 +45,34 @@ class Section:
 
             nodes = new_nodes
 
+        num_nodes = len(all_nodes)
+
         # new figure
         plt.figure()
         plt.title("Section of graph")
 
         # plot nodes
-        xs = []
-        ys = []
+        pos = torch.zeros((num_nodes, 2), device=self.data.edge_index.device)
 
-        self.data = self.data.to("cpu")
+        for i, node in enumerate(all_nodes):
+            pos[i] = self.data.x[node, 0:2]
 
-        for node in all_nodes:
-            print(node)
-            xs.append(self.data.x[node, 0])
-            ys.append(self.data.x[node, 1])
+        pos = pos.cpu()
 
-        plt.scatter(xs, ys, color="black")
+        plt.scatter(pos[:,0], pos[:,1], color="black")
 
         # plot edges
 
+        self.data = self.data.cpu()
+
         for node in all_nodes:
+            print("node", node)
+
             neighbors = get_neighbors(self.data, node)
             for neighbor in neighbors:
                 if neighbor in nodes:
-                    plt.plot([node, neighbor], [node, neighbor], color="black")
+                    plt.plot(
+                        [self.data.x[node,0], self.data.x[neighbor,0]], 
+                        [self.data.x[node,1], self.data.x[neighbor,1]], color="black")
 
         plt.show()
-
-
-
-
-    
-            
-
-        

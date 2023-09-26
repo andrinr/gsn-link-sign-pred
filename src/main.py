@@ -144,6 +144,9 @@ def main(argv) -> None:
             enemy_stiffness= params['enemy_stiffness'],
         )
 
+    sec = Section(distance=3, data=training_data)
+    sec()
+
     # confusion_matrix, part_of_balanced, part_of_unbalanced = edge_sampling.compare(training.y_pred)
 
     # print("Confusion matrix")
