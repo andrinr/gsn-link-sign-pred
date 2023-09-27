@@ -104,8 +104,6 @@ class Training:
         
         f.close()
 
-        
-
         self.y_pred = y_pred
 
         if (num_intervals > 1):
