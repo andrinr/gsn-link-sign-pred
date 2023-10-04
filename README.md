@@ -70,6 +70,8 @@ where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$,
 
 ### Comparison to other previous best method
 
+![Results](results.png)
+
 ### Energy minima and score corrlations
 
 Generally a decrease in energy in the system correlates with a better performance of the method. However the effect is much more pronounced in the beginning of the method.

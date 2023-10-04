@@ -1,9 +1,5 @@
-from springs import SpringTransform, log_regression
-from timeit import default_timer as timer
-import torch
-import matplotlib.pyplot as plt
 import jax.numpy as jnp
-from jax import value_and_grad, jit, random
+from jax import jit
 
 class Embeddings:
     """
