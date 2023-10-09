@@ -37,6 +37,7 @@ def compute_force(
     neutral = (l - params.neutral_distance) * params.neutral_stiffness * spring_vector_norm
     retraction = -jnp.maximum(params.enemy_distance - l, 0) * params.enemy_stiffness * spring_vector_norm
 
+    sign = jnp.expand_dims(sign, axis=1)
     force = jnp.where(sign == 1, attraction, retraction)
     force = jnp.where(sign == 0, neutral, force)
     
@@ -49,16 +50,40 @@ def update(
     sign : jnp.ndarray, 
     edge_index : jnp.ndarray) -> SpringState:
 
+    print(edge_index.shape)
+    print(sign.shape)
+
     position_i = state.position[edge_index[0]]
     position_j = state.position[edge_index[1]]
 
-    force = compute_force(params, position_i, position_j, sign)
+    edge_forces = compute_force(params, position_i, position_j, sign)
+    node_forces = jnp.zeros_like(state.position)
+    node_forces = jax.lax.scatter_add(
+        operand=node_forces,
+        scatter_indices=edge_index[0],
+        updates=edge_forces,
+        dimension_numbers=jax.lax.ScatterDimensionNumbers(
+            update_window_dims=(1),
+            inserted_window_dims=(1),
+            scatter_dims_to_operand_dims=(0,),
+        ))
 
-    velocity = state.velocity + 0.5 * params.time_step * force
+    velocity = state.velocity + 0.5 * params.time_step * node_forces
     position = state.position + params.time_step * velocity
 
-    force = compute_force(params, position_i, position_j, sign)
-    velocity = velocity + 0.5 * params.time_step * force
+    edge_forces = compute_force(params, position_i, position_j, sign)
+    node_forces = jnp.zeros_like(state.position)
+    node_forces = jax.lax.scatter_add(
+        operand=node_forces,
+        scatter_indices=edge_index[0],
+        updates=edge_forces,
+        dimension_numbers=jax.lax.ScatterDimensionNumbers(
+            update_window_dims=(1),
+            inserted_window_dims=(1),
+            scatter_dims_to_operand_dims=(0,),
+        ))
+    
+    velocity = velocity + 0.5 * params.time_step * node_forces
 
     velocity = velocity * params.damping
 
