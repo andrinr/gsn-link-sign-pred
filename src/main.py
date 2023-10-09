@@ -1,30 +1,25 @@
 # External dependencies
-import nevergrad as ng
 import sys, getopt
 import torch
-import numpy as np
 import torch_geometric.transforms as T
 from torch_geometric.utils import is_undirected
 import yaml
 import inquirer
-import seaborn as sns
-import pandas as pd
-import matplotlib.pyplot as plt
-from torch_geometric.utils import to_networkx
-from networkx.algorithms.cycles import simple_cycles
+from jax import random
+import jax.numpy as jnp
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 
 # Local dependencies
-from springs import Training, Embeddings
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
-from stats import Edges, Section
-from graph import CycleTransform, train_test_split
+from graph import train_test_split
+from springs import SpringParams, LogRegState, init_log_reg_state, update, train, predict, init_spring_state
 
 def main(argv) -> None:
     """
     Main function
 
     Parameters:
-    ----------
+    ----------  
     -s : int (default=64)
         Embedding dimension
     -h : float (default=0.005)
@@ -99,42 +94,67 @@ def main(argv) -> None:
         data = data, 
         train_percentage=0.8)
     
-    training_mask = training_data.edge_attr != 0
-    
-    # edge_sampling = Edges(data, n_edges=3000, mask=test_mask)
-    # edge_sampling()
-    training_data = training_data.to(device)
-    test_data = test_data.to(device)
+    # convert to jnp arrays from torch tensors
+    edge_index = jnp.array(data.edge_index)
+    signs = jnp.array(data.edge_attr)
+    training_mask = training_data.edge_attr == 1
 
-    embeddings = Embeddings(
-        edge_index=training_data.edge_index,
-        signs=training_data.edge_attr,
-        training_mask=training_mask,
-        embedding_dim=embedding_dim,
-        time_step=time_step,
-        iterations=iterations,
-        damping=damping,
+    spring_params = SpringParams(
         friend_distance=5.0,
         friend_stiffness=5.0,
         neutral_distance=params['neutral_distance'],
         neutral_stiffness=params['neutral_stiffness'],
         enemy_distance=params['enemy_distance'],
         enemy_stiffness=params['enemy_stiffness'],
+        time_step=time_step,
+        damping=damping,
     )
     
-    pos, aucs, f1_binaries, f1_micros, f1_macros = embeddings(num_intervals=1)
+    rng = random.PRNGKey(42)
 
-    print("AUC")
-    print(aucs)
+    spring_state = init_spring_state(
+        rng=rng,
+        n=data.num_nodes,
+        embedding_dim=embedding_dim,
+    )
 
-    # confusion_matrix, part_of_balanced, part_of_unbalanced = edge_sampling.compare(training.y_pred)
+    for i in range(iterations):
+        spring_state = update(
+            state=spring_state,
+            params=spring_params,
+            sign=signs,
+            edge_index=edge_index,
+        )
 
-    # print("Confusion matrix")
-    # print(confusion_matrix)
-    # print("Part of balanced")
-    # print(part_of_balanced)
-    # print("Part of unbalanced")
-    # print(part_of_unbalanced)
+    embeddings = spring_state.position
+
+    logreg_state = init_log_reg_state()
+
+    for i in range(1000):
+        logreg_state, loss = train(
+            state=logreg_state,
+            rate=0.01,
+            X=embeddings,
+            y=training_mask,
+        )
+
+    y_pred = predict(
+        state=logreg_state,
+        X=embeddings,
+    )
+
+    auc = roc_auc_score(training_mask, y_pred)
+    f1_micro = f1_score(training_mask, y_pred, average='micro')
+    f1_macro = f1_score(training_mask, y_pred, average='macro')
+    f1_binary = f1_score(training_mask, y_pred, average='binary')
+
+    print(f"auc: {auc}")
+    print(f"f1_micro: {f1_micro}")
+    print(f"f1_macro: {f1_macro}")
+    print(f"f1_binary: {f1_binary}")
+
+    print(f"confusion matrix: {confusion_matrix(training_mask, y_pred)}")
+    
 
 if __name__ == "__main__":
     main(sys.argv[1:])

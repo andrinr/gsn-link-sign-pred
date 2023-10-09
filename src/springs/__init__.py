@@ -1,6 +1,2 @@
-from .MassSpring import MassSpring
-from .log_regression import log_regression
-from .SpringTransform import SpringTransform
-from .Training import Training
-from .Embeddings import Embeddings
-from .LogReg import LogReg
+from .springs import SpringParams, SpringState, init_spring_state, update
+from .logreg import LogRegState, init_log_reg_state, train, predict
