@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from jax import jit
+from springs import LogReg
 
 class Embeddings:
     """
@@ -8,7 +9,7 @@ class Embeddings:
     def __init__(self, 
         edge_index,
         signs,
-        signs_truth,
+        training_mask,
         embedding_dim, 
         time_step, 
         iterations, 
@@ -22,7 +23,7 @@ class Embeddings:
 
         self.edge_index = edge_index
         self.signs = signs
-        self.signs_truth = signs_truth
+        self.training_mask = training_mask
         self.embedding_dim = embedding_dim
         self.time_step = time_step
         self.iterations = iterations
@@ -33,6 +34,11 @@ class Embeddings:
         self.neutral_stiffness = neutral_stiffness
         self.enemy_distance = enemy_distance
         self.enemy_stiffness = enemy_stiffness
+
+        self.trainings_signs = self.signs
+        self.trainings_signs[~self.training_mask] = 0
+
+        self.log_reg = LogReg(self.training_mask, self.signs)
 
     @jit
     def force(self, pos_i, pos_j, sign):
@@ -65,9 +71,6 @@ class Embeddings:
         return pos, vel
 
     @jit
-    def error(pos_i, pos_j):
-
-
     def __call__(self,
         num_intervals : int) -> float:
 
@@ -79,11 +82,28 @@ class Embeddings:
         key = jnp.random.PRNGKey(0)
         pos = jnp.random.uniform(key, (n, self.embedding_dim))
         vel = jnp.zeros((n, self.embedding_dim))
-        signs = self.train_data.edge_attr
+        signs = self.trainings_signs
 
-        for i in range(num_intervals):
-            for j in range(iterations_interval):
+        aucs = jnp.zeros(num_intervals)
+        f1_binaries = jnp.zeros(num_intervals)
+        f1_micros = jnp.zeros(num_intervals)
+        f1_macros = jnp.zeros(num_intervals)
 
-                pos, vel = self.step(pos, vel, signs, self.train_data.edge_index)
+        for interval in range(num_intervals):
+            for i in range(iterations_interval):
+
+                pos, vel = self.step(pos, vel, signs, self.edge_index)
 
                 vel = vel * self.damping
+
+            pos_i = pos[self.edge_index[0]]
+            pos_j = pos[self.edge_index[1]]
+
+            y_pred, auc_score, f1_binary, f1_micro, f1_macro = self.log_reg.predict(pos_i, pos_j)
+
+            aucs[interval] = auc_score
+            f1_binaries[interval] = f1_binary
+            f1_micros[interval] = f1_micro
+            f1_macros[interval] = f1_macro
+
+        return pos, aucs, f1_binaries, f1_micros, f1_macros

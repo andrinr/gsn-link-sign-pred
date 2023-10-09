@@ -14,7 +14,7 @@ from torch_geometric.utils import to_networkx
 from networkx.algorithms.cycles import simple_cycles
 
 # Local dependencies
-from springs import Training
+from springs import Training, Embeddings
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from stats import Edges, Section
 from graph import CycleTransform, train_test_split
@@ -99,53 +99,33 @@ def main(argv) -> None:
         data = data, 
         train_percentage=0.8)
     
-    test_mask = training_data.edge_attr == 0
+    training_mask = training_data.edge_attr != 0
     
     # edge_sampling = Edges(data, n_edges=3000, mask=test_mask)
     # edge_sampling()
     training_data = training_data.to(device)
     test_data = test_data.to(device)
-    
-    training = Training(
-        dataset_name=dataset_name,
-        train_data=training_data,
-        test_data=test_data,
-        embedding_dim= embedding_dim,
-        time_step= time_step,
-        iterations= iterations,
-        damping= damping,
+
+    embeddings = Embeddings(
+        edge_index=training_data.edge_index,
+        signs=training_data.edge_attr,
+        training_mask=training_mask,
+        embedding_dim=embedding_dim,
+        time_step=time_step,
+        iterations=iterations,
+        damping=damping,
         friend_distance=5.0,
-        friend_stiffness=5.0)
+        friend_stiffness=5.0,
+        neutral_distance=params['neutral_distance'],
+        neutral_stiffness=params['neutral_stiffness'],
+        enemy_distance=params['enemy_distance'],
+        enemy_stiffness=params['enemy_stiffness'],
+    )
+    
+    pos, aucs, f1_binaries, f1_micros, f1_macros = embeddings(num_intervals=1)
 
-    if optimizer_iterations > 0:
-        parametrization = ng.p.Instrumentation(
-            neutral_distance=ng.p.Scalar(lower=0.1, upper=30.0),
-            neutral_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
-            enemy_distance=ng.p.Scalar(lower=0.1, upper=30),
-            enemy_stiffness=ng.p.Scalar(lower=0.1, upper=8.0),
-        )
-
-        optimizer = ng.optimizers.NGOpt(parametrization=parametrization, budget=optimizer_iterations, num_workers=1)
-
-        recommendation = optimizer.minimize(training)
-        recommendation = dict(recommendation.kwargs)
-        print(recommendation)
-
-        user_input = input('Do you want to store the preferences? (y/n) ')
-        if user_input.lower() == 'y':
-            with open('src/params.yaml', 'w') as outfile:
-                yaml.dump(recommendation, outfile, default_flow_style=False)
-
-    else:
-        training(
-            neutral_distance= params['neutral_distance'],
-            neutral_stiffness= params['neutral_stiffness'],
-            enemy_distance= params['enemy_distance'],
-            enemy_stiffness= params['enemy_stiffness'],
-        )
-
-    sec = Section(distance=3, data=training_data)
-    sec()
+    print("AUC")
+    print(aucs)
 
     # confusion_matrix, part_of_balanced, part_of_unbalanced = edge_sampling.compare(training.y_pred)
 
