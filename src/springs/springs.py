@@ -3,11 +3,12 @@ import jax
 from typing import NamedTuple
 from functools import partial
 
+NEUTRAL_DISTANCE = 1.0
+NEUTRAL_STIFFNESS = 1.0
+
 class SpringParams(NamedTuple):
     friend_distance: float
     friend_stiffness: float
-    neutral_distance: float
-    neutral_stiffness: float
     enemy_distance: float
     enemy_stiffness: float
     damping: float
@@ -26,7 +27,7 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) ->
 
     return SpringState(position, velocity, energy)
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3))
+@partial(jax.jit)
 def compute_force(
     params : SpringParams, 
     position_i : jnp.ndarray,
@@ -34,12 +35,12 @@ def compute_force(
     sign : jnp.ndarray) -> jnp.ndarray:
     
     spring_vector = position_j - position_i
-    l = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
-    spring_vector_norm = spring_vector / (l + 0.001)
+    distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
+    spring_vector_norm = spring_vector / (distance + 0.001)
 
-    attraction = jnp.maximum(l - params.friend_distance, 0) * params.friend_stiffness * spring_vector_norm
-    neutral = (l - params.neutral_distance) * params.neutral_stiffness * spring_vector_norm
-    retraction = -jnp.maximum(params.enemy_distance - l, 0) * params.enemy_stiffness * spring_vector_norm
+    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness * spring_vector_norm
+    neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS * spring_vector_norm
+    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness * spring_vector_norm
 
     sign = jnp.expand_dims(sign, axis=1)
     force = jnp.where(sign == 1, attraction, retraction)
@@ -47,7 +48,7 @@ def compute_force(
     
     return force
 
-@partial(jax.jit, static_argnums=(1, 2, 3))
+@partial(jax.jit)
 def update(
     state : SpringState, 
     params : SpringParams, 
@@ -90,32 +91,29 @@ def update(
 
     return SpringState(position, velocity, energy)
 
-class SimulationParams(NamedTuple):
-    iterations : int
-    edge_index : jnp.ndarray
-    signs : jnp.ndarray
 
-@partial(jax.jit, static_argnums=(1, 2))
+@partial(jax.jit, static_argnames=["iterations"])
 def simulate(
+    iterations : int,
     spring_state : SpringState,
     spring_params : SpringParams,
-    simulation_params : SimulationParams,
-    ) -> SpringState:
+    signs : jnp.ndarray,
+    edge_index : jnp.ndarray) -> SpringState:
 
-    spring_state =jax.lax.fori_loop(
+    spring_state = jax.lax.fori_loop(
         0, 
-        simulation_params.iterations, 
+        iterations, 
         lambda i, 
-        state: update(spring_state, spring_params, simulation_params.signs, simulation_params.edge_index), 
+        state: update(spring_state, spring_params, signs, edge_index), 
         spring_state)
 
     embeddings = spring_state.position
-    position_i = embeddings.at[simulation_params.edge_index[0]].get()
-    position_j = embeddings.at[simulation_params.edge_index[1]].get()
+    position_i = embeddings.at[edge_index[0]].get()
+    position_j = embeddings.at[edge_index[1]].get()
 
     spring_vec = position_i - position_j
-    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1) - spring_params.neutral_distance
+    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1) - NEUTRAL_DISTANCE
 
     sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
 
-    return jnp.sum(sigmoid(spring_vec_norm) - simulation_params.signs)
+    return jnp.sum(sigmoid(spring_vec_norm) - signs), spring_state

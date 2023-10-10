@@ -14,7 +14,7 @@ import tqdm
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import train_test_val
-from springs import SpringParams, init_spring_state, simulate, SimulationParams
+from springs import SpringParams, init_spring_state, simulate
 
 def main(argv) -> None:
     """
@@ -28,7 +28,7 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 64
-    iterations = 500
+    iterations = 100
     time_step =  0.01
     damping = 0.2
     root = 'src/data/'
@@ -90,23 +90,15 @@ def main(argv) -> None:
     training_signs = training_signs.at[~training_mask].set(0)
 
     spring_params = SpringParams(
-        friend_distance=5.0,
-        friend_stiffness=5.0,
-        neutral_distance=params['neutral_distance'],
-        neutral_stiffness=params['neutral_stiffness'],
-        enemy_distance=params['enemy_distance'],
-        enemy_stiffness=params['enemy_stiffness'],
+        friend_distance=1.0,
+        friend_stiffness=1.0,
+        enemy_distance=1.0,
+        enemy_stiffness=1.0,
         time_step=time_step,
         damping=damping,
     )
     
     rng = random.PRNGKey(42)
-
-    spring_state = init_spring_state(
-        rng=rng,
-        n=data.num_nodes,
-        embedding_dim=embedding_dim,
-    )
 
     logreg = LogisticRegression()
     total_energies = []
@@ -114,42 +106,76 @@ def main(argv) -> None:
     f1_binaries = []
     f1_micros = []
     f1_macros = []
-
-    sim_params = SimulationParams(
-        iterations=iterations,
-        edge_index=edge_index,
-        signs=training_signs)
     
-    grad = value_and_grad(simulate, argnums=1)
+    grad = value_and_grad(simulate, argnums=2, has_aux=True)
     
-    for i in tqdm.trange(100):
-        value, grad = grad(spring_state, spring_params, sim_params)
+    learning_rate = 0.04
+    for i in tqdm.trange(20):
+        spring_state = init_spring_state(
+            rng=rng,
+            n=data.num_nodes,
+            embedding_dim=embedding_dim,
+        )
+            
+        (loss_value, spring_state), parameter_gradient = grad(
+            iterations,
+            spring_state, 
+            spring_params,
+            training_signs,
+            edge_index)
+        
+        print(f"loss: {loss_value}")
 
-        print(f"loss: {value}")
+        # update spring state
+        spring_params = spring_params._replace(
+            friend_distance=spring_params.friend_distance - learning_rate * parameter_gradient.friend_distance,
+            friend_stiffness=spring_params.friend_stiffness - learning_rate * parameter_gradient.friend_stiffness,
+            enemy_distance=spring_params.enemy_distance - learning_rate * parameter_gradient.enemy_distance,
+            enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness,
+            damping=spring_params.damping - learning_rate * parameter_gradient.damping,
+            time_step=0.1,
+        )
 
-        print(f"grad: {grad}")
+        print(f"friend_distance: {spring_params.friend_distance}")
+        print(f"friend_stiffness: {spring_params.friend_stiffness}")
+        print(f"enemy_distance: {spring_params.enemy_distance}")
+        print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
+        print(f"damping: {spring_params.damping}")
+
+        embeddings = spring_state.position
+        position_i = embeddings.at[edge_index[0]].get()
+        position_j = embeddings.at[edge_index[1]].get()
+
+        spring_vec = position_i - position_j
+        spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
+        spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
+
+        logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
+        y_pred = logreg.predict(spring_vec_norm.at[validation_mask].get())
+
+        auc = roc_auc_score(signs.at[validation_mask].get(), y_pred)
+        f1_binary = f1_score(signs.at[validation_mask].get(), y_pred, average='binary')
+        f1_micro = f1_score(signs.at[validation_mask].get(), y_pred, average='micro')
+        f1_macro = f1_score(signs.at[validation_mask].get(), y_pred, average='macro')
+
+        aucs.append(auc)
+        f1_binaries.append(f1_binary)
+        f1_micros.append(f1_micro)
+        f1_macros.append(f1_macro)
 
 
-            # embeddings = spring_state.position
-            # position_i = embeddings.at[edge_index[0]].get()
-            # position_j = embeddings.at[edge_index[1]].get()
+    spring_state = init_spring_state(
+        rng=rng,
+        n=data.num_nodes,
+        embedding_dim=embedding_dim,
+    )
 
-            # spring_vec = position_i - position_j
-            # spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
-            # spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
-
-            # logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
-            # y_pred = logreg.predict(spring_vec_norm.at[validation_mask].get())
-
-            # auc = roc_auc_score(signs.at[validation_mask].get(), y_pred)
-            # f1_binary = f1_score(signs.at[validation_mask].get(), y_pred, average='binary')
-            # f1_micro = f1_score(signs.at[validation_mask].get(), y_pred, average='micro')
-            # f1_macro = f1_score(signs.at[validation_mask].get(), y_pred, average='macro')
-
-            # aucs.append(auc)
-            # f1_binaries.append(f1_binary)
-            # f1_micros.append(f1_micro)
-            # f1_macros.append(f1_macro)
+    loss, spring_state = simulate(
+        iterations,
+        spring_state, 
+        spring_params,
+        signs,
+        edge_index)
 
     embeddings = spring_state.position
 
