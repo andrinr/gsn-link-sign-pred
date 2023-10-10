@@ -1,2 +1,2 @@
-from .springs import SpringParams, SpringState, init_spring_state, update
+from .springs import SpringParams, SpringState, init_spring_state, update, simulate, SimulationParams
 from .logreg import LogRegState, init_log_reg_state, train, predict

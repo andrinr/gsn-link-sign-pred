@@ -4,7 +4,7 @@ import torch_geometric.transforms as T
 from torch_geometric.utils import is_undirected
 import yaml
 import inquirer
-from jax import random
+from jax import random, value_and_grad
 import jax.numpy as jnp
 from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix
 from sklearn.linear_model import LogisticRegression
@@ -14,7 +14,7 @@ import tqdm
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import train_test_val
-from springs import SpringParams, init_log_reg_state, update, train, predict, init_spring_state
+from springs import SpringParams, init_spring_state, simulate, SimulationParams
 
 def main(argv) -> None:
     """
@@ -24,12 +24,6 @@ def main(argv) -> None:
     ----------  
     -s : int (default=64)
         Embedding dimension
-    -h : float (default=0.005)
-        Time step
-    -d : float (default=0.02)
-        Damping
-    -i : int (default=500)
-        Number of iterations
     -o : int (default=0)
         Number of iterations for the optimizer
     """
@@ -49,7 +43,7 @@ def main(argv) -> None:
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
 
-    opts,_ = getopt.getopt(argv,"s:h:d:i:p:",
+    opts,_ = getopt.getopt(argv,"s:h:d:i:p:o",
         ["embedding_size=","time_step=", "damping=", "iterations="])
     for opt, arg in opts:
         if opt == '-s':
@@ -121,41 +115,41 @@ def main(argv) -> None:
     f1_micros = []
     f1_macros = []
 
-    iter = tqdm.trange(iterations)
-    for i in iter:
-        spring_state = update(
-            state=spring_state,
-            params=spring_params,
-            sign=training_signs,
-            edge_index=edge_index,
-        )
+    sim_params = SimulationParams(
+        iterations=iterations,
+        edge_index=edge_index,
+        signs=training_signs)
+    
+    grad = value_and_grad(simulate, argnums=1)
+    
+    for i in tqdm.trange(100):
+        value, grad = grad(spring_state, spring_params, sim_params)
 
-        total_energy = jnp.sum(spring_state.energy)
-        total_energies.append(total_energy)
+        print(f"loss: {value}")
 
-        iter.set_description(f"Energy: {total_energy:.3f}")
+        print(f"grad: {grad}")
 
-        if i % 100 == 0:
-            embeddings = spring_state.position
-            position_i = embeddings.at[edge_index[0]].get()
-            position_j = embeddings.at[edge_index[1]].get()
 
-            spring_vec = position_i - position_j
-            spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
-            spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
+            # embeddings = spring_state.position
+            # position_i = embeddings.at[edge_index[0]].get()
+            # position_j = embeddings.at[edge_index[1]].get()
 
-            logreg.fit(spring_vec_norm.at[training_mask == 1].get(), signs.at[training_mask].get())
-            y_pred = logreg.predict(spring_vec_norm.at[validation_mask].get())
+            # spring_vec = position_i - position_j
+            # spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
+            # spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
 
-            auc = roc_auc_score(signs.at[validation_mask].get(), y_pred)
-            f1_binary = f1_score(signs.at[validation_mask].get(), y_pred, average='binary')
-            f1_micro = f1_score(signs.at[validation_mask].get(), y_pred, average='micro')
-            f1_macro = f1_score(signs.at[validation_mask].get(), y_pred, average='macro')
+            # logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
+            # y_pred = logreg.predict(spring_vec_norm.at[validation_mask].get())
 
-            aucs.append(auc)
-            f1_binaries.append(f1_binary)
-            f1_micros.append(f1_micro)
-            f1_macros.append(f1_macro)
+            # auc = roc_auc_score(signs.at[validation_mask].get(), y_pred)
+            # f1_binary = f1_score(signs.at[validation_mask].get(), y_pred, average='binary')
+            # f1_micro = f1_score(signs.at[validation_mask].get(), y_pred, average='micro')
+            # f1_macro = f1_score(signs.at[validation_mask].get(), y_pred, average='macro')
+
+            # aucs.append(auc)
+            # f1_binaries.append(f1_binary)
+            # f1_micros.append(f1_micro)
+            # f1_macros.append(f1_macro)
 
     embeddings = spring_state.position
 
@@ -166,9 +160,9 @@ def main(argv) -> None:
     spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
     spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
 
-    logreg.fit(spring_vec_norm.at[training_mask == 1].get(), signs.at[training_mask].get())
+    logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
     y_pred = logreg.predict(spring_vec_norm.at[test_mask].get())
-
+    
     auc = roc_auc_score(signs.at[test_mask].get(), y_pred)
     f1_binary = f1_score(signs.at[test_mask].get(), y_pred, average='binary')
     f1_micro = f1_score(signs.at[test_mask].get(), y_pred, average='micro')

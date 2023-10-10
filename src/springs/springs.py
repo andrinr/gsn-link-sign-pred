@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import jax
 from typing import NamedTuple
+from functools import partial
 
 class SpringParams(NamedTuple):
     friend_distance: float
@@ -16,6 +17,7 @@ class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
     energy: jnp.ndarray
+    loss : float = 0.0
 
 def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
@@ -24,7 +26,7 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) ->
 
     return SpringState(position, velocity, energy)
 
-@jax.jit
+@partial(jax.jit, static_argnums=(0, 1, 2, 3))
 def compute_force(
     params : SpringParams, 
     position_i : jnp.ndarray,
@@ -45,16 +47,26 @@ def compute_force(
     
     return force
 
-@jax.jit
+@partial(jax.jit, static_argnums=(1, 2, 3))
 def update(
     state : SpringState, 
     params : SpringParams, 
     sign : jnp.ndarray, 
     edge_index : jnp.ndarray) -> SpringState:
+    """
+    Update the spring state using the leapfrog method.
 
-    # n = state.position.shape[0]
-    # m = edge_index.shape[1]
-    # dim = state.position.shape[1]
+    Parameters
+    ----------
+    state : SpringState
+        The current spring state.
+    params : SpringParams
+        The parameters of the spring model.
+    sign : jnp.ndarray
+        The sign of the edges.
+    edge_index : jnp.ndarray
+        The edge index of the graph.
+    """
 
     position_i = state.position[edge_index[0]]
     position_j = state.position[edge_index[1]]
@@ -77,3 +89,33 @@ def update(
     energy = jnp.sum(jnp.square(velocity), axis=1)
 
     return SpringState(position, velocity, energy)
+
+class SimulationParams(NamedTuple):
+    iterations : int
+    edge_index : jnp.ndarray
+    signs : jnp.ndarray
+
+@partial(jax.jit, static_argnums=(1, 2))
+def simulate(
+    spring_state : SpringState,
+    spring_params : SpringParams,
+    simulation_params : SimulationParams,
+    ) -> SpringState:
+
+    spring_state =jax.lax.fori_loop(
+        0, 
+        simulation_params.iterations, 
+        lambda i, 
+        state: update(spring_state, spring_params, simulation_params.signs, simulation_params.edge_index), 
+        spring_state)
+
+    embeddings = spring_state.position
+    position_i = embeddings.at[simulation_params.edge_index[0]].get()
+    position_j = embeddings.at[simulation_params.edge_index[1]].get()
+
+    spring_vec = position_i - position_j
+    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1) - spring_params.neutral_distance
+
+    sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
+
+    return jnp.sum(sigmoid(spring_vec_norm) - simulation_params.signs)
