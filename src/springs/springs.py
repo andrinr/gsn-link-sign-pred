@@ -50,39 +50,24 @@ def update(
     sign : jnp.ndarray, 
     edge_index : jnp.ndarray) -> SpringState:
 
-    print(edge_index.shape)
-    print(sign.shape)
+    # n = state.position.shape[0]
+    # m = edge_index.shape[1]
+    # dim = state.position.shape[1]
 
     position_i = state.position[edge_index[0]]
     position_j = state.position[edge_index[1]]
 
     edge_forces = compute_force(params, position_i, position_j, sign)
     node_forces = jnp.zeros_like(state.position)
-    node_forces = jax.lax.scatter_add(
-        operand=node_forces,
-        scatter_indices=edge_index[0],
-        updates=edge_forces,
-        dimension_numbers=jax.lax.ScatterDimensionNumbers(
-            update_window_dims=(1),
-            inserted_window_dims=(1),
-            scatter_dims_to_operand_dims=(0,),
-        ))
+    node_forces = node_forces.at[edge_index[0]].add(edge_forces)
 
     velocity = state.velocity + 0.5 * params.time_step * node_forces
     position = state.position + params.time_step * velocity
 
     edge_forces = compute_force(params, position_i, position_j, sign)
     node_forces = jnp.zeros_like(state.position)
-    node_forces = jax.lax.scatter_add(
-        operand=node_forces,
-        scatter_indices=edge_index[0],
-        updates=edge_forces,
-        dimension_numbers=jax.lax.ScatterDimensionNumbers(
-            update_window_dims=(1),
-            inserted_window_dims=(1),
-            scatter_dims_to_operand_dims=(0,),
-        ))
-    
+    node_forces = node_forces.at[edge_index[0]].add(edge_forces)
+
     velocity = velocity + 0.5 * params.time_step * node_forces
 
     velocity = velocity * params.damping

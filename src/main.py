@@ -97,7 +97,8 @@ def main(argv) -> None:
     # convert to jnp arrays from torch tensors
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
-    training_mask = training_data.edge_attr == 1
+    training_mask = training_data.edge_attr != 0
+    training_mask = jnp.array(training_mask)
 
     spring_params = SpringParams(
         friend_distance=5.0,
@@ -128,25 +129,31 @@ def main(argv) -> None:
 
     embeddings = spring_state.position
 
+    position_i = embeddings.at[edge_index[0]].get()
+    position_j = embeddings.at[edge_index[1]].get()
+
+    spring_vector = position_i - position_j
+    spring_vector_norm = jnp.linalg.norm(spring_vector, axis=1)
+
     logreg_state = init_log_reg_state()
 
     for i in range(1000):
         logreg_state, loss = train(
             state=logreg_state,
             rate=0.01,
-            X=embeddings,
-            y=training_mask,
+            X=spring_vector_norm.at[training_mask == 1].get(),
+            y=signs.at[training_mask == 1].get(),
         )
 
     y_pred = predict(
         state=logreg_state,
-        X=embeddings,
+        X=spring_vector_norm.at[training_mask == 0].get(),
     )
 
-    auc = roc_auc_score(training_mask, y_pred)
-    f1_micro = f1_score(training_mask, y_pred, average='micro')
-    f1_macro = f1_score(training_mask, y_pred, average='macro')
-    f1_binary = f1_score(training_mask, y_pred, average='binary')
+    auc = roc_auc_score(signs.at[training_mask == 0].get(), y_pred)
+    f1_micro = f1_score(signs.at[training_mask == 0].get(), y_pred, average='micro')
+    f1_macro = f1_score(signs.at[training_mask == 0].get(), y_pred, average='macro')
+    f1_binary = f1_score(signs.at[training_mask == 0].get(), y_pred, average='binary')
 
     print(f"auc: {auc}")
     print(f"f1_micro: {f1_micro}")
