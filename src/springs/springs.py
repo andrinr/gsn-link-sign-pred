@@ -15,12 +15,14 @@ class SpringParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
+    energy: jnp.ndarray
 
 def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim))
     velocity = jnp.zeros((n, embedding_dim))
+    energy = jnp.zeros(n)
 
-    return SpringState(position, velocity)
+    return SpringState(position, velocity, energy)
 
 @jax.jit
 def compute_force(
@@ -72,7 +74,9 @@ def update(
 
     velocity = velocity * params.damping
 
-    return SpringState(position, velocity)
+    energy = jnp.sum(jnp.square(velocity), axis=1)
+
+    return SpringState(position, velocity, energy)
 
 
 #    iterations_interval = self.iterations // num_intervals
