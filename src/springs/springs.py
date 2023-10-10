@@ -18,7 +18,7 @@ class SpringState(NamedTuple):
     energy: jnp.ndarray
 
 def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) -> SpringState:
-    position = jax.random.uniform(rng, (n, embedding_dim))
+    position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
     energy = jnp.zeros(n)
 
@@ -72,43 +72,8 @@ def update(
 
     velocity = velocity + 0.5 * params.time_step * node_forces
 
-    velocity = velocity * params.damping
+    velocity = velocity * (1.0 - params.damping)
 
     energy = jnp.sum(jnp.square(velocity), axis=1)
 
     return SpringState(position, velocity, energy)
-
-
-#    iterations_interval = self.iterations // num_intervals
-
-#     n = self.train_data.num_nodes
-#     m = self.train_data.num_edges
-
-#     key = jnp.random.PRNGKey(0)
-#     pos = jnp.random.uniform(key, (n, self.embedding_dim))
-#     vel = jnp.zeros((n, self.embedding_dim))
-#     signs = self.trainings_signs
-
-#     aucs = jnp.zeros(num_intervals)
-#     f1_binaries = jnp.zeros(num_intervals)
-#     f1_micros = jnp.zeros(num_intervals)
-#     f1_macros = jnp.zeros(num_intervals)
-
-#     for interval in range(num_intervals):
-#         for i in range(iterations_interval):
-
-#             pos, vel = self.step(pos, vel, signs, self.edge_index)
-
-#             vel = vel * self.damping
-
-#         pos_i = pos[self.edge_index[0]]
-#         pos_j = pos[self.edge_index[1]]
-
-#         y_pred, auc_score, f1_binary, f1_micro, f1_macro = self.log_reg.predict(pos_i, pos_j)
-
-#         aucs[interval] = auc_score
-#         f1_binaries[interval] = f1_binary
-#         f1_micros[interval] = f1_micro
-#         f1_macros[interval] = f1_macro
-
-#     return pos, aucs, f1_binaries, f1_micros, f1_macros

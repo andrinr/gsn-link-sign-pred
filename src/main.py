@@ -13,7 +13,7 @@ import tqdm
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
-from graph import train_test_split
+from graph import train_test_val
 from springs import SpringParams, init_log_reg_state, update, train, predict, init_spring_state
 
 def main(argv) -> None:
@@ -34,9 +34,9 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 64
-    iterations = 1500
+    iterations = 500
     time_step =  0.01
-    damping = 0.01
+    damping = 0.2
     root = 'src/data/'
 
     dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
@@ -83,19 +83,17 @@ def main(argv) -> None:
         data = transform(data)
 
     # Create train and test datasets
-    data, training_data, test_data = train_test_split(
-        data = data, 
-        train_percentage=0.8)
+    data, training_mask, validation_mask, test_mask = train_test_val(data, 0.1, 0.8)
+    training_mask = jnp.array(training_mask)
+    validation_mask = jnp.array(validation_mask)
+    test_mask = jnp.array(test_mask)
     
     # convert to jnp arrays from torch tensors
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
 
-    training_mask = training_data.edge_attr != 0
-    training_mask = jnp.array(training_mask)
-
     training_signs = signs.copy()
-    training_signs = training_signs.at[training_mask == 1].set(0)
+    training_signs = training_signs.at[~training_mask].set(0)
 
     spring_params = SpringParams(
         friend_distance=5.0,
@@ -134,7 +132,7 @@ def main(argv) -> None:
 
         total_energy = jnp.sum(spring_state.energy)
         total_energies.append(total_energy)
-        # format the energy to 3 decimal places
+
         iter.set_description(f"Energy: {total_energy:.3f}")
 
         if i % 100 == 0:
@@ -146,19 +144,18 @@ def main(argv) -> None:
             spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
             spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
 
-            logreg.fit(spring_vec_norm.at[training_mask == 1].get(), signs.at[training_mask == 1].get())
-            y_pred = logreg.predict(spring_vec_norm.at[training_mask == 0].get())
+            logreg.fit(spring_vec_norm.at[training_mask == 1].get(), signs.at[training_mask].get())
+            y_pred = logreg.predict(spring_vec_norm.at[validation_mask].get())
 
-            auc = roc_auc_score(signs.at[training_mask == 0].get(), y_pred)
-            f1_binary = f1_score(signs.at[training_mask == 0].get(), y_pred, average='binary')
-            f1_micro = f1_score(signs.at[training_mask == 0].get(), y_pred, average='micro')
-            f1_macro = f1_score(signs.at[training_mask == 0].get(), y_pred, average='macro')
+            auc = roc_auc_score(signs.at[validation_mask].get(), y_pred)
+            f1_binary = f1_score(signs.at[validation_mask].get(), y_pred, average='binary')
+            f1_micro = f1_score(signs.at[validation_mask].get(), y_pred, average='micro')
+            f1_macro = f1_score(signs.at[validation_mask].get(), y_pred, average='macro')
 
             aucs.append(auc)
             f1_binaries.append(f1_binary)
             f1_micros.append(f1_micro)
             f1_macros.append(f1_macro)
-
 
     embeddings = spring_state.position
 
@@ -169,37 +166,33 @@ def main(argv) -> None:
     spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
     spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
 
-    logreg = LogisticRegression()
+    logreg.fit(spring_vec_norm.at[training_mask == 1].get(), signs.at[training_mask].get())
+    y_pred = logreg.predict(spring_vec_norm.at[test_mask].get())
 
-    # logreg_state = init_log_reg_state()
+    auc = roc_auc_score(signs.at[test_mask].get(), y_pred)
+    f1_binary = f1_score(signs.at[test_mask].get(), y_pred, average='binary')
+    f1_micro = f1_score(signs.at[test_mask].get(), y_pred, average='micro')
+    f1_macro = f1_score(signs.at[test_mask].get(), y_pred, average='macro')
 
-    # losses = []
-    # for _ in range(1000):
-    #     logreg_state, loss = train(
-    #         state=logreg_state,
-    #         rate=0.01,
-    #         X=spring_vector_norm.at[training_mask == 1].get(),
-    #         y=signs.at[training_mask == 1].get(),
-    #     )
-    #     losses.append(loss)
+    aucs.append(auc)
+    f1_binaries.append(f1_binary)
+    f1_micros.append(f1_micro)
+    f1_macros.append(f1_macro)
 
-    # y_pred = predict(
-    #     state=logreg_state,
-    #     X=spring_vector_norm.at[training_mask == 0].get(),
-    # )
-
-    # signs = signs > 0
-
-    print(f"auc: {aucs[-1]}")
-    print(f"f1_micro: {f1_micros[-1]}")
-    print(f"f1_macro: {f1_macros[-1]}")
-    print(f"f1_binary: {f1_binaries[-1]}")
+    print(f"auc: {auc}")
+    print(f"f1_micro: {f1_micro}")
+    print(f"f1_macro: {f1_macro}")
+    print(f"f1_binary: {f1_binary}")
 
     # create four subplots
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
     # plot the embeddings
-    ax1.scatter(embeddings[:, 0], embeddings[:, 1])
+    ax1.scatter(embeddings[:, 0], embeddings[:, 1], c=spring_state.energy)
+    # color bar
+    sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=0, vmax=1))
+    sm.set_array([])
+    fig.colorbar(sm, ax=ax1)
     ax1.set_title('Embeddings')
 
     # plot energies

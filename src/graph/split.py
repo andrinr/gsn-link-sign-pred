@@ -2,9 +2,10 @@ from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 import torch
 
-def train_test_split(
+def train_test_val(
         data : Data, 
-        train_percentage : float):
+        val_percentage : float,
+        train_percentage : float) -> tuple[Data, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Sets the edge_attr of the test edges to 0. 
 
@@ -20,6 +21,7 @@ def train_test_split(
 
     assert data.is_undirected()
     assert data.edge_attr is not None
+    assert val_percentage + train_percentage <= 1.0
 
     mask = data.edge_index[0] < data.edge_index[1]
     data.edge_index = data.edge_index[:, mask]
@@ -27,7 +29,8 @@ def train_test_split(
 
     num_total = data.edge_attr.shape[0]
     num_train = int(train_percentage * num_total)
-    num_test = num_total - num_train
+    num_val = int(val_percentage * num_total)
+    num_test = num_total - num_train - num_val
 
     perm = torch.randperm(num_total, device=data.edge_index.device)
 
@@ -37,22 +40,13 @@ def train_test_split(
     data.edge_index = torch.cat([data.edge_index, data.edge_index.flip([0])], dim=-1)
     data.edge_attr = torch.cat([data.edge_attr, data.edge_attr], dim=0)
     
-    train_edge_attr = data.edge_attr.clone()
-    train_edge_attr[:num_test] = 0
-    train_edge_attr[num_total:num_test+num_total] = 0
+    train_mask = torch.zeros(num_total * 2, dtype=torch.bool)
+    train_mask[:num_train] = True
 
-    test_edge_attr = data.edge_attr.clone()
-    test_edge_attr[num_test:num_total] = 0
-    test_edge_attr[num_total+num_test::] = 0
+    val_mask = torch.zeros(num_total * 2, dtype=torch.bool)
+    val_mask[num_train:num_train + num_val] = True
+
+    test_mask = torch.zeros(num_total * 2, dtype=torch.bool)
+    test_mask[num_train + num_val:] = True
     
-    training_data = Data(
-        edge_index=data.edge_index,
-        edge_attr=train_edge_attr,
-        num_nodes=data.num_nodes)
-    
-    test_data = Data(
-        edge_index=data.edge_index,
-        edge_attr=test_edge_attr,
-        num_nodes=data.num_nodes)
-    
-    return data, training_data, test_data
+    return data, test_mask, val_mask, train_mask
