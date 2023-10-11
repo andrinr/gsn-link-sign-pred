@@ -106,7 +106,7 @@ def main(argv) -> None:
     
     grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
     
-    learning_rate = 0.00001
+    learning_rate = 0.01
     for i in tqdm.trange(20):
         spring_state = init_spring_state(
             rng=rng,
@@ -132,7 +132,7 @@ def main(argv) -> None:
             friend_stiffness=spring_params.friend_stiffness - learning_rate * parameter_gradient.friend_stiffness,
             enemy_distance=spring_params.enemy_distance - learning_rate * parameter_gradient.enemy_distance,
             enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness,
-            damping=spring_params.damping - learning_rate * parameter_gradient.damping,
+            damping=0.01,
             time_step=0.01,
         )
 

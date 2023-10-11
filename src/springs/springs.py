@@ -139,13 +139,14 @@ def simulate_and_loss(
     spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
     
     predicted_sign = spring_vec_norm - NEUTRAL_DISTANCE
-    predicted_sign = predicted_sign * 2 - 1
+    logistic = lambda x: 1 / (1 + jnp.exp(-x))
+    predicted_sign = logistic(predicted_sign)
+
+    signs_categorical = jnp.where(signs == 1, 1, 0)
 
     # categorical cross entropy
-    loss = predicted_sign != signs
+    loss = -signs_categorical * jnp.log(predicted_sign) - (1 - signs_categorical) * jnp.log(1 - predicted_sign)
     loss = jnp.where(validation_mask, loss, 0)
     loss = jnp.sum(loss)
-
-    loss = loss / jnp.sum(validation_mask)
 
     return loss, spring_state
