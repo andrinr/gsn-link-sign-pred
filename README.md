@@ -66,6 +66,20 @@ $ f^{+}_{i,j} = \alpha^{+} \times max(l^{+} - L_i, 0) \frac{X_j - X_i}{\|{ X_j -
 
 where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$, $l^{0}$ and $l^{+}$ are the thresholds for the negative, neutral and positive force respectively. $\alpha^{-}$, $\alpha^{0}$ and $\alpha^{+}$ are the scaling factors for the negative, neutral and positive force respectively.
 
+### Current State
+
+The method works reasonably well, however it appears to be rather difficult to extend upon it. There are some areas where the method could be improved:
+
+1. Find better paramters for the simulation to increase the results.
+2. Optimize the simulation runtime to underline the fact, that the method is way faster than other methods.
+3. Find theories other than the social balance theory, that could be implemented using a spring network simulation.
+4. Apply the method to other datasets.
+
+### Things I have tried
+
+I have rewritten the code to JAX, which allows me to make use of its acceleration and autodifferentiation library. In theory we can determine the simulation paramaters such as $l^{-}$, $l^{0}$ and $l^{+}$. I did not get it working as of now.
+
+
 ## Results
 
 ### Comparison to other previous best method
