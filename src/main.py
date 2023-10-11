@@ -13,8 +13,8 @@ import tqdm
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
-from graph import train_test_val
-from springs import SpringParams, init_spring_state, simulate
+from graph import permute_split
+from springs import SpringParams, init_spring_state, simulate, simulate_and_loss
 
 def main(argv) -> None:
     """
@@ -76,8 +76,8 @@ def main(argv) -> None:
         transform = T.ToUndirected(reduce="min")
         data = transform(data)
 
-    # Create train and test datasets
-    data, training_mask, validation_mask, test_mask = train_test_val(data, 0.1, 0.8)
+    # Permute data and create masks
+    data, training_mask, validation_mask, test_mask = permute_split(data, 0.1, 0.8)
     training_mask = jnp.array(training_mask)
     validation_mask = jnp.array(validation_mask)
     test_mask = jnp.array(test_mask)
@@ -86,16 +86,13 @@ def main(argv) -> None:
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
 
-    training_signs = signs.copy()
-    training_signs = training_signs.at[~training_mask].set(0)
-
     spring_params = SpringParams(
-        friend_distance=1.0,
+        friend_distance=0.5,
         friend_stiffness=1.0,
-        enemy_distance=1.0,
+        enemy_distance=1.5,
         enemy_stiffness=1.0,
-        time_step=time_step,
         damping=damping,
+        time_step=time_step,
     )
     
     rng = random.PRNGKey(42)
@@ -107,24 +104,27 @@ def main(argv) -> None:
     f1_micros = []
     f1_macros = []
     
-    grad = value_and_grad(simulate, argnums=2, has_aux=True)
+    grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
     
-    learning_rate = 0.04
+    learning_rate = 0.00001
     for i in tqdm.trange(20):
         spring_state = init_spring_state(
             rng=rng,
             n=data.num_nodes,
             embedding_dim=embedding_dim,
         )
-            
+
         (loss_value, spring_state), parameter_gradient = grad(
             iterations,
             spring_state, 
             spring_params,
-            training_signs,
+            signs,
+            training_mask,
+            validation_mask,
             edge_index)
         
         print(f"loss: {loss_value}")
+        print(f"parameter_gradient: {parameter_gradient}")
 
         # update spring state
         spring_params = spring_params._replace(
@@ -133,8 +133,14 @@ def main(argv) -> None:
             enemy_distance=spring_params.enemy_distance - learning_rate * parameter_gradient.enemy_distance,
             enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness,
             damping=spring_params.damping - learning_rate * parameter_gradient.damping,
-            time_step=0.1,
+            time_step=0.01,
         )
+
+        print(f"friend_distance gradient: {parameter_gradient.friend_distance}")
+        print(f"friend_stiffness gradient: {parameter_gradient.friend_stiffness}")
+        print(f"enemy_distance gradient: {parameter_gradient.enemy_distance}")
+        print(f"enemy_stiffness gradient: {parameter_gradient.enemy_stiffness}")
+        print(f"damping gradient: {parameter_gradient.damping}")
 
         print(f"friend_distance: {spring_params.friend_distance}")
         print(f"friend_stiffness: {spring_params.friend_stiffness}")
@@ -163,18 +169,19 @@ def main(argv) -> None:
         f1_micros.append(f1_micro)
         f1_macros.append(f1_macro)
 
-
     spring_state = init_spring_state(
         rng=rng,
         n=data.num_nodes,
         embedding_dim=embedding_dim,
     )
 
+    training_signs = jnp.where(training_mask, signs, 0)
+
     loss, spring_state = simulate(
         iterations,
         spring_state, 
         spring_params,
-        signs,
+        training_signs,
         edge_index)
 
     embeddings = spring_state.position

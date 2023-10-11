@@ -27,7 +27,7 @@ def test_split():
     data = gen_graph(n)
     p_train = 0.6
 
-    data, train_data, test_data = graph.train_test_val(
+    data, train_data, test_data = graph.permute_split(
         data, p_train)
     assert train_data.num_edges == n * 2
     assert test_data.num_edges == n * 2

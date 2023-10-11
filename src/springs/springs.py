@@ -18,7 +18,6 @@ class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
     energy: jnp.ndarray
-    loss : float = 0.0
 
 def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
@@ -89,8 +88,12 @@ def update(
 
     energy = jnp.sum(jnp.square(velocity), axis=1)
 
-    return SpringState(position, velocity, energy)
-
+    state = state._replace(
+        position=position,
+        velocity=velocity,
+        energy=energy)
+    
+    return state
 
 @partial(jax.jit, static_argnames=["iterations"])
 def simulate(
@@ -103,17 +106,46 @@ def simulate(
     spring_state = jax.lax.fori_loop(
         0, 
         iterations, 
-        lambda i, 
-        state: update(spring_state, spring_params, signs, edge_index), 
+        # capture the spring_params and signs in the closure
+        lambda i, spring_state: update(spring_state, spring_params, signs, edge_index), 
         spring_state)
+    
+    return spring_state
+
+@partial(jax.jit, static_argnames=["iterations"])
+def simulate_and_loss(
+    iterations : int,
+    spring_state : SpringState,
+    spring_params : SpringParams,
+    signs : jnp.ndarray,
+    training_mask : jnp.ndarray,
+    validation_mask : jnp.ndarray,
+    edge_index : jnp.ndarray) -> SpringState:
+
+    training_signs = jnp.where(training_mask, signs, 0)
+
+    spring_state = simulate(
+        iterations,
+        spring_state,
+        spring_params,
+        training_signs,
+        edge_index)
 
     embeddings = spring_state.position
     position_i = embeddings.at[edge_index[0]].get()
     position_j = embeddings.at[edge_index[1]].get()
 
     spring_vec = position_i - position_j
-    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1) - NEUTRAL_DISTANCE
+    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
+    
+    predicted_sign = spring_vec_norm - NEUTRAL_DISTANCE
+    predicted_sign = predicted_sign * 2 - 1
 
-    sigmoid = lambda x: 1.0 / (1.0 + jnp.exp(-x))
+    # categorical cross entropy
+    loss = predicted_sign != signs
+    loss = jnp.where(validation_mask, loss, 0)
+    loss = jnp.sum(loss)
 
-    return jnp.sum(sigmoid(spring_vec_norm) - signs), spring_state
+    loss = loss / jnp.sum(validation_mask)
+
+    return loss, spring_state

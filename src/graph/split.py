@@ -2,7 +2,7 @@ from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 import torch
 
-def train_test_val(
+def permute_split(
         data : Data, 
         val_percentage : float,
         train_percentage : float) -> tuple[Data, torch.Tensor, torch.Tensor, torch.Tensor]:
