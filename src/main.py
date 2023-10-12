@@ -28,7 +28,7 @@ def main(argv) -> None:
     embedding_dim = 64
     optimization_runs = 50
     optimization_iterations = 100
-    iterations = 500
+    iterations = 200
     time_step =  0.01
     damping = 0.1
     root = 'src/data/'

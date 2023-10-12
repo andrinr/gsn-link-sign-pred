@@ -1,9 +1,7 @@
 from springs import SpringState
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score, f1_score
-from functools import partial
 import jax.numpy as jnp
-import jax
 from typing import NamedTuple
 
 class Metrics(NamedTuple):

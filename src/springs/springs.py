@@ -82,7 +82,7 @@ def update(
 
     velocity = velocity + 0.5 * dt * node_forces
 
-    velocity = velocity * (1.0 - damping * dt)
+    velocity = velocity * (1.0 - damping)
 
     state = state._replace(
         position=position,
