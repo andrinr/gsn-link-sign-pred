@@ -110,6 +110,7 @@ def main(argv) -> None:
         spring_state = init_spring_state(
             rng=rng,
             n=data.num_nodes,
+            m=data.num_edges,
             embedding_dim=embedding_dim,
         )
 
@@ -164,6 +165,7 @@ def main(argv) -> None:
     spring_state = init_spring_state(
         rng=rng,
         n=data.num_nodes,
+        m=data.num_edges,
         embedding_dim=embedding_dim,
     )
 

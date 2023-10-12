@@ -75,10 +75,27 @@ The method works reasonably well, however it appears to be rather difficult to e
 3. Find theories other than the social balance theory, that could be implemented using a spring network simulation.
 4. Apply the method to other datasets.
 
-### Things I have tried
+### Differentiable Simulation for Parameter Optimization
 
-I have rewritten the code to JAX, which allows me to make use of its acceleration and autodifferentiation library. In theory we can determine the simulation paramaters such as $l^{-}$, $l^{0}$ and $l^{+}$. I did not get it working as of now.
+I have rewritten the entire code and made it JAX comptabile. 
 
+Now the simulation is differentiable and for each simulation run we evaulate a loss function which correlates to the common measures (auc, f1scores). However the loss function must be differentiated, therefore I slightly changed the scoring function (which can be used as an inverse loss function). 
+
+This appears to be working pretty welly and can used instead of the nevergrad blackbox optimization which I have used before, at a fraction of the runtime.
+
+Since I have this implemented now, I could potentially use this pipeline to optimzie other parameters than the $l^+$, $l^0$, $l^-$ and $\alpha^+$, $\alpha^0$, $\alpha^-$ parameters.
+
+### Integrating a GNN into the pipeline
+
+For the future I propose the following architecture:
+
+1. A GNN is used to compute edge embeddings.
+2. The edge embeddings are combined along with the sign information to determine attraction and repulsion forces.
+3. The spring network simulation is run.
+4. The loss is evaluated and backpropagated through the entire pipeline.
+5. The parameters of the GNN are optimized using the loss function.
+
+The reason why this might outperform the current method, is that more complex dynamics can be captured by the NN and while its still a classical particle simulation, the actual forces acting on the individual nodes are modeled by a neural network and are therefore more complex.
 
 ## Results
 

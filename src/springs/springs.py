@@ -15,12 +15,14 @@ class SpringParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
+    edge_embeddings: jnp.ndarray
 
-def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) -> SpringState:
+def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
+    edge_embeddings = jnp.zeros((m, embedding_dim))
 
-    return SpringState(position, velocity)
+    return SpringState(position, velocity, edge_embeddings)
 
 @partial(jax.jit)
 def compute_force(
@@ -166,11 +168,13 @@ def simulate_and_loss(
 
     signs = jnp.where(signs == 1, 1, 0)
 
-    fraction_negatives = jnp.mean(predicted_sign)
-    fraction_positives = 1 - fraction_negatives
+    # fraction_negatives = jnp.mean(predicted_sign)
+    # fraction_positives = 1 - fraction_negatives
 
-    score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
+    # score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
 
-    loss = -jnp.mean(score)
+    # loss = -jnp.mean(score)
+
+    loss = -f1_macro(signs, predicted_sign)
     
     return loss, spring_state
