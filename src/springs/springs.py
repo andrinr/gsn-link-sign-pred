@@ -3,8 +3,8 @@ import jax
 from typing import NamedTuple
 from functools import partial
 
-NEUTRAL_DISTANCE = 1.0
-NEUTRAL_STIFFNESS = 1.0
+NEUTRAL_DISTANCE = 10.0
+NEUTRAL_STIFFNESS = 10.0
 
 class SpringParams(NamedTuple):
     friend_distance: float
@@ -26,7 +26,7 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) ->
 
     return SpringState(position, velocity, energy)
 
-@partial(jax.jit)
+# @partial(jax.jit)
 def compute_force(
     params : SpringParams, 
     position_i : jnp.ndarray,
@@ -47,7 +47,7 @@ def compute_force(
     
     return force
 
-@partial(jax.jit)
+# @partial(jax.jit)
 def update(
     state : SpringState, 
     params : SpringParams, 
@@ -102,6 +102,22 @@ def simulate(
     spring_params : SpringParams,
     signs : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
+    """
+    Simulate the spring model for a number of iterations.
+
+    Parameters
+    ----------
+    iterations : int
+        The number of iterations.
+    spring_state : SpringState
+        The current spring state.
+    spring_params : SpringParams
+        The parameters of the spring model.
+    signs : jnp.ndarray
+        The sign of the edges.
+    edge_index : jnp.ndarray
+        The edge index of the graph.
+    """
 
     spring_state = jax.lax.fori_loop(
         0, 
@@ -121,6 +137,26 @@ def simulate_and_loss(
     training_mask : jnp.ndarray,
     validation_mask : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
+    """
+    Simulate the spring model for a number of iterations and compute the loss.
+
+    Parameters
+    ----------
+    iterations : int
+        The number of iterations.
+    spring_state : SpringState
+        The current spring state.
+    spring_params : SpringParams
+        The parameters of the spring model.
+    signs : jnp.ndarray
+        The sign of the edges.
+    training_mask : jnp.ndarray 
+        The training mask.
+    validation_mask : jnp.ndarray
+        The validation mask.
+    edge_index : jnp.ndarray
+        The edge index of the graph.
+    """
 
     training_signs = jnp.where(training_mask, signs, 0)
 
@@ -142,10 +178,12 @@ def simulate_and_loss(
     logistic = lambda x: 1 / (1 + jnp.exp(-x))
     predicted_sign = logistic(predicted_sign)
 
-    signs_categorical = jnp.where(signs == 1, 1, 0)
+    signs = jnp.where(signs == 1, 1, 0)
 
-    # categorical cross entropy
-    loss = -signs_categorical * jnp.log(predicted_sign) - (1 - signs_categorical) * jnp.log(1 - predicted_sign)
+    print(predicted_sign.shape)
+
+    # categorical loss
+    loss = jnp.square(predicted_sign - signs)
     loss = jnp.where(validation_mask, loss, 0)
     loss = jnp.sum(loss)
 

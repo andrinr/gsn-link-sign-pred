@@ -6,15 +6,13 @@ import yaml
 import inquirer
 from jax import random, value_and_grad
 import jax.numpy as jnp
-from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix
-from sklearn.linear_model import LogisticRegression
 import matplotlib.pyplot as plt
 import tqdm
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import permute_split
-from springs import SpringParams, init_spring_state, simulate, simulate_and_loss
+from springs import SpringParams, evalute, init_spring_state, simulate, simulate_and_loss
 
 def main(argv) -> None:
     """
@@ -28,9 +26,9 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 64
-    iterations = 100
+    iterations = 500
     time_step =  0.01
-    damping = 0.2
+    damping = 0.1
     root = 'src/data/'
 
     dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
@@ -87,17 +85,16 @@ def main(argv) -> None:
     signs = jnp.array(data.edge_attr)
 
     spring_params = SpringParams(
-        friend_distance=0.5,
-        friend_stiffness=1.0,
-        enemy_distance=1.5,
-        enemy_stiffness=1.0,
+        friend_distance=5.0,
+        friend_stiffness=5.0,
+        enemy_distance=20.0,
+        enemy_stiffness=6.0,
         damping=damping,
         time_step=time_step,
     )
     
     rng = random.PRNGKey(42)
 
-    logreg = LogisticRegression()
     total_energies = []
     aucs = []
     f1_binaries = []
@@ -148,26 +145,19 @@ def main(argv) -> None:
         print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
         print(f"damping: {spring_params.damping}")
 
-        embeddings = spring_state.position
-        position_i = embeddings.at[edge_index[0]].get()
-        position_j = embeddings.at[edge_index[1]].get()
-
-        spring_vec = position_i - position_j
-        spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
-        spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
-
-        logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
-        y_pred = logreg.predict(spring_vec_norm.at[validation_mask].get())
-
-        auc = roc_auc_score(signs.at[validation_mask].get(), y_pred)
-        f1_binary = f1_score(signs.at[validation_mask].get(), y_pred, average='binary')
-        f1_micro = f1_score(signs.at[validation_mask].get(), y_pred, average='micro')
-        f1_macro = f1_score(signs.at[validation_mask].get(), y_pred, average='macro')
-
-        aucs.append(auc)
-        f1_binaries.append(f1_binary)
-        f1_micros.append(f1_micro)
-        f1_macros.append(f1_macro)
+        metrics = evalute(
+            spring_state,
+            edge_index,
+            signs,
+            training_mask,
+            validation_mask)
+        
+        print(metrics)
+        
+        aucs.append(metrics.auc)
+        f1_binaries.append(metrics.f1_binary)
+        f1_micros.append(metrics.f1_micro)
+        f1_macros.append(metrics.f1_macro)
 
     spring_state = init_spring_state(
         rng=rng,
@@ -177,43 +167,26 @@ def main(argv) -> None:
 
     training_signs = jnp.where(training_mask, signs, 0)
 
-    loss, spring_state = simulate(
+    spring_state = simulate(
         iterations,
         spring_state, 
         spring_params,
         training_signs,
         edge_index)
 
-    embeddings = spring_state.position
+    metrics = evalute(
+        spring_state,
+        edge_index,
+        signs,
+        training_mask,
+        test_mask)
 
-    position_i = embeddings.at[edge_index[0]].get()
-    position_j = embeddings.at[edge_index[1]].get()
-
-    spring_vec = position_i - position_j
-    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
-    spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
-
-    logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
-    y_pred = logreg.predict(spring_vec_norm.at[test_mask].get())
-    
-    auc = roc_auc_score(signs.at[test_mask].get(), y_pred)
-    f1_binary = f1_score(signs.at[test_mask].get(), y_pred, average='binary')
-    f1_micro = f1_score(signs.at[test_mask].get(), y_pred, average='micro')
-    f1_macro = f1_score(signs.at[test_mask].get(), y_pred, average='macro')
-
-    aucs.append(auc)
-    f1_binaries.append(f1_binary)
-    f1_micros.append(f1_micro)
-    f1_macros.append(f1_macro)
-
-    print(f"auc: {auc}")
-    print(f"f1_micro: {f1_micro}")
-    print(f"f1_macro: {f1_macro}")
-    print(f"f1_binary: {f1_binary}")
+    print(metrics)
 
     # create four subplots
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
+    embeddings = spring_state.position
     # plot the embeddings
     ax1.scatter(embeddings[:, 0], embeddings[:, 1], c=spring_state.energy)
     # color bar
