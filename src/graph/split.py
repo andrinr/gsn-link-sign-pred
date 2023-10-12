@@ -49,4 +49,4 @@ def permute_split(
     test_mask = torch.zeros(num_total * 2, dtype=torch.bool)
     test_mask[num_train + num_val:] = True
     
-    return data, test_mask, val_mask, train_mask
+    return data, train_mask, val_mask, test_mask

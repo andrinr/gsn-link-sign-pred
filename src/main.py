@@ -75,9 +75,11 @@ def main(argv) -> None:
         data = transform(data)
 
     # Permute data and create masks
-    data, training_mask, validation_mask, test_mask = permute_split(data, 0.1, 0.8)
-    training_mask = jnp.array(training_mask)
-    validation_mask = jnp.array(validation_mask)
+    # the edges are arranged as follows: training, validation, test
+    data, train_mask, val_mask, test_mask = permute_split(data, 0.1, 0.8)
+
+    train_mask = jnp.array(train_mask)
+    val_mask = jnp.array(val_mask)
     test_mask = jnp.array(test_mask)
     
     # convert to jnp arrays from torch tensors
@@ -104,7 +106,7 @@ def main(argv) -> None:
     grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
     
     learning_rate = 0.01
-    for i in tqdm.trange(0):
+    for i in tqdm.trange(10):
         spring_state = init_spring_state(
             rng=rng,
             n=data.num_nodes,
@@ -116,8 +118,8 @@ def main(argv) -> None:
             spring_state, 
             spring_params,
             signs,
-            training_mask,
-            validation_mask,
+            train_mask,
+            val_mask,
             edge_index)
         
         print(f"loss: {loss_value}")
@@ -149,8 +151,8 @@ def main(argv) -> None:
             spring_state,
             edge_index,
             signs,
-            training_mask,
-            validation_mask)
+            train_mask,
+            val_mask)
         
         print(metrics)
         
@@ -165,7 +167,8 @@ def main(argv) -> None:
         embedding_dim=embedding_dim,
     )
 
-    training_signs = jnp.where(training_mask, signs, 0)
+    training_signs = signs.copy()
+    training_signs = training_signs.at[train_mask].set(0)
 
     spring_state = simulate(
         iterations,
@@ -178,7 +181,7 @@ def main(argv) -> None:
         spring_state,
         edge_index,
         signs,
-        training_mask,
+        train_mask,
         test_mask)
 
     print(metrics)
@@ -188,7 +191,7 @@ def main(argv) -> None:
 
     embeddings = spring_state.position
     # plot the embeddings
-    ax1.scatter(embeddings[:, 0], embeddings[:, 1], c=spring_state.energy)
+    ax1.scatter(embeddings[:, 0], embeddings[:, 1])# c=spring_state.energy)
     # color bar
     sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=0, vmax=1))
     sm.set_array([])

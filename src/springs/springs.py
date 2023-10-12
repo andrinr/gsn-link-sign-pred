@@ -25,7 +25,7 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) ->
 
     return SpringState(position, velocity)
 
-# @partial(jax.jit)
+@partial(jax.jit)
 def compute_force(
     params : SpringParams, 
     position_i : jnp.ndarray,
@@ -46,7 +46,7 @@ def compute_force(
     
     return force
 
-# @partial(jax.jit)
+@partial(jax.jit)
 def update(
     state : SpringState, 
     params : SpringParams, 
@@ -119,7 +119,8 @@ def simulate_and_loss(
     validation_mask : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
 
-    training_signs = jnp.where(training_mask, signs, 0)
+    training_signs = signs.copy()
+    training_signs = jnp.where(training_mask, training_signs, 0)
 
     spring_state = simulate(
         iterations,
@@ -142,7 +143,5 @@ def simulate_and_loss(
     loss = jnp.square(predicted_sign - signs)
     loss = jnp.where(validation_mask, loss, 0)
     loss = jnp.sum(loss)
-
-    loss = 1.0
 
     return loss, spring_state

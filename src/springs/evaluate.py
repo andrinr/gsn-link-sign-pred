@@ -15,13 +15,12 @@ class Metrics(NamedTuple):
     def __str__(self):
         return f"auc: {self.auc}, f1_binary: {self.f1_binary}, f1_micro: {self.f1_micro}, f1_macro: {self.f1_macro}"
 
-@jax.jit
 def evaluate(
     spring_state : SpringState, 
     edge_index : jnp.ndarray,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
-    evaluation_mask : jnp.ndarray) -> Metrics:
+    evaulation_mask : jnp.ndarray) -> Metrics:
 
     logreg = LogisticRegression()
         
@@ -29,16 +28,15 @@ def evaluate(
     position_i = embeddings.at[edge_index[0]].get()
     position_j = embeddings.at[edge_index[1]].get()
 
-    spring_vec = position_i - position_j
-    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
+    spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
     spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
 
-    logreg.fit(spring_vec_norm[training_mask], signs[training_mask])
-    y_pred = logreg.predict(spring_vec_norm[evaluation_mask])
+    logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
+    y_pred = logreg.predict(spring_vec_norm.at[evaulation_mask].get())
 
-    auc = roc_auc_score(signs.at[evaluation_mask].get(), y_pred)
-    f1_binary = f1_score(signs.at[evaluation_mask].get(), y_pred, average='binary')
-    f1_micro = f1_score(signs.at[evaluation_mask].get(), y_pred, average='micro')
-    f1_macro = f1_score(signs.at[evaluation_mask].get(), y_pred, average='macro')
+    auc = roc_auc_score(signs.at[evaulation_mask].get(), y_pred)
+    f1_binary = f1_score(signs.at[evaulation_mask].get(), y_pred, average='binary')
+    f1_micro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='micro')
+    f1_macro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='macro')
 
     return Metrics(auc, f1_binary, f1_micro, f1_macro)
