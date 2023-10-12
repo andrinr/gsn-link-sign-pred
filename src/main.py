@@ -7,7 +7,7 @@ import inquirer
 from jax import random, value_and_grad
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import tqdm
+import jax.profiler
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
@@ -26,6 +26,8 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 64
+    optimization_runs = 50
+    optimization_iterations = 100
     iterations = 500
     time_step =  0.01
     damping = 0.1
@@ -91,8 +93,6 @@ def main(argv) -> None:
         friend_stiffness=5.0,
         enemy_distance=20.0,
         enemy_stiffness=6.0,
-        damping=damping,
-        time_step=time_step,
     )
     
     rng = random.PRNGKey(42)
@@ -105,8 +105,8 @@ def main(argv) -> None:
     
     grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
     
-    learning_rate = 0.01
-    for i in tqdm.trange(10):
+    learning_rate = 1.0
+    for i in range(optimization_runs):
         spring_state = init_spring_state(
             rng=rng,
             n=data.num_nodes,
@@ -114,9 +114,11 @@ def main(argv) -> None:
         )
 
         (loss_value, spring_state), parameter_gradient = grad(
-            iterations,
+            optimization_iterations,
             spring_state, 
             spring_params,
+            time_step,
+            damping,
             signs,
             train_mask,
             val_mask,
@@ -130,22 +132,18 @@ def main(argv) -> None:
             friend_distance=spring_params.friend_distance - learning_rate * parameter_gradient.friend_distance,
             friend_stiffness=spring_params.friend_stiffness - learning_rate * parameter_gradient.friend_stiffness,
             enemy_distance=spring_params.enemy_distance - learning_rate * parameter_gradient.enemy_distance,
-            enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness,
-            damping=0.01,
-            time_step=0.01,
+            enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness
         )
 
         print(f"friend_distance gradient: {parameter_gradient.friend_distance}")
         print(f"friend_stiffness gradient: {parameter_gradient.friend_stiffness}")
         print(f"enemy_distance gradient: {parameter_gradient.enemy_distance}")
         print(f"enemy_stiffness gradient: {parameter_gradient.enemy_stiffness}")
-        print(f"damping gradient: {parameter_gradient.damping}")
 
         print(f"friend_distance: {spring_params.friend_distance}")
         print(f"friend_stiffness: {spring_params.friend_stiffness}")
         print(f"enemy_distance: {spring_params.enemy_distance}")
         print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
-        print(f"damping: {spring_params.damping}")
 
         metrics = evaluate(
             spring_state,
@@ -161,6 +159,8 @@ def main(argv) -> None:
         f1_micros.append(metrics.f1_micro)
         f1_macros.append(metrics.f1_macro)
 
+    jax.profiler.save_device_memory_profile("memory.prof")
+    
     spring_state = init_spring_state(
         rng=rng,
         n=data.num_nodes,
@@ -174,6 +174,8 @@ def main(argv) -> None:
         iterations,
         spring_state, 
         spring_params,
+        time_step,
+        damping,
         training_signs,
         edge_index)
 

@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple
 from functools import partial
-from memory_profiler import profile
 
 NEUTRAL_DISTANCE = 10.0
 NEUTRAL_STIFFNESS = 10.0
@@ -12,8 +11,6 @@ class SpringParams(NamedTuple):
     friend_stiffness: float
     enemy_distance: float
     enemy_stiffness: float
-    damping: float
-    time_step: float
 
 class SpringState(NamedTuple):
     position: jnp.ndarray
@@ -50,6 +47,8 @@ def compute_force(
 def update(
     state : SpringState, 
     params : SpringParams, 
+    dt : float,
+    damping : float,
     sign : jnp.ndarray, 
     edge_index : jnp.ndarray) -> SpringState:
     """
@@ -74,16 +73,16 @@ def update(
     node_forces = jnp.zeros_like(state.position)
     node_forces = node_forces.at[edge_index[0]].add(edge_forces)
 
-    velocity = state.velocity + 0.5 * params.time_step * node_forces
-    position = state.position + params.time_step * velocity
+    velocity = state.velocity + 0.5 * dt * node_forces
+    position = state.position + dt * velocity
 
     edge_forces = compute_force(params, position_i, position_j, sign)
     node_forces = jnp.zeros_like(state.position)
     node_forces = node_forces.at[edge_index[0]].add(edge_forces)
 
-    velocity = velocity + 0.5 * params.time_step * node_forces
+    velocity = velocity + 0.5 * dt * node_forces
 
-    velocity = velocity * (1.0 - params.damping)
+    velocity = velocity * (1.0 - damping * dt)
 
     state = state._replace(
         position=position,
@@ -96,6 +95,8 @@ def simulate(
     iterations : int,
     spring_state : SpringState,
     spring_params : SpringParams,
+    dt : float,
+    damping : float,
     signs : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
 
@@ -103,17 +104,40 @@ def simulate(
         0, 
         iterations, 
         # capture the spring_params and signs in the closure
-        lambda i, spring_state: update(spring_state, spring_params, signs, edge_index), 
+        lambda i, spring_state: update(spring_state, spring_params, dt, damping, signs, edge_index), 
         spring_state)
     
     return spring_state
 
-@profile
+@jax.jit
+def f_beta(truth : jnp.array, prediction : jnp.array, beta : float) -> float:
+    tp = jnp.sum(prediction * truth)
+    fp = jnp.sum(prediction * (1 - truth))
+    fn = jnp.sum((1 - prediction) * truth)
+
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+
+    return (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
+
+@jax.jit
+def f1_macro(truth : jnp.array, prediction : jnp.array) -> float:
+    tp = jnp.sum(prediction * truth, axis=0)
+    fp = jnp.sum(prediction * (1 - truth), axis=0)
+    fn = jnp.sum((1 - prediction) * truth, axis=0)
+
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+
+    return jnp.mean(2 * precision * recall / (precision + recall))
+
 @partial(jax.jit, static_argnames=["iterations"])
 def simulate_and_loss(
     iterations : int,
     spring_state : SpringState,
     spring_params : SpringParams,
+    dt : float,
+    damping : float,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
     validation_mask : jnp.ndarray,
@@ -126,6 +150,8 @@ def simulate_and_loss(
         iterations,
         spring_state,
         spring_params,
+        dt,
+        damping,
         training_signs,
         edge_index)
 
@@ -140,8 +166,11 @@ def simulate_and_loss(
 
     signs = jnp.where(signs == 1, 1, 0)
 
-    loss = jnp.square(predicted_sign - signs)
-    loss = jnp.where(validation_mask, loss, 0)
-    loss = jnp.sum(loss)
+    fraction_negatives = jnp.mean(predicted_sign)
+    fraction_positives = 1 - fraction_negatives
 
+    score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
+
+    loss = -jnp.mean(score)
+    
     return loss, spring_state
