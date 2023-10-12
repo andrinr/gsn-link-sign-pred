@@ -12,7 +12,7 @@ import tqdm
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import permute_split
-from springs import SpringParams, evalute, init_spring_state, simulate, simulate_and_loss
+from springs import SpringParams, evaluate, init_spring_state, simulate, simulate_and_loss
 
 def main(argv) -> None:
     """
@@ -104,7 +104,7 @@ def main(argv) -> None:
     grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
     
     learning_rate = 0.01
-    for i in tqdm.trange(20):
+    for i in tqdm.trange(0):
         spring_state = init_spring_state(
             rng=rng,
             n=data.num_nodes,
@@ -145,7 +145,7 @@ def main(argv) -> None:
         print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
         print(f"damping: {spring_params.damping}")
 
-        metrics = evalute(
+        metrics = evaluate(
             spring_state,
             edge_index,
             signs,
@@ -174,7 +174,7 @@ def main(argv) -> None:
         training_signs,
         edge_index)
 
-    metrics = evalute(
+    metrics = evaluate(
         spring_state,
         edge_index,
         signs,
@@ -195,9 +195,9 @@ def main(argv) -> None:
     fig.colorbar(sm, ax=ax1)
     ax1.set_title('Embeddings')
 
-    # plot energies
-    ax2.hist(spring_state.energy)
-    ax2.set_title('Energies')
+    # # plot energies
+    # ax2.hist(spring_state.energy)
+    # ax2.set_title('Energies')
 
     # plot the energies over time, log scale
     ax3.plot(total_energies)

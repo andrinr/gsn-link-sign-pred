@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple
 from functools import partial
+from memory_profiler import profile
 
 NEUTRAL_DISTANCE = 10.0
 NEUTRAL_STIFFNESS = 10.0
@@ -17,14 +18,12 @@ class SpringParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
-    energy: jnp.ndarray
 
 def init_spring_state(rng : jax.random.PRNGKey, n : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
-    energy = jnp.zeros(n)
 
-    return SpringState(position, velocity, energy)
+    return SpringState(position, velocity)
 
 # @partial(jax.jit)
 def compute_force(
@@ -86,12 +85,9 @@ def update(
 
     velocity = velocity * (1.0 - params.damping)
 
-    energy = jnp.sum(jnp.square(velocity), axis=1)
-
     state = state._replace(
         position=position,
-        velocity=velocity,
-        energy=energy)
+        velocity=velocity)
     
     return state
 
@@ -102,22 +98,6 @@ def simulate(
     spring_params : SpringParams,
     signs : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
-    """
-    Simulate the spring model for a number of iterations.
-
-    Parameters
-    ----------
-    iterations : int
-        The number of iterations.
-    spring_state : SpringState
-        The current spring state.
-    spring_params : SpringParams
-        The parameters of the spring model.
-    signs : jnp.ndarray
-        The sign of the edges.
-    edge_index : jnp.ndarray
-        The edge index of the graph.
-    """
 
     spring_state = jax.lax.fori_loop(
         0, 
@@ -128,6 +108,7 @@ def simulate(
     
     return spring_state
 
+@profile
 @partial(jax.jit, static_argnames=["iterations"])
 def simulate_and_loss(
     iterations : int,
@@ -137,26 +118,6 @@ def simulate_and_loss(
     training_mask : jnp.ndarray,
     validation_mask : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
-    """
-    Simulate the spring model for a number of iterations and compute the loss.
-
-    Parameters
-    ----------
-    iterations : int
-        The number of iterations.
-    spring_state : SpringState
-        The current spring state.
-    spring_params : SpringParams
-        The parameters of the spring model.
-    signs : jnp.ndarray
-        The sign of the edges.
-    training_mask : jnp.ndarray 
-        The training mask.
-    validation_mask : jnp.ndarray
-        The validation mask.
-    edge_index : jnp.ndarray
-        The edge index of the graph.
-    """
 
     training_signs = jnp.where(training_mask, signs, 0)
 
@@ -167,12 +128,10 @@ def simulate_and_loss(
         training_signs,
         edge_index)
 
-    embeddings = spring_state.position
-    position_i = embeddings.at[edge_index[0]].get()
-    position_j = embeddings.at[edge_index[1]].get()
+    position_i = spring_state.position[edge_index[0]]
+    position_j = spring_state.position[edge_index[1]]
 
-    spring_vec = position_i - position_j
-    spring_vec_norm = jnp.linalg.norm(spring_vec, axis=1)
+    spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
     
     predicted_sign = spring_vec_norm - NEUTRAL_DISTANCE
     logistic = lambda x: 1 / (1 + jnp.exp(-x))
@@ -180,11 +139,10 @@ def simulate_and_loss(
 
     signs = jnp.where(signs == 1, 1, 0)
 
-    print(predicted_sign.shape)
-
-    # categorical loss
     loss = jnp.square(predicted_sign - signs)
     loss = jnp.where(validation_mask, loss, 0)
     loss = jnp.sum(loss)
+
+    loss = 1.0
 
     return loss, spring_state
