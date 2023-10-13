@@ -54,7 +54,8 @@ def update(
     sign : jnp.ndarray, 
     edge_index : jnp.ndarray) -> SpringState:
     """
-    Update the spring state using the leapfrog method.
+    Update the spring state using the leapfrog method. 
+    This is essentially a simple message passing network implementation. 
 
     Parameters
     ----------
