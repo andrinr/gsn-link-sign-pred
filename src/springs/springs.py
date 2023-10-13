@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple
 from functools import partial
+from nn import AttentionHead
 
 NEUTRAL_DISTANCE = 10.0
 NEUTRAL_STIFFNESS = 10.0
