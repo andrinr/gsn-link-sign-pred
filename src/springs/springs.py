@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple
 from functools import partial
-from nn import AttentionHead
 
 NEUTRAL_DISTANCE = 10.0
 NEUTRAL_STIFFNESS = 10.0
@@ -16,14 +15,14 @@ class SpringParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
-    edge_embeddings: jnp.ndarray
+    auxillaries: jnp.ndarray
 
 def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
-    edge_embeddings = jnp.zeros((m, embedding_dim))
+    auxillaries = jnp.random.uniform(rng, (m, embedding_dim), maxval=1.0, minval=-1.0)
 
-    return SpringState(position, velocity, edge_embeddings)
+    return SpringState(position, velocity, auxillaries)
 
 @partial(jax.jit)
 def compute_force(
@@ -46,7 +45,7 @@ def compute_force(
     
     return force
 
-@partial(jax.jit)
+@partial(jax.jit, staticmethods=["dt", "params"])
 def update(
     state : SpringState, 
     params : SpringParams, 
@@ -57,17 +56,6 @@ def update(
     """
     Update the spring state using the leapfrog method. 
     This is essentially a simple message passing network implementation. 
-
-    Parameters
-    ----------
-    state : SpringState
-        The current spring state.
-    params : SpringParams
-        The parameters of the spring model.
-    sign : jnp.ndarray
-        The sign of the edges.
-    edge_index : jnp.ndarray
-        The edge index of the graph.
     """
 
     position_i = state.position[edge_index[0]]
@@ -94,21 +82,33 @@ def update(
     
     return state
 
-@partial(jax.jit, static_argnames=["iterations"])
+class SimulationParams(NamedTuple):
+    iterations : int
+    dt : float
+    damping : float
+    message_passing_iterations : int
+
+@partial(jax.jit, static_argnames=["simulation_params"])
 def simulate(
-    iterations : int,
+    simulation_params : SimulationParams,
     spring_state : SpringState,
     spring_params : SpringParams,
-    dt : float,
-    damping : float,
     signs : jnp.ndarray,
     edge_index : jnp.ndarray) -> SpringState:
 
+    # capture the spring_params and signs in the closure
+    loop_function = lambda i, spring_state: update(
+        spring_state, 
+        spring_params, 
+        simulation_params.dt, 
+        simulation_params.damping,
+        signs, 
+        edge_index)
+
     spring_state = jax.lax.fori_loop(
         0, 
-        iterations, 
-        # capture the spring_params and signs in the closure
-        lambda i, spring_state: update(spring_state, spring_params, dt, damping, signs, edge_index), 
+        simulation_params.iterations, 
+        loop_function,
         spring_state)
     
     return spring_state
@@ -135,27 +135,23 @@ def f1_macro(truth : jnp.array, prediction : jnp.array) -> float:
 
     return jnp.mean(2 * precision * recall / (precision + recall))
 
-@partial(jax.jit, static_argnames=["iterations"])
+@partial(jax.jit, static_argnames=["simulation_params"])
 def simulate_and_loss(
-    iterations : int,
+    simulation_params : SimulationParams,
     spring_state : SpringState,
     spring_params : SpringParams,
-    dt : float,
-    damping : float,
+    edge_index : jnp.ndarray,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
-    validation_mask : jnp.ndarray,
-    edge_index : jnp.ndarray) -> SpringState:
+    validation_mask : jnp.ndarray) -> SpringState:
 
     training_signs = signs.copy()
     training_signs = jnp.where(training_mask, training_signs, 0)
 
     spring_state = simulate(
-        iterations,
+        simulation_params,
         spring_state,
         spring_params,
-        dt,
-        damping,
         training_signs,
         edge_index)
 

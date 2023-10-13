@@ -8,6 +8,7 @@ from jax import random, value_and_grad
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import jax.profiler
+import optax
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
