@@ -5,15 +5,15 @@ import flax.linen as nn
 class AttentionHead(nn.Module):
   def __init__(
     self,
-    n_dimensions : int
+    embedding_dimensions : int
   ): 
     super().__init__()
-    self.n_dimensions = n_dimensions
-    self.input_shape = 3 * n_dimensions + 1
+    self.embedding_dimensions = embedding_dimensions
+    input_shape = 3 * embedding_dimensions + 1
 
-    self.Q = nn.Dense(features=self.input_shape)
-    self.K = nn.Dense(features=self.input_shape)
-    self.V = nn.Dense(features=self.input_shape)
+    self.Q = nn.Dense(features=input_shape)
+    self.K = nn.Dense(features=input_shape)
+    self.V = nn.Dense(features=input_shape)
 
   @nn.compact
   def __call__(
@@ -31,6 +31,6 @@ class AttentionHead(nn.Module):
     k = self.K(other_node)
     v = self.V(other_node)
 
-    score_softmax = jnp.dot(q, k.T) / jnp.sqrt(self.n_dimensions)
+    score_softmax = jnp.dot(q, k.T) / jnp.sqrt(self.embedding_dimensions)
 
     return score_softmax * v

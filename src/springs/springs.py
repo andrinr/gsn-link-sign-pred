@@ -1,7 +1,9 @@
 import jax.numpy as jnp
 import jax
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 from functools import partial
+from springs import f1_macro
+from gnn import AttentionHead
 
 NEUTRAL_DISTANCE = 10.0
 NEUTRAL_STIFFNESS = 10.0
@@ -88,13 +90,15 @@ class SimulationParams(NamedTuple):
     damping : float
     message_passing_iterations : int
 
-@partial(jax.jit, static_argnames=["simulation_params"])
+@partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
 def simulate(
     simulation_params : SimulationParams,
     spring_state : SpringState,
     spring_params : SpringParams,
-    signs : jnp.ndarray,
-    edge_index : jnp.ndarray) -> SpringState:
+    attention_head : AttentionHead,
+    attention_heads_params : list[dict],
+    edge_index : jnp.ndarray,
+    signs : jnp.ndarray) -> SpringState:
 
     # capture the spring_params and signs in the closure
     loop_function = lambda i, spring_state: update(
@@ -113,37 +117,17 @@ def simulate(
     
     return spring_state
 
-@jax.jit
-def f_beta(truth : jnp.array, prediction : jnp.array, beta : float) -> float:
-    tp = jnp.sum(prediction * truth)
-    fp = jnp.sum(prediction * (1 - truth))
-    fn = jnp.sum((1 - prediction) * truth)
-
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-
-    return (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
-
-@jax.jit
-def f1_macro(truth : jnp.array, prediction : jnp.array) -> float:
-    tp = jnp.sum(prediction * truth, axis=0)
-    fp = jnp.sum(prediction * (1 - truth), axis=0)
-    fn = jnp.sum((1 - prediction) * truth, axis=0)
-
-    precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
-
-    return jnp.mean(2 * precision * recall / (precision + recall))
-
-@partial(jax.jit, static_argnames=["simulation_params"])
+@partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
 def simulate_and_loss(
     simulation_params : SimulationParams,
     spring_state : SpringState,
     spring_params : SpringParams,
+    attention_head : AttentionHead,
+    attention_heads_params : list[dict],
     edge_index : jnp.ndarray,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
-    validation_mask : jnp.ndarray) -> SpringState:
+    validation_mask : jnp.ndarray,) -> SpringState:
 
     training_signs = signs.copy()
     training_signs = jnp.where(training_mask, training_signs, 0)
