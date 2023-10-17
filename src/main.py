@@ -13,7 +13,8 @@ import optax
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import permute_split
-from springs import SpringParams, evaluate, init_spring_state, simulate, simulate_and_loss
+from springs import SpringParams, evaluate, init_spring_state, simulate, simulate_and_loss, SimulationParams
+from gnn import AttentionHead
 
 def main(argv) -> None:
     """
@@ -27,11 +28,12 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 64
-    optimization_runs = 50
-    optimization_iterations = 100
+    trainings = 50
+    training_iterations = 100
     iterations = 200
     time_step =  0.01
     damping = 0.1
+    n_attention_heads = 3
     root = 'src/data/'
 
     dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
@@ -95,9 +97,21 @@ def main(argv) -> None:
         enemy_distance=20.0,
         enemy_stiffness=6.0,
     )
-    
-    rng = random.PRNGKey(42)
 
+    simulation_params = SimulationParams(
+        iterations=training_iterations,
+        dt=time_step,
+        damping=damping,
+        message_passing_iterations=5
+    )
+
+    attention_head = AttentionHead(embedding_dimensions=embedding_dim)
+    attention_head_params = []
+    rng = random.PRNGKey(42)
+    keys = random.split(rng, n_attention_heads)
+    for i in range(n_attention_heads):
+        attention_head_params.append(attention_head.init(keys[i]))
+    
     total_energies = []
     aucs = []
     f1_binaries = []
@@ -107,7 +121,7 @@ def main(argv) -> None:
     grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
     
     learning_rate = 1.0
-    for i in range(optimization_runs):
+    for i in range(trainings):
         spring_state = init_spring_state(
             rng=rng,
             n=data.num_nodes,
@@ -116,15 +130,15 @@ def main(argv) -> None:
         )
 
         (loss_value, spring_state), parameter_gradient = grad(
-            optimization_iterations,
+            simulation_params,
             spring_state, 
             spring_params,
-            time_step,
-            damping,
+            attention_head,
+            attention_head_params,
+            edge_index,
             signs,
             train_mask,
-            val_mask,
-            edge_index)
+            val_mask,)
         
         print(f"loss: {loss_value}")
         print(f"parameter_gradient: {parameter_gradient}")
@@ -173,14 +187,16 @@ def main(argv) -> None:
     training_signs = signs.copy()
     training_signs = training_signs.at[train_mask].set(0)
 
+    simulation_params.iterations = iterations
+
     spring_state = simulate(
-        iterations,
+        simulation_params,
         spring_state, 
         spring_params,
-        time_step,
-        damping,
-        training_signs,
-        edge_index)
+        attention_head,
+        attention_head_params,
+        edge_index,
+        training_signs)
 
     metrics = evaluate(
         spring_state,

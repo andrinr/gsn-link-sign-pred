@@ -29,6 +29,8 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim 
 @partial(jax.jit)
 def compute_force(
     params : SpringParams, 
+    attention_head : AttentionHead,
+    attention_heads_params : list[dict],
     position_i : jnp.ndarray,
     position_j : jnp.ndarray,
     sign : jnp.ndarray) -> jnp.ndarray:
@@ -47,116 +49,46 @@ def compute_force(
     
     return force
 
-@partial(jax.jit, staticmethods=["dt", "params"])
+@partial(jax.jit, staticmethods=["dt", "damping", "attention_head"])
 def update(
-    state : SpringState, 
-    params : SpringParams, 
+    spring_state : SpringState, 
+    spring_params : SpringParams, 
+    attention_head : AttentionHead,
+    attention_heads_params : list[dict],
     dt : float,
     damping : float,
-    sign : jnp.ndarray, 
-    edge_index : jnp.ndarray) -> SpringState:
+    edge_index : jnp.ndarray,
+    sign : jnp.ndarray) -> SpringState:
     """
     Update the spring state using the leapfrog method. 
     This is essentially a simple message passing network implementation. 
     """
 
-    position_i = state.position[edge_index[0]]
-    position_j = state.position[edge_index[1]]
+    position_i = spring_state.position[edge_index[0]]
+    position_j = spring_state.position[edge_index[1]]
 
-    edge_forces = compute_force(params, position_i, position_j, sign)
-    node_forces = jnp.zeros_like(state.position)
+    edge_forces = compute_force(
+        spring_state,
+        spring_params, 
+        position_i, 
+        position_j, 
+        sign)
+    node_forces = jnp.zeros_like(spring_state.position)
     node_forces = node_forces.at[edge_index[0]].add(edge_forces)
 
-    velocity = state.velocity + 0.5 * dt * node_forces
-    position = state.position + dt * velocity
+    velocity = spring_state.velocity + 0.5 * dt * node_forces
+    position = spring_state.position + dt * velocity
 
-    edge_forces = compute_force(params, position_i, position_j, sign)
-    node_forces = jnp.zeros_like(state.position)
+    edge_forces = compute_force(spring_params, position_i, position_j, sign)
+    node_forces = jnp.zeros_like(spring_state.position)
     node_forces = node_forces.at[edge_index[0]].add(edge_forces)
 
     velocity = velocity + 0.5 * dt * node_forces
 
     velocity = velocity * (1.0 - damping)
 
-    state = state._replace(
+    spring_state = spring_state._replace(
         position=position,
         velocity=velocity)
     
-    return state
-
-class SimulationParams(NamedTuple):
-    iterations : int
-    dt : float
-    damping : float
-    message_passing_iterations : int
-
-@partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
-def simulate(
-    simulation_params : SimulationParams,
-    spring_state : SpringState,
-    spring_params : SpringParams,
-    attention_head : AttentionHead,
-    attention_heads_params : list[dict],
-    edge_index : jnp.ndarray,
-    signs : jnp.ndarray) -> SpringState:
-
-    # capture the spring_params and signs in the closure
-    loop_function = lambda i, spring_state: update(
-        spring_state, 
-        spring_params, 
-        simulation_params.dt, 
-        simulation_params.damping,
-        signs, 
-        edge_index)
-
-    spring_state = jax.lax.fori_loop(
-        0, 
-        simulation_params.iterations, 
-        loop_function,
-        spring_state)
-    
     return spring_state
-
-@partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
-def simulate_and_loss(
-    simulation_params : SimulationParams,
-    spring_state : SpringState,
-    spring_params : SpringParams,
-    attention_head : AttentionHead,
-    attention_heads_params : list[dict],
-    edge_index : jnp.ndarray,
-    signs : jnp.ndarray,
-    training_mask : jnp.ndarray,
-    validation_mask : jnp.ndarray,) -> SpringState:
-
-    training_signs = signs.copy()
-    training_signs = jnp.where(training_mask, training_signs, 0)
-
-    spring_state = simulate(
-        simulation_params,
-        spring_state,
-        spring_params,
-        training_signs,
-        edge_index)
-
-    position_i = spring_state.position[edge_index[0]]
-    position_j = spring_state.position[edge_index[1]]
-
-    spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
-    
-    predicted_sign = spring_vec_norm - NEUTRAL_DISTANCE
-    logistic = lambda x: 1 / (1 + jnp.exp(-x))
-    predicted_sign = logistic(predicted_sign)
-
-    signs = jnp.where(signs == 1, 1, 0)
-
-    # fraction_negatives = jnp.mean(predicted_sign)
-    # fraction_positives = 1 - fraction_negatives
-
-    # score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
-
-    # loss = -jnp.mean(score)
-
-    loss = -f1_macro(signs, predicted_sign)
-    
-    return loss, spring_state

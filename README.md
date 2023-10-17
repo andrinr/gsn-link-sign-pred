@@ -85,17 +85,17 @@ This appears to be working pretty welly and can used instead of the nevergrad bl
 
 Since I have this implemented now, I could potentially use this pipeline to optimzie other parameters than the $l^+$, $l^0$, $l^-$ and $\alpha^+$, $\alpha^0$, $\alpha^-$ parameters.
 
-### Integrating a GNN into the pipeline
+### Graph Transformer Network
 
-For the future I propose the following architecture:
+We train two neural networks, a message passing network which generated an auxillary information vector for each node and a graph transformer network which takes the auxillary information vector, the edge signs and positions of the nodes to compute the forces.
 
-1. A GNN is used to compute edge embeddings.
-2. The edge embeddings are combined along with the sign information to determine attraction and repulsion forces.
-3. The spring network simulation is run.
-4. The loss is evaluated and backpropagated through the entire pipeline.
-5. The parameters of the GNN are optimized using the loss function.
+A prediction then looks as follows:
 
-The reason why this might outperform the current method, is that more complex dynamics can be captured by the NN and while its still a classical particle simulation, the actual forces acting on the individual nodes are modeled by a neural network and are therefore more complex.
+1. Compute the auxillary information vector for each node using a fixed number of iterations of the message passing network.
+2. Compute the forces using the graph transformer network.
+3. Advance the simulation using the computed forces.
+4. Repeat 2. and 3. until the simulation has converged.
+
 
 ## Results
 
