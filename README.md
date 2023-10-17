@@ -87,14 +87,18 @@ Since I have this implemented now, I could potentially use this pipeline to opti
 
 ### Graph Transformer Network
 
-We train two neural networks, a message passing network which generated an auxillary information vector for each node and a graph transformer network which takes the auxillary information vector, the edge signs and positions of the nodes to compute the forces.
+We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a graph transformer network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to compute the forces.
 
-A prediction then looks as follows:
+A single prediction then looks as follows:
 
-1. Compute the auxillary information vector for each node using a fixed number of iterations of the message passing network.
-2. Compute the forces using the graph transformer network.
+1. Compute the auxillary information vector for each node using a fixed number of iterations of the message passing network $M$.
+2. Compute the forces using the graph transformer network $T$.
 3. Advance the simulation using the computed forces.
 4. Repeat 2. and 3. until the simulation has converged.
+
+The network can be trained as follows:
+
+We predict the node embeddings using the above method, we then compute a loss and propagate thrue the entire network to update the weights of the message passing network $M$ and the graph transformer network $T$.
 
 
 ## Results
