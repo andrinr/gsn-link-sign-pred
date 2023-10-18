@@ -29,7 +29,7 @@ def main(argv) -> None:
     """
     embedding_dim = 64
     trainings = 50
-    training_iterations = 100
+    training_iterations = 20
     iterations = 200
     time_step =  0.01
     damping = 0.1

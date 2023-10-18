@@ -26,7 +26,7 @@ def update_auxillary_state(
         auxillaries_nn_params)
     
     auxillaries = jnp.zeros_like(spring_state.auxillaries)
-    node_forces = node_forces.at[edge_index[0]].add(auxillaries_i)
+    auxillaries = auxillaries.at[edge_index[0]].add(auxillaries_i)
     
     spring_state = spring_state._replace(
         auxillaries=auxillaries)

@@ -40,11 +40,12 @@ def simulate(
     simulation_update = lambda i, state: sim.update_spring_state(
         spring_state = state,
         spring_params = spring_params,
+        nn_based_forces = nn_based_forces,
         forces_nn_params = forces_nn_params,
         dt = simulation_params.dt,
         damping = simulation_params.damping,
         edge_index = edge_index,
-        signs = signs)
+        sign = signs)
 
     spring_state = jax.lax.fori_loop(
         0, 

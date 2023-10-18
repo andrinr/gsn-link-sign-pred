@@ -24,6 +24,6 @@ def attention(
   k = jnp.dot(x_j, params['K'])
   v = jnp.dot(x_j, params['V'])
 
-  score_softmax = jnp.dot(q, k.T) / jnp.sqrt(params['Q'].shape[1])
+  score_softmax = jnp.einsum('ij,ij->i', q, k) / jnp.sqrt(params['Q'].shape[1])
 
-  return score_softmax * v
+  return jnp.einsum('i,ij->ij', score_softmax, v)
