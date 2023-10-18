@@ -18,15 +18,11 @@ def init_attention_params(
 def attention(
     x_i : jnp.ndarray,
     x_j : jnp.ndarray,
-    sign : jnp.ndarray,
     params : dict[jnp.ndarray]) -> jnp.ndarray:
   
-  other_node = jnp.concatenate([x_j, sign], axis=-1)
-  self_node = jnp.concatenate([x_i, sign], axis=-1)
-
-  q = jnp.dot(self_node, params['Q'])
-  k = jnp.dot(other_node, params['K'])
-  v = jnp.dot(other_node, params['V'])
+  q = jnp.dot(x_i, params['Q'])
+  k = jnp.dot(x_j, params['K'])
+  v = jnp.dot(x_j, params['V'])
 
   score_softmax = jnp.dot(q, k.T) / jnp.sqrt(params['Q'].shape[1])
 

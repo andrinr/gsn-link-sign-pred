@@ -2,8 +2,8 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple, Optional
 from functools import partial
-from springs import f1_macro
-from gnn import AttentionHead
+from simulation import f1_macro
+from neural import mlp
 
 NEUTRAL_DISTANCE = 10.0
 NEUTRAL_STIFFNESS = 10.0
@@ -26,33 +26,45 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim 
 
     return SpringState(position, velocity, auxillaries)
 
-@partial(jax.jit)
+@partial(jax.jit, static_argnames=["nn_based_forces"])
 def compute_force(
     params : SpringParams, 
-    forces_nn_params : jnp.ndarray,
+    nn_based_forces : bool,
+    forces_nn_params : dict[jnp.ndarray],
     position_i : jnp.ndarray,
     position_j : jnp.ndarray,
+    auxillaries_i : jnp.ndarray,
+    auxillaries_j : jnp.ndarray,
     sign : jnp.ndarray) -> jnp.ndarray:
-    
+
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + 0.001)
 
-    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness * spring_vector_norm
-    neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS * spring_vector_norm
-    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness * spring_vector_norm
-
-    sign = jnp.expand_dims(sign, axis=1)
-    force = jnp.where(sign == 1, attraction, retraction)
-    force = jnp.where(sign == 0, neutral, force)
+    # neural network based forces
+    if nn_based_forces:
+        forces = mlp(
+            jnp.concatenate([spring_vector, auxillaries_i, auxillaries_j, sign], axis=-1),
+            forces_nn_params)
     
-    return force
+    # social balance theory based forces
+    else:
+        attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
+        neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS
+        retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
+
+        sign = jnp.expand_dims(sign, axis=1)
+        forces = jnp.where(sign == 1, attraction, retraction)
+        forces = jnp.where(sign == 0, neutral, forces)
+    
+    return forces * spring_vector_norm
 
 @partial(jax.jit, staticmethods=["dt", "damping", "attention_head"])
-def update(
+def update_spring_state(
     spring_state : SpringState, 
     spring_params : SpringParams, 
-    forces_nn_params : jnp.ndarray,
+    nn_based_forces : bool,
+    forces_nn_params : dict[jnp.ndarray],
     dt : float,
     damping : float,
     edge_index : jnp.ndarray,
@@ -65,12 +77,20 @@ def update(
     position_i = spring_state.position[edge_index[0]]
     position_j = spring_state.position[edge_index[1]]
 
+    auxillaries_i = spring_state.auxillaries[edge_index[0]]
+    auxillaries_j = spring_state.auxillaries[edge_index[1]]
+
     edge_forces = compute_force(
         spring_state,
         spring_params, 
+        nn_based_forces,
+        forces_nn_params,
         position_i, 
         position_j, 
+        auxillaries_i,
+        auxillaries_j,
         sign)
+    
     node_forces = jnp.zeros_like(spring_state.position)
     node_forces = node_forces.at[edge_index[0]].add(edge_forces)
 

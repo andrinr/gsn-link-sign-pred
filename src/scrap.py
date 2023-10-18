@@ -2,15 +2,12 @@ import numpy as np
 
 import jax.numpy as jnp
 
-a = jnp.array([[1, 2, 3], [4, 5, 6]])
-b = jnp.array([[2, 3, 4], [6, 5, 6]])
 
-print(a.shape)
-print(b.shape)
+# example matrices
+A = np.array([[1, 2], [3, 4], [4, 5], [6, 7]])  # A is 2 x 2 (m x n)
+B = np.array([[2, 3], [1, 2]])  # B is 2 x 2 (n x k)
 
-c = jnp.array([0,1])
+# performing dot product
+C = np.dot(A, B)  # C will be 2 x 2 (m x k)
 
-c = jnp.expand_dims(c, axis=1)
-
-
-print(jnp.where(c == 1, a, b))
+print(C)

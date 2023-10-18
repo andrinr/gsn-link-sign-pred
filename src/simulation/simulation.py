@@ -2,9 +2,8 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple
 from functools import partial
-from springs import f1_macro
-from nn import mlp
-from springs import SpringParams, SpringState, update, NEUTRAL_DISTANCE
+from simulation import f1_macro
+import simulation as sim
 
 class SimulationParams(NamedTuple):
     iterations : int
@@ -12,29 +11,34 @@ class SimulationParams(NamedTuple):
     damping : float
     message_passing_iterations : int
 
-@partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
+@partial(jax.jit, static_argnames=["simulation_params", "attention_head", "nn_based_forces"])
 def simulate(
     simulation_params : SimulationParams,
-    spring_state : SpringState,
-    spring_params : SpringParams,
-    auxillaries_nn_params : jnp.ndarray,
-    forces_nn_params : jnp.ndarray,
+    spring_state : sim.SpringState,
+    spring_params : sim.SpringParams,
+    nn_based_forces : bool,
+    auxillaries_nn_params : dict[jnp.ndarray],
+    forces_nn_params : dict[jnp.ndarray],
     edge_index : jnp.ndarray,
-    signs : jnp.ndarray) -> SpringState:
+    signs : jnp.ndarray) -> sim.SpringState:
 
-    # capture the auxillaries_nn_params in the closure
-    auxillary_update = lambda i, spring_state: mlp(
-        spring_state.auxillaries, auxillaries_nn_params)
+    if nn_based_forces:
+        # capture the auxillaries_nn_params in the closure
+        auxillary_update = lambda i, state: sim.update_auxillary_state(
+            spring_state = state,
+            auxillaries_nn_params = auxillaries_nn_params,
+            edge_index = edge_index,
+            sign = signs)
 
-    spring_state = jax.lax.fori_loop(
-        0,
-        simulation_params.message_passing_iterations,
-        auxillary_update,
-        spring_state)
+        spring_state = jax.lax.fori_loop(
+            0,
+            simulation_params.message_passing_iterations,
+            auxillary_update,
+            spring_state)
 
     # capture the spring_params and signs in the closure
-    simulation_update = lambda i, spring_state: update(
-        spring_state = spring_state,
+    simulation_update = lambda i, state: sim.update_spring_state(
+        spring_state = state,
         spring_params = spring_params,
         forces_nn_params = forces_nn_params,
         dt = simulation_params.dt,
@@ -53,14 +57,15 @@ def simulate(
 @partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
 def simulate_and_loss(
     simulation_params : SimulationParams,
-    spring_state : SpringState,
-    spring_params : SpringParams,
-    auxillaries_nn_params : jnp.ndarray,
-    forces_nn_params : jnp.ndarray,
+    spring_state : sim.SpringState,
+    spring_params : sim.SpringParams,
+    nn_based_forces : bool,
+    auxillaries_nn_params : dict[jnp.ndarray],
+    forces_nn_params : dict[jnp.ndarray],
     edge_index : jnp.ndarray,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
-    validation_mask : jnp.ndarray) -> SpringState:
+    validation_mask : jnp.ndarray) -> sim.SpringState:
 
     training_signs = signs.copy()
     training_signs = jnp.where(training_mask, training_signs, 0)
@@ -69,6 +74,7 @@ def simulate_and_loss(
         simulation_params = simulation_params,
         spring_state = spring_state,
         spring_params = spring_params,
+        nn_based_forces = nn_based_forces,
         auxillaries_nn_params = auxillaries_nn_params,
         forces_nn_params = forces_nn_params,
         edge_index = edge_index,
@@ -79,7 +85,7 @@ def simulate_and_loss(
 
     spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
     
-    predicted_sign = spring_vec_norm - NEUTRAL_DISTANCE
+    predicted_sign = spring_vec_norm - sim.NEUTRAL_DISTANCE
     logistic = lambda x: 1 / (1 + jnp.exp(-x))
     predicted_sign = logistic(predicted_sign)
 
