@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple, Optional
 from functools import partial
-from simulation import f1_macro
 from neural import mlp
 
 NEUTRAL_DISTANCE = 10.0
@@ -22,7 +21,7 @@ class SpringState(NamedTuple):
 def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
-    auxillaries = jnp.random.uniform(rng, (m, embedding_dim), maxval=1.0, minval=-1.0)
+    auxillaries = jax.random.uniform(rng, (m, embedding_dim), maxval=1.0, minval=-1.0)
 
     return SpringState(position, velocity, auxillaries)
 
@@ -59,7 +58,7 @@ def compute_force(
     
     return forces * spring_vector_norm
 
-@partial(jax.jit, staticmethods=["dt", "damping", "attention_head"])
+@partial(jax.jit, static_argnames=["dt", "damping", "attention_head"])
 def update_spring_state(
     spring_state : SpringState, 
     spring_params : SpringParams, 

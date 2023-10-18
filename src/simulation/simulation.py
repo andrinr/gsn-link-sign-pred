@@ -11,7 +11,7 @@ class SimulationParams(NamedTuple):
     damping : float
     message_passing_iterations : int
 
-@partial(jax.jit, static_argnames=["simulation_params", "attention_head", "nn_based_forces"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces"])
 def simulate(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,
@@ -54,7 +54,7 @@ def simulate(
     
     return spring_state
 
-@partial(jax.jit, static_argnames=["simulation_params", "attention_head"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces"])
 def simulate_and_loss(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,

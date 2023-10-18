@@ -13,9 +13,8 @@ import optax
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import permute_split
-from . import simulate
-from springs import SpringParams, evaluate, init_spring_state, simulate_and_loss, SimulationParams
-from gnn import AttentionHead
+import simulation as sim
+import neural as nn
 
 def main(argv) -> None:
     """
@@ -92,77 +91,98 @@ def main(argv) -> None:
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
 
-    spring_params = SpringParams(
+    spring_params = sim.SpringParams(
         friend_distance=5.0,
         friend_stiffness=5.0,
         enemy_distance=20.0,
         enemy_stiffness=6.0,
     )
 
-    simulation_params = SimulationParams(
+    simulation_params = sim.SimulationParams(
         iterations=training_iterations,
         dt=time_step,
         damping=damping,
         message_passing_iterations=5
     )
 
-    attention_head = AttentionHead(embedding_dimensions=embedding_dim)
-    attention_head_params = []
-    rng = random.PRNGKey(42)
-    keys = random.split(rng, n_attention_heads)
-    for i in range(n_attention_heads):
-        attention_head_params.append(attention_head.init(keys[i]))
+    rng = random.PRNGKey(0)
+
+    key0, key1 = random.split(random.PRNGKey(0))
+
+    auxillaries_params = nn.init_attention_params(
+        key=key0,
+        input_dimension=embedding_dim + 1,
+        output_dimension=embedding_dim)
+    
+    forces_params = nn.init_mlp_params(
+        key=key1,
+        layer_dimensions = [embedding_dim * 3 + 1, 256, 256, 1])
+    
+    auxillaries_opt = optax.adam(learning_rate=1e-2)
+    forces_op = optax.adam(learning_rate=1e-2)
+
+    auxillaries_opt_state = auxillaries_opt.init(auxillaries_params)
+    forces_opt_state = forces_op.init(forces_params)
+
+    grad = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
     
     total_energies = []
     aucs = []
     f1_binaries = []
     f1_micros = []
     f1_macros = []
-    
-    grad = value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
-    
-    learning_rate = 1.0
-    for i in range(trainings):
-        spring_state = init_spring_state(
+
+    for _ in range(trainings):
+        spring_state = sim.init_spring_state(
             rng=rng,
             n=data.num_nodes,
             m=data.num_edges,
             embedding_dim=embedding_dim,
         )
 
-        (loss_value, spring_state), parameter_gradient = grad(
+        (loss_value, spring_state), (auxillaries_gradient, forces_gradient) = grad(
             simulation_params,
             spring_state, 
             spring_params,
-            attention_head,
-            attention_head_params,
+            True, # nn_based_forces
+            auxillaries_params,
+            forces_params,
             edge_index,
             signs,
             train_mask,
-            val_mask,)
+            val_mask)
         
+        auxillaries_updates, auxillaries_opt_state = auxillaries_opt.update(
+            auxillaries_gradient, auxillaries_opt_state, auxillaries_params)
+        
+        auxillaries_params = optax.apply_updates(auxillaries_params, auxillaries_updates)
+
+        forces_updates, forces_opt_state = forces_op.update(
+            forces_gradient, forces_opt_state, forces_params)
+        
+        forces_params = optax.apply_updates(forces_params, forces_updates)
+
         print(f"loss: {loss_value}")
-        print(f"parameter_gradient: {parameter_gradient}")
 
-        # update spring state
-        spring_params = spring_params._replace(
-            friend_distance=spring_params.friend_distance - learning_rate * parameter_gradient.friend_distance,
-            friend_stiffness=spring_params.friend_stiffness - learning_rate * parameter_gradient.friend_stiffness,
-            enemy_distance=spring_params.enemy_distance - learning_rate * parameter_gradient.enemy_distance,
-            enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness
-        )
+        # # update spring params
+        # spring_params = spring_params._replace(
+        #     friend_distance=spring_params.friend_distance - learning_rate * parameter_gradient.friend_distance,
+        #     friend_stiffness=spring_params.friend_stiffness - learning_rate * parameter_gradient.friend_stiffness,
+        #     enemy_distance=spring_params.enemy_distance - learning_rate * parameter_gradient.enemy_distance,
+        #     enemy_stiffness=spring_params.enemy_stiffness - learning_rate * parameter_gradient.enemy_stiffness
+        # )
 
-        print(f"friend_distance gradient: {parameter_gradient.friend_distance}")
-        print(f"friend_stiffness gradient: {parameter_gradient.friend_stiffness}")
-        print(f"enemy_distance gradient: {parameter_gradient.enemy_distance}")
-        print(f"enemy_stiffness gradient: {parameter_gradient.enemy_stiffness}")
+        # print(f"friend_distance gradient: {parameter_gradient.friend_distance}")
+        # print(f"friend_stiffness gradient: {parameter_gradient.friend_stiffness}")
+        # print(f"enemy_distance gradient: {parameter_gradient.enemy_distance}")
+        # print(f"enemy_stiffness gradient: {parameter_gradient.enemy_stiffness}")
 
-        print(f"friend_distance: {spring_params.friend_distance}")
-        print(f"friend_stiffness: {spring_params.friend_stiffness}")
-        print(f"enemy_distance: {spring_params.enemy_distance}")
-        print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
+        # print(f"friend_distance: {spring_params.friend_distance}")
+        # print(f"friend_stiffness: {spring_params.friend_stiffness}")
+        # print(f"enemy_distance: {spring_params.enemy_distance}")
+        # print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
 
-        metrics = evaluate(
+        metrics = sim.evaluate(
             spring_state,
             edge_index,
             signs,
@@ -178,7 +198,7 @@ def main(argv) -> None:
 
     jax.profiler.save_device_memory_profile("memory.prof")
     
-    spring_state = init_spring_state(
+    spring_state = sim.init_spring_state(
         rng=rng,
         n=data.num_nodes,
         m=data.num_edges,
@@ -190,16 +210,17 @@ def main(argv) -> None:
 
     simulation_params.iterations = iterations
 
-    spring_state = simulate(
-        simulation_params,
-        spring_state, 
-        spring_params,
-        attention_head,
-        attention_head_params,
-        edge_index,
-        training_signs)
+    spring_state = sim.simulate(
+        simulation_params=simulation_params,
+        spring_state=spring_state, 
+        spring_params=spring_params,
+        nn_based_forces=True,
+        auxillaries_nn_params=auxillaries_params,
+        forces_nn_params=forces_params,
+        edge_index=edge_index,
+        signs=training_signs)
 
-    metrics = evaluate(
+    metrics = sim.evaluate(
         spring_state,
         edge_index,
         signs,
