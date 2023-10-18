@@ -11,7 +11,7 @@ class SimulationParams(NamedTuple):
     damping : float
     message_passing_iterations : int
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces", "spring_params"])
 def simulate(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,
@@ -55,7 +55,7 @@ def simulate(
     
     return spring_state
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces", "spring_params"])
 def simulate_and_loss(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,
@@ -92,13 +92,13 @@ def simulate_and_loss(
 
     signs = jnp.where(signs == 1, 1, 0)
 
-    # fraction_negatives = jnp.mean(predicted_sign)
-    # fraction_positives = 1 - fraction_negatives
+    fraction_negatives = jnp.mean(predicted_sign)
+    fraction_positives = 1 - fraction_negatives
 
-    # score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
+    score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
 
-    # loss = -jnp.mean(score)
+    loss = -jnp.mean(score)
 
-    loss = -f1_macro(signs, predicted_sign)
+    # loss = -f1_macro(signs, predicted_sign)
     
     return loss, spring_state

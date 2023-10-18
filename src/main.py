@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import jax.profiler
 import optax
+import os
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
@@ -35,6 +36,10 @@ def main(argv) -> None:
     damping = 0.1
     n_attention_heads = 3
     root = 'src/data/'
+
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
+    #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".XX"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
@@ -151,6 +156,11 @@ def main(argv) -> None:
             signs,
             train_mask,
             val_mask)
+        
+        print(f"loss: {loss_value}")
+
+        print(auxillaries_params)
+        print(forces_params)
         
         auxillaries_updates, auxillaries_opt_state = auxillaries_opt.update(
             auxillaries_gradient, auxillaries_opt_state, auxillaries_params)
