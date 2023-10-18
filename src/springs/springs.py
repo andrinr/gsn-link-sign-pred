@@ -29,8 +29,7 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim 
 @partial(jax.jit)
 def compute_force(
     params : SpringParams, 
-    attention_head : AttentionHead,
-    attention_heads_params : list[dict],
+    forces_nn_params : jnp.ndarray,
     position_i : jnp.ndarray,
     position_j : jnp.ndarray,
     sign : jnp.ndarray) -> jnp.ndarray:
@@ -53,8 +52,7 @@ def compute_force(
 def update(
     spring_state : SpringState, 
     spring_params : SpringParams, 
-    attention_head : AttentionHead,
-    attention_heads_params : list[dict],
+    forces_nn_params : jnp.ndarray,
     dt : float,
     damping : float,
     edge_index : jnp.ndarray,

@@ -13,7 +13,8 @@ import optax
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
 from graph import permute_split
-from springs import SpringParams, evaluate, init_spring_state, simulate, simulate_and_loss, SimulationParams
+from . import simulate
+from springs import SpringParams, evaluate, init_spring_state, simulate_and_loss, SimulationParams
 from gnn import AttentionHead
 
 def main(argv) -> None:

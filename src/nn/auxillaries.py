@@ -5,6 +5,8 @@ from functools import partial
 from gnn import AttentionHead
 import optax
 
+
+
 @partial(jax.jit, static_argnames=["key", "message_passing_iterations", "embedding_dim", "learning_rate"])
 def generate_auxillaries(
         key : jax.random.PRNGKey,
@@ -21,6 +23,8 @@ def generate_auxillaries(
     params = attention_head.init(key)
 
     tx = optax.adam(learning_rate=learning_rate)
+
+    opt_state = tx.init(params)
 
 
     
