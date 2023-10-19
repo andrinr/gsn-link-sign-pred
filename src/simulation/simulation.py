@@ -23,13 +23,15 @@ def simulate(
     signs : jnp.ndarray) -> sim.SpringState:
 
     if nn_based_forces:
+        jax.debug.print("Using nn based forces")
         # capture the auxillaries_nn_params in the closure
         auxillary_update = lambda i, state: sim.update_auxillary_state(
             spring_state = state,
             auxillaries_nn_params = auxillaries_nn_params,
             edge_index = edge_index,
             sign = signs)
-
+        
+        jax.debug.print(f"message_passing_iterations: {simulation_params.message_passing_iterations}") 
         spring_state = jax.lax.fori_loop(
             0,
             simulation_params.message_passing_iterations,

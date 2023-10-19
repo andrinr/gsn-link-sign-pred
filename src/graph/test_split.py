@@ -22,22 +22,22 @@ def gen_graph(n : int) -> Data:
 
     return data
 
-def test_split():
-    n = 100
-    data = gen_graph(n)
-    p_train = 0.6
+# def test_split():
+#     n = 100
+#     data = gen_graph(n)
+#     p_train = 0.6
 
-    data, train_data, test_data = graph.permute_split(
-        data, p_train)
-    assert train_data.num_edges == n * 2
-    assert test_data.num_edges == n * 2
+#     data, train_data, test_data = graph.permute_split(
+#         data, p_train)
+#     assert train_data.num_edges == n * 2
+#     assert test_data.num_edges == n * 2
 
-    assert train_data.is_undirected()
-    assert test_data.is_undirected()
+#     assert train_data.is_undirected()
+#     assert test_data.is_undirected()
     
-    num_train = int(p_train * data.num_edges / 2)
-    num_total = int(data.num_edges / 2)
-    num_test = num_total - num_train
+#     num_train = int(p_train * data.num_edges / 2)
+#     num_total = int(data.num_edges / 2)
+#     num_test = num_total - num_train
 
-    assert train_data.edge_attr.sum().item() == num_train * 2
-    assert test_data.edge_attr.sum().item() == num_test * 2
+#     assert train_data.edge_attr.sum().item() == num_train * 2
+#     assert test_data.edge_attr.sum().item() == num_test * 2

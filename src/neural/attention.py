@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+from jax.experimental import checkify
 
 def init_attention_params(
   key : jax.random.PRNGKey,
@@ -19,11 +20,12 @@ def attention(
     x_i : jnp.ndarray,
     x_j : jnp.ndarray,
     params : dict[jnp.ndarray]) -> jnp.ndarray:
-  
+
   q = jnp.dot(x_i, params['Q'])
   k = jnp.dot(x_j, params['K'])
   v = jnp.dot(x_j, params['V'])
 
   score_softmax = jnp.einsum('ij,ij->i', q, k) / jnp.sqrt(params['Q'].shape[1])
-
-  return jnp.einsum('i,ij->ij', score_softmax, v)
+  v = jnp.einsum('i,ij->ij', score_softmax, v)
+  
+  return v

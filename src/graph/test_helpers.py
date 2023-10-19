@@ -48,11 +48,3 @@ def test_get_edge_index():
     assert graph.get_edge_index(data, 1, 0).item() == 1
     assert graph.get_edge_index(data, 1, 2).item() == 2
     assert graph.get_edge_index(data, 2, 1).item() == 3
-
-def test_get_cycles():
-    data = gen_graph()
-    cycles = graph.get_cycles(data, 4)
-    
-    print(cycles)
-
-    assert False

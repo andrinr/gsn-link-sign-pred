@@ -50,7 +50,7 @@ def compute_force(
     if nn_based_forces:
         forces = mlp(
             jnp.concatenate([spring_vector, auxillaries_i, auxillaries_j, sign], axis=-1),
-            forces_nn_params)
+            forces_nn_params) - 0.5
     
     # social balance theory based forces
     else:

@@ -12,7 +12,7 @@ import optax
 import os
 
 # Local dependencies
-from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions
+from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
 from graph import permute_split
 import simulation as sim
 import neural as nn
@@ -28,7 +28,7 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
-    embedding_dim = 64
+    embedding_dim = 8
     trainings = 50
     training_iterations = 20
     iterations = 200
@@ -39,9 +39,9 @@ def main(argv) -> None:
 
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
     #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".XX"
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
+    #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
+    dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions', 'Tribes']
     questions = [
         inquirer.List('dataset',
             message="Choose a dataset",
@@ -78,11 +78,19 @@ def main(argv) -> None:
             dataset = Slashdot(root= root, pre_transform=pre_transform)
         case "Epinions":
             dataset = Epinions(root= root, pre_transform=pre_transform)
+        case "Tribes":
+            dataset = Tribes(root= root, pre_transform=pre_transform)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
         transform = T.ToUndirected(reduce="min")
         data = transform(data)
+
+    num_nodes = data.num_nodes
+    num_edges = data.num_edges
+
+    print(f"num_nodes: {num_nodes}")
+    print(f"num_edges: {num_edges}")
 
     # Permute data and create masks
     # the edges are arranged as follows: training, validation, test
@@ -157,10 +165,7 @@ def main(argv) -> None:
             train_mask,
             val_mask)
         
-        print(f"loss: {loss_value}")
-
-        print(auxillaries_params)
-        print(forces_params)
+        print(spring_state)
         
         auxillaries_updates, auxillaries_opt_state = auxillaries_opt.update(
             auxillaries_gradient, auxillaries_opt_state, auxillaries_params)

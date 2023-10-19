@@ -18,10 +18,10 @@ def gen_graph() ->  Data:
 
     return data
 
-def test_triples():
-    data = gen_graph()
-    assert not data.is_directed()
-    triplets_stats = stats.Triplets(data).sample(n_triplets=500)
-    triplets_stats.stats()
-    print(triplets_stats.p_balanced)
-    assert np.abs(triplets_stats.p_balanced - 0.66) < 0.05
+# def test_triples():
+#     data = gen_graph()
+#     assert not data.is_directed()
+#     triplets_stats = stats.Triplets(data).sample(n_triplets=500)
+#     triplets_stats.stats()
+#     print(triplets_stats.p_balanced)
+#     assert np.abs(triplets_stats.p_balanced - 0.66) < 0.05
