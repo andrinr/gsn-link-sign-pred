@@ -5,7 +5,7 @@ import optax
 from simulation import update_auxillary_state, SpringState
 from functools import partial
 
-@partial(jax.jit, static_argnames=["iterations"])
+# @partial(jax.jit, static_argnames=["iterations"])
 def loss(params, spring_state, edge_index, signs, iterations, y):
     for i in range(iterations):
         spring_state = update_auxillary_state(
@@ -14,19 +14,19 @@ def loss(params, spring_state, edge_index, signs, iterations, y):
             edge_index=edge_index,
             sign=signs)
         
-    # convert from one hot to integer
-    y_pred = jnp.argmax(spring_state.auxillaries, axis=-1)
+        # print(f"spring_state.auxillaries: {spring_state.auxillaries}")
+        
+    # print(y_pred.shape)
+    # print(y.shape)
 
-    print(y_pred.shape)
-    print(y.shape)
-
-    return jnp.mean((y_pred - y)**2), spring_state
+    return jnp.mean((spring_state.auxillaries - y)**2), spring_state
         
 def test_bipartition():
     # generate two clusters of points and connect them randomly with edges
     # check if the attention mp algorithm can separate them
 
-    num_nodes_per_cluster = 10
+    num_nodes_per_cluster = 5
+    num_edges = 20
 
     key = jax.random.PRNGKey(0)
     key0, key1, key2, key3 = jax.random.split(key, num=4)
@@ -35,13 +35,13 @@ def test_bipartition():
         key=key0,
         minval=0,
         maxval=num_nodes_per_cluster,
-        shape=(num_nodes_per_cluster,))
+        shape=(num_edges,))
     
     edge_j = jax.random.randint(
         key=key1,
         minval=num_nodes_per_cluster,
         maxval=2*num_nodes_per_cluster,
-        shape=(num_nodes_per_cluster,))
+        shape=(num_edges,))
     
     edge_index = jnp.stack([edge_i, edge_j], axis=1)
 
@@ -51,7 +51,7 @@ def test_bipartition():
     # flip axes
     edge_index = edge_index.T
 
-    signs = jnp.ones((2*num_nodes_per_cluster,))
+    signs = jnp.ones((2*num_edges,))
     y = jnp.concatenate([
         jnp.zeros((num_nodes_per_cluster,)),
         jnp.ones((num_nodes_per_cluster,))], axis=0)
@@ -61,22 +61,42 @@ def test_bipartition():
     print(signs.shape)
     print(y.shape)
 
-
     value_and_grad_fn = jax.value_and_grad(loss, argnums=0, has_aux=True)
 
     # init the neural network params
     params = nn.init_attention_params(
         key=key2,
-        input_dimension=3,
-        output_dimension=2)
+        input_dimension=2,
+        output_dimension=1,
+        factor=0.3)
+
+    print(params)
     
-    optimizer = optax.adam(learning_rate=0.1)
+    optimizer = optax.adam(learning_rate=0.01)
     optimizer_state = optimizer.init(params)
 
-    for epoch in range(100):
+    # auxillaries = jax.random.normal(
+    #     key=key3,
+    #     shape=(2*num_nodes_per_cluster, 2))
+    
+    # spring_state = SpringState(
+    #     position=auxillaries,
+    #     velocity=jnp.zeros_like(auxillaries),
+    #     auxillaries=auxillaries)
+    
+    # loss_value, spring_state = loss(
+    #     params, spring_state, edge_index, signs, 5, y)
+    
+    # print(f"solution: {spring_state.auxillaries}")
+    num_epochs = 100
+    keys = jax.random.split(key3, num=num_epochs)
+    for epoch in range(num_epochs):
+
+        print(f" -------- \n epoch: {epoch} \n --------")
+
         auxillaries = jax.random.normal(
-            key=key3,
-            shape=(2*num_nodes_per_cluster, 2))
+            key=keys[epoch],
+            shape=(2*num_nodes_per_cluster, 1))
     
         spring_state = SpringState(
             position=auxillaries,
@@ -85,23 +105,11 @@ def test_bipartition():
         
         (loss_value, spring_state), gradient = value_and_grad_fn(
             params, spring_state, edge_index, signs, 5, y)
-        
+
         print(f"loss_value: {loss_value}")
         print(f"gradient: {gradient}")
 
         updates, optimizer_state = optimizer.update(gradient, optimizer_state, params)
         params = optax.apply_updates(params, updates)
 
-
     assert False
-
-
-
-
-
-        
-
-
-    
-
-    

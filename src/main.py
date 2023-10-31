@@ -122,7 +122,8 @@ def main(argv) -> None:
     auxillaries_params = nn.init_attention_params(
         key=key_attention,
         input_dimension=embedding_dim + 1,
-        output_dimension=embedding_dim)
+        output_dimension=embedding_dim,
+        factor=0.001)
     
     forces_params = nn.init_mlp_params(
         key=key_mlp,
@@ -207,19 +208,19 @@ def main(argv) -> None:
         # print(f"enemy_distance: {spring_params.enemy_distance}")
         # print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
 
-        metrics = sim.evaluate(
-            spring_state,
-            edge_index,
-            signs,
-            train_mask,
-            val_mask)
+        # metrics = sim.evaluate(
+        #     spring_state,
+        #     edge_index,
+        #     signs,
+        #     train_mask,
+        #     val_mask)
         
-        print(metrics)
+        # print(metrics)
         
-        aucs.append(metrics.auc)
-        f1_binaries.append(metrics.f1_binary)
-        f1_micros.append(metrics.f1_micro)
-        f1_macros.append(metrics.f1_macro)
+        # aucs.append(metrics.auc)
+        # f1_binaries.append(metrics.f1_binary)
+        # f1_micros.append(metrics.f1_micro)
+        # f1_macros.append(metrics.f1_macro)
 
     jax.profiler.save_device_memory_profile("memory.prof")
     

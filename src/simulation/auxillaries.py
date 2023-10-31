@@ -26,8 +26,8 @@ def update_auxillary_state(
     
     auxillaries = jnp.zeros_like(spring_state.auxillaries)
     auxillaries = auxillaries.at[edge_index[0]].add(auxillaries_i)
-    
-    spring_state = spring_state._replace(
+
+    return sim.SpringState(
+        position=spring_state.position,
+        velocity=spring_state.velocity,
         auxillaries=auxillaries)
-    
-    return spring_state
