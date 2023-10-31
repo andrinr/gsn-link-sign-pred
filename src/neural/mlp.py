@@ -10,7 +10,7 @@ def init_mlp_params(
     params = {}
 
     for i, (key, (input_dimension, output_dimension)) in enumerate(zip(keys, zip(layer_dimensions[:-1], layer_dimensions[1:]))):
-        params[f'W{i}'] = jax.random.normal(key, shape=(input_dimension, output_dimension))
+        params[f'W{i}'] = jax.random.normal(key=key, shape=(input_dimension, output_dimension))
         params[f'b{i}'] = jnp.zeros(output_dimension)
 
     return params
@@ -22,6 +22,7 @@ def mlp(
 
     for i in range(len(params) // 2):
         x = jnp.dot(x, params[f'W{i}']) + params[f'b{i}']
-        x = jax.nn.relu(x)
+        if i < len(params) // 2 - 1:
+            x = jax.nn.relu(x)
 
     return x

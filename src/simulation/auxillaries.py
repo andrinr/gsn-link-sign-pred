@@ -11,8 +11,7 @@ def update_auxillary_state(
     edge_index : jnp.ndarray,
     sign : jnp.ndarray) -> sim.SpringState:
     """
-    Update the spring state using the leapfrog method. 
-    This is essentially a simple message passing network implementation. 
+    Update the auxillary state using the message passing method.
     """
 
     auxillaries_i = spring_state.auxillaries[edge_index[0]]

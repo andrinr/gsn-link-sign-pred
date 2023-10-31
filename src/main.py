@@ -29,14 +29,14 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     embedding_dim = 8
-    trainings = 50
-    training_iterations = 20
-    iterations = 200
-    time_step =  0.01
+    num_trainings = 2
+    training_simulation_iterations = 20
+    simulation_iterations = 200
+    time_step =  0.1
     damping = 0.1
-    n_attention_heads = 3
     root = 'src/data/'
 
+    # Deactivate preallocation of memory to avoid OOM errors
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
     #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".XX"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
@@ -51,7 +51,7 @@ def main(argv) -> None:
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
 
-    opts,_ = getopt.getopt(argv,"s:h:d:i:p:o",
+    opts,i = getopt.getopt(argv,"s:h:d:i:p:o",
         ["embedding_size=","time_step=", "damping=", "iterations="])
     for opt, arg in opts:
         if opt == '-s':
@@ -61,7 +61,7 @@ def main(argv) -> None:
         elif opt == '-d':
             damping = int(arg)
         elif opt == '-i':
-            iterations = int(arg)
+            simulation_iterations = int(arg)
 
     stream = open("src/params.yaml", 'r')
     params = yaml.load(stream, Loader=yaml.FullLoader)
@@ -108,56 +108,58 @@ def main(argv) -> None:
         friend_distance=5.0,
         friend_stiffness=5.0,
         enemy_distance=20.0,
-        enemy_stiffness=6.0,
-    )
-
-    simulation_params = sim.SimulationParams(
-        iterations=training_iterations,
+        enemy_stiffness=6.0)
+    
+    simulation_params_train = sim.SimulationParams(
+        iterations=training_simulation_iterations,
         dt=time_step,
         damping=damping,
-        message_passing_iterations=5
-    )
+        message_passing_iterations=1)
 
-    rng = random.PRNGKey(0)
-
-    key0, key1 = random.split(random.PRNGKey(0))
+    # Create initial values for neural network parameters
+    key_attention, key_mlp, key_training, key_test = random.split(random.PRNGKey(0), 4)
 
     auxillaries_params = nn.init_attention_params(
-        key=key0,
+        key=key_attention,
         input_dimension=embedding_dim + 1,
         output_dimension=embedding_dim)
     
     forces_params = nn.init_mlp_params(
-        key=key1,
-        layer_dimensions = [embedding_dim * 3 + 1, 256, 256, 1])
+        key=key_mlp,
+        layer_dimensions = [embedding_dim * 3 + 1, 128, 32, 1])
     
+    # setup optax optimizers
     auxillaries_opt = optax.adam(learning_rate=1e-2)
     forces_op = optax.adam(learning_rate=1e-2)
 
     auxillaries_opt_state = auxillaries_opt.init(auxillaries_params)
     forces_opt_state = forces_op.init(forces_params)
 
-    grad = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
-    
+    # compute value and grad function of simulation using jax
+    value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
     total_energies = []
     aucs = []
     f1_binaries = []
     f1_micros = []
-    f1_macros = []
-
-    for _ in range(trainings):
+    f1_macros = []  
+    
+    keys_training = random.split(key_training, num_trainings)
+    for i in range(num_trainings):
+        # initialize spring state
+        # take new key each time to avoid overfitting to specific initial conditions
         spring_state = sim.init_spring_state(
-            rng=rng,
+            rng=keys_training[i],
             n=data.num_nodes,
             m=data.num_edges,
             embedding_dim=embedding_dim,
         )
 
-        (loss_value, spring_state), (auxillaries_gradient, forces_gradient) = grad(
-            simulation_params,
+        # run simulation and compute loss, auxillaries and gradient
+        (loss_value, spring_state), (auxillaries_gradient, forces_gradient) = value_grad_fn(
+            simulation_params_train,
             spring_state, 
             spring_params,
-            True, # nn_based_forces
+            False, # nn_based_forces
             auxillaries_params,
             forces_params,
             edge_index,
@@ -165,7 +167,12 @@ def main(argv) -> None:
             train_mask,
             val_mask)
         
-        print(spring_state)
+        # print(f"springs: {spring_state}")
+        # print(f"auxillaries_params: {auxillaries_params}")
+        # print(f"forces_params: {forces_params}")
+        
+        # print(f"auxillaries_gradient: {auxillaries_gradient}")
+        # print(f"forces_gradient: {forces_gradient}")
         
         auxillaries_updates, auxillaries_opt_state = auxillaries_opt.update(
             auxillaries_gradient, auxillaries_opt_state, auxillaries_params)
@@ -177,7 +184,10 @@ def main(argv) -> None:
         
         forces_params = optax.apply_updates(forces_params, forces_updates)
 
-        print(f"loss: {loss_value}")
+        # print(f"auxillaries_params: {auxillaries_params}")
+        # print(f"forces_params: {forces_params}")
+        
+        # print(f"loss: {loss_value}")
 
         # # update spring params
         # spring_params = spring_params._replace(
@@ -214,7 +224,7 @@ def main(argv) -> None:
     jax.profiler.save_device_memory_profile("memory.prof")
     
     spring_state = sim.init_spring_state(
-        rng=rng,
+        rng=key_test,
         n=data.num_nodes,
         m=data.num_edges,
         embedding_dim=embedding_dim,
@@ -223,10 +233,14 @@ def main(argv) -> None:
     training_signs = signs.copy()
     training_signs = training_signs.at[train_mask].set(0)
 
-    simulation_params.iterations = iterations
+    simulation_params_test = sim.SimulationParams(
+        iterations=simulation_iterations,
+        dt=time_step,
+        damping=damping,
+        message_passing_iterations=1)
 
     spring_state = sim.simulate(
-        simulation_params=simulation_params,
+        simulation_params=simulation_params_test,
         spring_state=spring_state, 
         spring_params=spring_params,
         nn_based_forces=True,
@@ -235,43 +249,43 @@ def main(argv) -> None:
         edge_index=edge_index,
         signs=training_signs)
 
-    metrics = sim.evaluate(
-        spring_state,
-        edge_index,
-        signs,
-        train_mask,
-        test_mask)
+    # metrics = sim.evaluate(
+    #     spring_state,
+    #     edge_index,
+    #     signs,
+    #     train_mask,
+    #     test_mask)
 
-    print(metrics)
+    # print(metrics)
 
-    # create four subplots
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+    # # create four subplots
+    # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
-    embeddings = spring_state.position
-    # plot the embeddings
-    ax1.scatter(embeddings[:, 0], embeddings[:, 1])# c=spring_state.energy)
-    # color bar
-    sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=0, vmax=1))
-    sm.set_array([])
-    fig.colorbar(sm, ax=ax1)
-    ax1.set_title('Embeddings')
+    # embeddings = spring_state.position
+    # # plot the embeddings
+    # ax1.scatter(embeddings[:, 0], embeddings[:, 1])# c=spring_state.energy)
+    # # color bar
+    # sm = plt.cm.ScalarMappable(cmap='viridis', norm=plt.Normalize(vmin=0, vmax=1))
+    # sm.set_array([])
+    # fig.colorbar(sm, ax=ax1)
+    # ax1.set_title('Embeddings')
 
-    # # plot energies
-    # ax2.hist(spring_state.energy)
-    # ax2.set_title('Energies')
+    # # # plot energies
+    # # ax2.hist(spring_state.energy)
+    # # ax2.set_title('Energies')
 
-    # plot the energies over time, log scale
-    ax3.plot(total_energies)
-    ax3.set_yscale('log')
-    ax3.set_title('Total energy')
+    # # plot the energies over time, log scale
+    # ax3.plot(total_energies)
+    # ax3.set_yscale('log')
+    # ax3.set_title('Total energy')
 
-    # plot measures
-    ax4.plot(aucs)
-    ax4.plot(f1_binaries)
-    ax4.plot(f1_micros)
-    ax4.plot(f1_macros)
-    ax4.set_title('Measures')
-    ax4.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
+    # # plot measures
+    # ax4.plot(aucs)
+    # ax4.plot(f1_binaries)
+    # ax4.plot(f1_micros)
+    # ax4.plot(f1_macros)
+    # ax4.set_title('Measures')
+    # ax4.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
 
     plt.show()
     

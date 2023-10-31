@@ -25,7 +25,7 @@ def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim 
 
     return SpringState(position, velocity, auxillaries)
 
-@partial(jax.jit, static_argnames=["nn_based_forces"])
+@partial(jax.jit, static_argnames=["nn_based_forces", "params"])
 def compute_force(
     state : SpringState,
     params : SpringParams, 
@@ -50,7 +50,7 @@ def compute_force(
     if nn_based_forces:
         forces = mlp(
             jnp.concatenate([spring_vector, auxillaries_i, auxillaries_j, sign], axis=-1),
-            forces_nn_params) - 0.5
+            forces_nn_params)
     
     # social balance theory based forces
     else:
@@ -63,7 +63,7 @@ def compute_force(
     
     return forces * spring_vector_norm
 
-@partial(jax.jit, static_argnames=["dt", "damping", "nn_based_forces"])
+@partial(jax.jit, static_argnames=["dt", "damping", "nn_based_forces", "spring_params"])
 def update_spring_state(
     spring_state : SpringState, 
     spring_params : SpringParams, 

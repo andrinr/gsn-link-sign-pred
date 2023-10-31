@@ -11,7 +11,7 @@ class SimulationParams(NamedTuple):
     damping : float
     message_passing_iterations : int
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces", "spring_params"])
+# @partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces", "spring_params"])
 def simulate(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,
@@ -37,6 +37,8 @@ def simulate(
             simulation_params.message_passing_iterations,
             auxillary_update,
             spring_state)
+        
+    print(f"spring_state.auxillaries: {spring_state.auxillaries}")
 
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
