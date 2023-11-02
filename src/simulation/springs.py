@@ -21,16 +21,17 @@ class SpringState(NamedTuple):
 def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
-    auxillaries = jax.random.uniform(rng, (m, embedding_dim), maxval=1.0, minval=-1.0)
+    auxillaries = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
 
     return SpringState(position, velocity, auxillaries)
 
-@partial(jax.jit, static_argnames=["nn_based_forces", "params"])
+@partial(jax.jit, static_argnames=["nn_force", "nn_auxillary", "params"])
 def compute_force(
     state : SpringState,
     params : SpringParams, 
-    nn_based_forces : bool,
-    forces_nn_params : dict[jnp.ndarray],
+    nn_auxillary : bool,
+    nn_force : bool,
+    nn_force_params : dict[jnp.ndarray],
     edge_index : jnp.ndarray,
     sign : jnp.ndarray) -> jnp.ndarray:
 
@@ -46,29 +47,44 @@ def compute_force(
 
     sign = jnp.expand_dims(sign, axis=1)
 
+    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
+    neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS
+    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
+
     # neural network based forces
-    if nn_based_forces:
-        forces = mlp(
+    if nn_force and nn_auxillary:
+        decision = mlp(
             jnp.concatenate([spring_vector, auxillaries_i, auxillaries_j, sign], axis=-1),
-            forces_nn_params)
+            nn_force_params)
+        decision = jnp.argmax(decision, axis=-1) - 1
+        decision = jnp.expand_dims(decision, axis=1)
+
+    elif nn_force:
+        decision = mlp(
+            jnp.concatenate([spring_vector, sign], axis=-1),
+            nn_force_params)
+        # get categorical decision
+        decision = jnp.argmax(decision, axis=-1) - 1
+        decision = jnp.expand_dims(decision, axis=1)
     
     # social balance theory based forces
     else:
-        attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
-        neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS
-        retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
+        decision = sign
 
-        forces = jnp.where(sign == 1, attraction, retraction)
-        forces = jnp.where(sign == 0, neutral, forces)
+    jax.debug.print(f"decision: {decision.shape}")
+
+    forces = jnp.where(decision == 1, attraction, retraction)
+    forces = jnp.where(decision == 0, neutral, forces)
     
     return forces * spring_vector_norm
 
-@partial(jax.jit, static_argnames=["dt", "damping", "nn_based_forces", "spring_params"])
+@partial(jax.jit, static_argnames=["dt", "damping", "nn_force", "nn_auxillary", "spring_params"])
 def update_spring_state(
     spring_state : SpringState, 
     spring_params : SpringParams, 
-    nn_based_forces : bool,
-    forces_nn_params : dict[jnp.ndarray],
+    nn_auxillary : bool,
+    nn_force : bool,
+    nn_force_params : dict[jnp.ndarray],
     dt : float,
     damping : float,
     edge_index : jnp.ndarray,
@@ -80,8 +96,9 @@ def update_spring_state(
     edge_forces = compute_force(
         spring_state,
         spring_params, 
-        nn_based_forces,
-        forces_nn_params,
+        nn_auxillary,
+        nn_force,
+        nn_force_params,
         edge_index,
         sign)
     
@@ -98,8 +115,9 @@ def update_spring_state(
     edge_forces = compute_force(
         spring_state,
         spring_params, 
-        nn_based_forces,
-        forces_nn_params,
+        nn_auxillary,
+        nn_force,
+        nn_force_params,
         edge_index,
         sign)
     

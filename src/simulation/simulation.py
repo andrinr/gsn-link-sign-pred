@@ -11,41 +11,42 @@ class SimulationParams(NamedTuple):
     damping : float
     message_passing_iterations : int
 
-# @partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces", "spring_params"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary", "spring_params"])
 def simulate(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,
     spring_params : sim.SpringParams,
-    nn_based_forces : bool,
-    auxillaries_nn_params : dict[jnp.ndarray],
-    forces_nn_params : dict[jnp.ndarray],
+    nn_auxillary : bool,
+    nn_auxillary_params : dict,
+    nn_force : bool,
+    nn_force_params : dict,
     edge_index : jnp.ndarray,
     signs : jnp.ndarray) -> sim.SpringState:
 
-    if nn_based_forces:
-        jax.debug.print("Using nn based forces")
+    if nn_auxillary:
         # capture the auxillaries_nn_params in the closure
         auxillary_update = lambda i, state: sim.update_auxillary_state(
             spring_state = state,
-            auxillaries_nn_params = auxillaries_nn_params,
+            auxillaries_nn_params = nn_auxillary_params,
             edge_index = edge_index,
             sign = signs)
         
-        jax.debug.print(f"message_passing_iterations: {simulation_params.message_passing_iterations}") 
+        # jax.debug.print(f"message_passing_iterations: {simulation_params.message_passing_iterations}") 
         spring_state = jax.lax.fori_loop(
             0,
             simulation_params.message_passing_iterations,
             auxillary_update,
             spring_state)
         
-    print(f"spring_state.auxillaries: {spring_state.auxillaries}")
+    # print(f"spring_state.auxillaries: {spring_state.auxillaries}")
 
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         spring_state = state,
         spring_params = spring_params,
-        nn_based_forces = nn_based_forces,
-        forces_nn_params = forces_nn_params,
+        nn_auxillary = nn_auxillary,
+        nn_force = nn_force,
+        nn_force_params = nn_force_params,
         dt = simulation_params.dt,
         damping = simulation_params.damping,
         edge_index = edge_index,
@@ -59,14 +60,15 @@ def simulate(
     
     return spring_state
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_based_forces", "spring_params"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary", "spring_params"])
 def simulate_and_loss(
     simulation_params : SimulationParams,
     spring_state : sim.SpringState,
     spring_params : sim.SpringParams,
-    nn_based_forces : bool,
-    auxillaries_nn_params : dict[jnp.ndarray],
-    forces_nn_params : dict[jnp.ndarray],
+    nn_auxillary : bool,
+    nn_auxillary_params : dict,
+    nn_force : bool,
+    nn_force_params : dict,
     edge_index : jnp.ndarray,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
@@ -79,9 +81,10 @@ def simulate_and_loss(
         simulation_params = simulation_params,
         spring_state = spring_state,
         spring_params = spring_params,
-        nn_based_forces = nn_based_forces,
-        auxillaries_nn_params = auxillaries_nn_params,
-        forces_nn_params = forces_nn_params,
+        nn_auxillary = nn_auxillary,
+        nn_auxillary_params = nn_auxillary_params,
+        nn_force = nn_force,
+        nn_force_params = nn_force_params,
         edge_index = edge_index,
         signs = training_signs)
 
@@ -91,18 +94,25 @@ def simulate_and_loss(
     spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
     
     predicted_sign = spring_vec_norm - sim.NEUTRAL_DISTANCE
-    logistic = lambda x: 1 / (1 + jnp.exp(-x))
-    predicted_sign = logistic(predicted_sign)
 
+    # apply sigmoid function to get sign (0 for negative, 1 for positive)
+    predicted_sign = 1 / (1 + jnp.exp(-predicted_sign))
+
+    # apply same transformation to the actual signs
     signs = jnp.where(signs == 1, 1, 0)
 
-    fraction_negatives = jnp.mean(predicted_sign)
-    fraction_positives = 1 - fraction_negatives
+    incorrect_predictions = jnp.mean(jnp.abs((signs - predicted_sign) ** 2))
 
-    score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
+    # fraction_positives = jnp.sum
+    # fraction_negatives = 1 - fraction_positives
 
-    loss = -jnp.mean(score)
+    # # jax.debug.print(f"fraction_negatives: {fraction_negatives.shape}")
+    # # jax.debug.print(f"fraction_positives: {fraction_positives.shape}")
+
+    # score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
+
+    # loss = -jnp.mean(score)
 
     # loss = -f1_macro(signs, predicted_sign)
     
-    return loss, spring_state
+    return incorrect_predictions, (spring_state, predicted_sign)

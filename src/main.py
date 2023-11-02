@@ -28,18 +28,25 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
-    embedding_dim = 8
-    num_trainings = 2
-    training_simulation_iterations = 20
-    simulation_iterations = 200
-    time_step =  0.1
-    damping = 0.1
-    root = 'src/data/'
+    NN_FORCE = True
+    EMBEDDING_DIM = 8
+    NN_AUXILLARY = False
+    AUXILLARY_DIM = 8
+
+    DT = 0.1
+    DAMPING = 0.1
+
+    NUM_EPOCHS = 300
+    PER_EPOCH_SIM_ITERATIONS = 300
+    FINAL_SIM_ITERATIONS = 200
+    AUXILLARY_ITERATIONS = 5
+
+    DATA_ROOT = 'src/data/'
 
     # Deactivate preallocation of memory to avoid OOM errors
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
     #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".XX"
-    #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions', 'Tribes']
     questions = [
@@ -55,13 +62,13 @@ def main(argv) -> None:
         ["embedding_size=","time_step=", "damping=", "iterations="])
     for opt, arg in opts:
         if opt == '-s':
-            embedding_dim = int(arg)
+            EMBEDDING_DIM = int(arg)
         elif opt == '-h':
-            time_step = int(arg)
+            DT = int(arg)
         elif opt == '-d':
-            damping = int(arg)
+            DAMPING = int(arg)
         elif opt == '-i':
-            simulation_iterations = int(arg)
+            FINAL_SIM_ITERATIONS = int(arg)
 
     stream = open("src/params.yaml", 'r')
     params = yaml.load(stream, Loader=yaml.FullLoader)
@@ -69,17 +76,17 @@ def main(argv) -> None:
     pre_transform = T.Compose([])
     match dataset_name:
         case "BitcoinOTC":
-            dataset = BitcoinO(root= root, pre_transform=pre_transform)
+            dataset = BitcoinO(root=DATA_ROOT, pre_transform=pre_transform)
         case "Bitcoin_Alpha":
-            dataset = BitcoinA(root= root, pre_transform=pre_transform)
+            dataset = BitcoinA(root=DATA_ROOT, pre_transform=pre_transform)
         case "WikiRFA":
-            dataset = WikiRFA(root= root, pre_transform=pre_transform)
+            dataset = WikiRFA(root=DATA_ROOT, pre_transform=pre_transform)
         case "Slashdot":
-            dataset = Slashdot(root= root, pre_transform=pre_transform)
+            dataset = Slashdot(root=DATA_ROOT, pre_transform=pre_transform)
         case "Epinions":
-            dataset = Epinions(root= root, pre_transform=pre_transform)
+            dataset = Epinions(root=DATA_ROOT, pre_transform=pre_transform)
         case "Tribes":
-            dataset = Tribes(root= root, pre_transform=pre_transform)
+            dataset = Tribes(root=DATA_ROOT, pre_transform=pre_transform)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
@@ -111,84 +118,112 @@ def main(argv) -> None:
         enemy_stiffness=6.0)
     
     simulation_params_train = sim.SimulationParams(
-        iterations=training_simulation_iterations,
-        dt=time_step,
-        damping=damping,
-        message_passing_iterations=1)
+        iterations=PER_EPOCH_SIM_ITERATIONS,
+        dt=DT,
+        damping=DAMPING,
+        message_passing_iterations=AUXILLARY_ITERATIONS)
 
     # Create initial values for neural network parameters
     key_attention, key_mlp, key_training, key_test = random.split(random.PRNGKey(0), 4)
 
-    auxillaries_params = nn.init_attention_params(
+    auxillary_params = nn.init_attention_params(
         key=key_attention,
-        input_dimension=embedding_dim + 1,
-        output_dimension=embedding_dim,
-        factor=0.001)
+        input_dimension=AUXILLARY_DIM + 1,
+        output_dimension=AUXILLARY_DIM,
+        factor=1 / AUXILLARY_ITERATIONS)
     
-    forces_params = nn.init_mlp_params(
+    force_params = nn.init_mlp_params(
         key=key_mlp,
-        layer_dimensions = [embedding_dim * 3 + 1, 128, 32, 1])
+        layer_dimensions = [EMBEDDING_DIM + (NN_AUXILLARY * AUXILLARY_DIM * 2) + 1, 128, 32, 3],
+        factor=1 / FINAL_SIM_ITERATIONS)
     
     # setup optax optimizers
-    auxillaries_opt = optax.adam(learning_rate=1e-2)
-    forces_op = optax.adam(learning_rate=1e-2)
+    if NN_AUXILLARY:
+        auxillary_optimizer = optax.adam(learning_rate=1e-3)
+        auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
-    auxillaries_opt_state = auxillaries_opt.init(auxillaries_params)
-    forces_opt_state = forces_op.init(forces_params)
+    if NN_FORCE:
+        force_optimizer = optax.adam(learning_rate=1e-3)
+        force_optimizier_state = force_optimizer.init(force_params)
 
     # compute value and grad function of simulation using jax
-    value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
+    if NN_AUXILLARY and NN_FORCE:
+        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 6], has_aux=True)
+
+    elif NN_AUXILLARY:
+        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4], has_aux=True)
+
+    elif NN_FORCE:
+        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[6], has_aux=True)
+
     total_energies = []
     aucs = []
     f1_binaries = []
     f1_micros = []
-    f1_macros = []  
+    f1_macros = []
     
-    keys_training = random.split(key_training, num_trainings)
-    for i in range(num_trainings):
+    epochs_keys = random.split(key_training, NUM_EPOCHS)
+    for epoch in range(NUM_EPOCHS):
         # initialize spring state
         # take new key each time to avoid overfitting to specific initial conditions
         spring_state = sim.init_spring_state(
-            rng=keys_training[i],
+            rng=epochs_keys[epoch],
             n=data.num_nodes,
             m=data.num_edges,
-            embedding_dim=embedding_dim,
+            embedding_dim=EMBEDDING_DIM,
         )
 
+        print(NN_AUXILLARY)
+
         # run simulation and compute loss, auxillaries and gradient
-        (loss_value, spring_state), (auxillaries_gradient, forces_gradient) = value_grad_fn(
-            simulation_params_train,
-            spring_state, 
-            spring_params,
-            False, # nn_based_forces
-            auxillaries_params,
-            forces_params,
-            edge_index,
-            signs,
-            train_mask,
+        (loss_value, (spring_state, signs_pred)), grads = value_grad_fn(
+            simulation_params_train, #0
+            spring_state, #1
+            spring_params, #2
+            NN_AUXILLARY, #3
+            auxillary_params, #4
+            NN_FORCE, #5
+            force_params, #6
+            edge_index, #7
+            signs, #8
+            train_mask, #9
             val_mask)
         
-        # print(f"springs: {spring_state}")
+        if NN_AUXILLARY and NN_FORCE:
+            (nn_auxillary_grad, nn_force_grad) = grads
+
+        elif NN_AUXILLARY:
+            nn_auxillary_grad = grads
+
+        elif NN_FORCE:
+            nn_force_grad = grads
+
+        print(nn_force_grad)
+        
+        # print(f"signs_pred: {signs_pred}")
+        # print(f"signs: {signs}")
+        # # print(f"springs: {spring_state}")
+        # # print(f"auxillaries_params: {auxillaries_params}")
+        # # print(f"forces_params: {forces_params}")
+        
+        if NN_FORCE:
+            nn_force_update, force_optimizier_state = force_optimizer.update(
+                nn_force_grad, force_optimizier_state, force_params)
+            
+            force_params = optax.apply_updates(force_params, nn_force_update)
+        
+        if NN_AUXILLARY:
+            nn_auxillary_update, auxillary_optimizier_state = auxillary_optimizer.update(
+                nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
+        
+            auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
+
         # print(f"auxillaries_params: {auxillaries_params}")
         # print(f"forces_params: {forces_params}")
-        
-        # print(f"auxillaries_gradient: {auxillaries_gradient}")
-        # print(f"forces_gradient: {forces_gradient}")
-        
-        auxillaries_updates, auxillaries_opt_state = auxillaries_opt.update(
-            auxillaries_gradient, auxillaries_opt_state, auxillaries_params)
-        
-        auxillaries_params = optax.apply_updates(auxillaries_params, auxillaries_updates)
 
-        forces_updates, forces_opt_state = forces_op.update(
-            forces_gradient, forces_opt_state, forces_params)
-        
-        forces_params = optax.apply_updates(forces_params, forces_updates)
-
-        # print(f"auxillaries_params: {auxillaries_params}")
-        # print(f"forces_params: {forces_params}")
-        
-        # print(f"loss: {loss_value}")
+        print(f"predictions: {jnp.round(signs_pred)}")
+        print(f"loss: {loss_value}")
+        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs))} out of {signs.shape[0]}")
 
         # # update spring params
         # spring_params = spring_params._replace(
@@ -228,16 +263,16 @@ def main(argv) -> None:
         rng=key_test,
         n=data.num_nodes,
         m=data.num_edges,
-        embedding_dim=embedding_dim,
+        embedding_dim=EMBEDDING_DIM,
     )
 
     training_signs = signs.copy()
     training_signs = training_signs.at[train_mask].set(0)
 
     simulation_params_test = sim.SimulationParams(
-        iterations=simulation_iterations,
-        dt=time_step,
-        damping=damping,
+        iterations=FINAL_SIM_ITERATIONS,
+        dt=DT,
+        damping=DAMPING,
         message_passing_iterations=1)
 
     spring_state = sim.simulate(
@@ -245,8 +280,8 @@ def main(argv) -> None:
         spring_state=spring_state, 
         spring_params=spring_params,
         nn_based_forces=True,
-        auxillaries_nn_params=auxillaries_params,
-        forces_nn_params=forces_params,
+        nn_auxillary_params=auxillary_params,
+        nn_force_params=force_params,
         edge_index=edge_index,
         signs=training_signs)
 

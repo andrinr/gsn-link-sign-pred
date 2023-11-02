@@ -4,10 +4,12 @@ import jax.numpy as jnp
 
 
 # example matrices
-A = np.array([[1, 2], [3, 4], [4, 5], [6, 7]])  # A is 2 x 2 (m x n)
-B = np.array([[2, 3], [1, 2]])  # B is 2 x 2 (n x k)
+A = jnp.array([[1, 0], [0, 1], [4, 5], [10, 7]])  # A is 2 x 2 (m x n)
 
-# performing dot product
-C = np.dot(A, B)  # C will be 2 x 2 (m x k)
+A = jnp.argmax(A, axis=-1)
+
+B = jnp.array([0, 1, 2, 3])
+
+C = jnp.where(A == 1, 1, 0)
 
 print(C)
