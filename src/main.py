@@ -28,17 +28,17 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
-    NN_FORCE = False
-    EMBEDDING_DIM = 64
-    NN_AUXILLARY = False
+    NN_FORCE = True
+    EMBEDDING_DIM = 16
+    NN_AUXILLARY = True
     AUXILLARY_DIM = 16
     OPTIMIZE_SPRING_PARAMS = False
 
-    DT = 0.01
-    DAMPING = 0.01
+    DT = 0.02
+    DAMPING = 0.1
 
-    NUM_EPOCHS = 300
-    PER_EPOCH_SIM_ITERATIONS = 300
+    NUM_EPOCHS = 5000
+    PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = 200
     AUXILLARY_ITERATIONS = 6
 
@@ -112,10 +112,10 @@ def main(argv) -> None:
     stream = open("src/params.yaml", 'r')
     params = yaml.load(stream, Loader=yaml.FullLoader)
     spring_params = sim.SpringParams(
-        friend_distance=params['friend_distance'],
-        friend_stiffness=params['friend_stiffness'],
-        enemy_distance=params['enemy_distance'],
-        enemy_stiffness=params['enemy_stiffness'])
+        friend_distance=1.0,
+        friend_stiffness=4.0,
+        enemy_distance=21.0,
+        enemy_stiffness=5.0)
     
     simulation_params_train = sim.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS,
@@ -128,38 +128,33 @@ def main(argv) -> None:
 
     auxillary_params = nn.init_attention_params(
         key=key_attention,
-        input_dimension=AUXILLARY_DIM + 1,
+        input_dimension=AUXILLARY_DIM + 3,
         output_dimension=AUXILLARY_DIM,
         factor=1 / AUXILLARY_ITERATIONS)
 
-    layer_0_size = EMBEDDING_DIM + (int(NN_AUXILLARY) * AUXILLARY_DIM * 2) + 1
+    layer_0_size = (int(NN_AUXILLARY) * AUXILLARY_DIM * 2) + 4
     print(f"layer_0_size: {layer_0_size}")
     force_params = nn.init_mlp_params(
         key=key_mlp,
-        layer_dimensions = [layer_0_size, 128, 64, 32, 1],
-        factor=0)
+        layer_dimensions = [layer_0_size, layer_0_size, 1],
+        factor=1 / PER_EPOCH_SIM_ITERATIONS)
     
     # setup optax optimizers
     if NN_AUXILLARY:
-        auxillary_optimizer = optax.adam(learning_rate=1e-3)
+        auxillary_optimizer = optax.radam(learning_rate=1e-4)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
     if NN_FORCE:
-        force_optimizer = optax.adam(learning_rate=1e-5)
+        force_optimizer = optax.radam(learning_rate=1e-4)
         force_optimizier_state = force_optimizer.init(force_params)
-
-    if OPTIMIZE_SPRING_PARAMS:
-        params_optimizer = optax.adam(learning_rate=1e-3)
-        params_optimizier_state = params_optimizer.init(spring_params)
 
     # compute value and grad function of simulation using jax
     argnums = []
-    if OPTIMIZE_SPRING_PARAMS: argnums.append(2)
     if NN_AUXILLARY: argnums.append(4)
     if NN_FORCE: argnums.append(6)
     if len(argnums) == 1: argnums = argnums[0]
 
-    if len(argnums > 0):
+    if NN_AUXILLARY or NN_FORCE:
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=argnums, has_aux=True)
 
     total_energies = []
@@ -180,7 +175,7 @@ def main(argv) -> None:
             auxillary_dim=AUXILLARY_DIM)
 
         # run simulation and compute loss, auxillaries and gradient
-        if len(argnums) > 0:
+        if NN_AUXILLARY or NN_FORCE:
             (loss_value, (spring_state, signs_pred)), grads = value_grad_fn(
                 simulation_params_train, #0
                 spring_state, #1
@@ -207,16 +202,14 @@ def main(argv) -> None:
                 train_mask, #9
                 val_mask)
         
-        if NN_AUXILLARY and NN_FORCE and OPTIMIZE_SPRING_PARAMS:
-            (nn_auxillary_grad, nn_force_grad, params_grad) = grads
+        if NN_AUXILLARY and NN_FORCE:
+            (nn_auxillary_grad, nn_force_grad) = grads
 
-        elif NN_AUXILLARY and NN_FORCE:
+        elif NN_AUXILLARY:
             nn_auxillary_grad = grads
-            assert jnp.sum(jnp.abs(nn_auxillary_grad['Q'])) > 0
 
         elif NN_FORCE:
             nn_force_grad = grads
-            assert jnp.sum(jnp.abs(nn_force_grad['W0'])) > 0
 
         # make sure there are no zero gradients 
         # print(f"signs_pred: {signs_pred}")
@@ -240,9 +233,11 @@ def main(argv) -> None:
         # print(f"auxillaries_params: {auxillaries_params}")
         # print(f"forces_params: {forces_params}")
 
-        print(f"predictions: {jnp.round(signs_pred)}")
+        # if epoch % 30 == 0:
+        signs_ = signs * 0.5 + 0.5
+        print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
-        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs))} out of {signs.shape[0]}")
+        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
 
         # # update spring params
         # spring_params = spring_params._replace(
@@ -262,14 +257,14 @@ def main(argv) -> None:
         # print(f"enemy_distance: {spring_params.enemy_distance}")
         # print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
 
-        metrics = sim.evaluate(
-            spring_state,
-            edge_index,
-            signs,
-            train_mask,
-            val_mask)
+        # metrics = sim.evaluate(
+        #     spring_state,
+        #     edge_index,
+        #     signs,
+        #     train_mask,
+        #     val_mask)
         
-        print(metrics)
+        # print(metrics)
         
         # aucs.append(metrics.auc)
         # f1_binaries.append(metrics.f1_binary)

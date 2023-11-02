@@ -91,24 +91,24 @@ def simulate_and_loss(
     position_i = spring_state.position[edge_index[0]]
     position_j = spring_state.position[edge_index[1]]
 
-    spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
-    
-    predicted_sign = spring_vec_norm - sim.NEUTRAL_DISTANCE
+    distance = jnp.linalg.norm(position_i - position_j, axis=1) - sim.NEUTRAL_DISTANCE
 
     # apply sigmoid function to get sign (0 for negative, 1 for positive)
-    predicted_sign = 1 / (1 + jnp.exp(-predicted_sign))
+    predicted_sign = 1 / (1 + jnp.exp(-distance))
 
     # apply same transformation to the actual signs
-    signs = jnp.where(signs == 1, 1, 0)
+    signs = signs * 0.5 + 0.5
 
-    weight_positives = 1 / (jnp.sum(signs == 1) / signs.shape[0])
-    weight_negatives = 1 / (jnp.sum(signs == 0) / signs.shape[0])
+    incorrect_predictions = (predicted_sign - signs) ** 2
 
-    incorrect_predictions = jnp.abs((signs - predicted_sign) ** 2)
+    fraction_negatives = jnp.sum(signs == 0) / signs.shape[0]
+    fraction_positives =  1 - fraction_negatives
+
+    loss = jnp.sum(jnp.where(signs == 1, incorrect_predictions * 1 / fraction_positives, incorrect_predictions * 1 / fraction_negatives))
     
     # apply weights to the loss
     # incorrect_predictions = jnp.where(signs == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
 
     # loss = -f1_macro(signs, predicted_sign)
     
-    return jnp.sum(incorrect_predictions), (spring_state, predicted_sign)
+    return loss, (spring_state, predicted_sign)

@@ -17,11 +17,12 @@ def update_auxillary_state(
     auxillaries_i = spring_state.auxillary[edge_index[0]]
     auxillaries_j = spring_state.auxillary[edge_index[1]]
 
-    sign = jnp.expand_dims(sign, axis=1)
+
+    sign_one_hot = jax.nn.one_hot(sign, 3)
 
     auxillaries_i = nn.attention(
-        jnp.concatenate([auxillaries_i, sign], axis=-1),
-        jnp.concatenate([auxillaries_j, sign], axis=-1),
+        jnp.concatenate([auxillaries_i, sign_one_hot], axis=-1),
+        jnp.concatenate([auxillaries_j, sign_one_hot], axis=-1),
         auxillaries_nn_params)
     
     auxillaries = jnp.zeros_like(spring_state.auxillary)

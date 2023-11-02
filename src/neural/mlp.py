@@ -26,7 +26,7 @@ def mlp(
 
     for i in range(num_params):
         x = jnp.dot(x, params[f'W{i}']) + params[f'b{i}']
-        if i < len(params) // 2 - 1:
+        if i < num_params - 1:
             x = jax.nn.relu(x)
 
     return x

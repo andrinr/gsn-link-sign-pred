@@ -47,29 +47,29 @@ def compute_force(
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
+    difference = distance - NEUTRAL_DISTANCE
     spring_vector_norm = spring_vector / (distance + 0.001)
 
-    sign = jnp.expand_dims(sign, axis=1)
-
-    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
-    neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS
-    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
+    # = jnp.expand_dims(sign, axis=1)
+    sign_one_hot = jax.nn.one_hot(sign, 3)
 
     # neural network based forces
     if nn_force and nn_auxillary:
         forces = mlp(
-            jnp.concatenate([spring_vector, auxillaries_i, auxillaries_j, sign], axis=-1),
-            nn_force_params)
+            jnp.concatenate([auxillaries_i, auxillaries_j, difference, sign_one_hot], axis=-1),
+            nn_force_params) * 10
 
     elif nn_force:
         forces = mlp(
-            jnp.concatenate([spring_vector, sign], axis=-1),
-            nn_force_params)
-        
-        jnp.print(forces.shape)
+            jnp.concatenate([difference, sign_one_hot], axis=-1),
+            nn_force_params) * 10
     
     # social balance theory based forces
     else:
+        attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
+        neutral = (distance - NEUTRAL_DISTANCE) * NEUTRAL_STIFFNESS
+        retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
+
         forces = jnp.where(sign == 1, attraction, retraction)
         forces = jnp.where(sign == 0, neutral, forces)
     
