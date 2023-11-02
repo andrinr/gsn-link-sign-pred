@@ -28,18 +28,19 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
-    NN_FORCE = True
-    EMBEDDING_DIM = 8
+    NN_FORCE = False
+    EMBEDDING_DIM = 64
     NN_AUXILLARY = False
-    AUXILLARY_DIM = 8
+    AUXILLARY_DIM = 16
+    OPTIMIZE_SPRING_PARAMS = False
 
-    DT = 0.1
-    DAMPING = 0.1
+    DT = 0.01
+    DAMPING = 0.01
 
     NUM_EPOCHS = 300
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 200
-    AUXILLARY_ITERATIONS = 5
+    AUXILLARY_ITERATIONS = 6
 
     DATA_ROOT = 'src/data/'
 
@@ -69,9 +70,6 @@ def main(argv) -> None:
             DAMPING = int(arg)
         elif opt == '-i':
             FINAL_SIM_ITERATIONS = int(arg)
-
-    stream = open("src/params.yaml", 'r')
-    params = yaml.load(stream, Loader=yaml.FullLoader)
 
     pre_transform = T.Compose([])
     match dataset_name:
@@ -111,11 +109,13 @@ def main(argv) -> None:
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
 
+    stream = open("src/params.yaml", 'r')
+    params = yaml.load(stream, Loader=yaml.FullLoader)
     spring_params = sim.SpringParams(
-        friend_distance=5.0,
-        friend_stiffness=5.0,
-        enemy_distance=20.0,
-        enemy_stiffness=6.0)
+        friend_distance=params['friend_distance'],
+        friend_stiffness=params['friend_stiffness'],
+        enemy_distance=params['enemy_distance'],
+        enemy_stiffness=params['enemy_stiffness'])
     
     simulation_params_train = sim.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS,
@@ -131,11 +131,13 @@ def main(argv) -> None:
         input_dimension=AUXILLARY_DIM + 1,
         output_dimension=AUXILLARY_DIM,
         factor=1 / AUXILLARY_ITERATIONS)
-    
+
+    layer_0_size = EMBEDDING_DIM + (int(NN_AUXILLARY) * AUXILLARY_DIM * 2) + 1
+    print(f"layer_0_size: {layer_0_size}")
     force_params = nn.init_mlp_params(
         key=key_mlp,
-        layer_dimensions = [EMBEDDING_DIM + (NN_AUXILLARY * AUXILLARY_DIM * 2) + 1, 128, 32, 3],
-        factor=1 / FINAL_SIM_ITERATIONS)
+        layer_dimensions = [layer_0_size, 128, 64, 32, 1],
+        factor=0)
     
     # setup optax optimizers
     if NN_AUXILLARY:
@@ -143,18 +145,22 @@ def main(argv) -> None:
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
     if NN_FORCE:
-        force_optimizer = optax.adam(learning_rate=1e-3)
+        force_optimizer = optax.adam(learning_rate=1e-5)
         force_optimizier_state = force_optimizer.init(force_params)
 
+    if OPTIMIZE_SPRING_PARAMS:
+        params_optimizer = optax.adam(learning_rate=1e-3)
+        params_optimizier_state = params_optimizer.init(spring_params)
+
     # compute value and grad function of simulation using jax
-    if NN_AUXILLARY and NN_FORCE:
-        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 6], has_aux=True)
+    argnums = []
+    if OPTIMIZE_SPRING_PARAMS: argnums.append(2)
+    if NN_AUXILLARY: argnums.append(4)
+    if NN_FORCE: argnums.append(6)
+    if len(argnums) == 1: argnums = argnums[0]
 
-    elif NN_AUXILLARY:
-        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4], has_aux=True)
-
-    elif NN_FORCE:
-        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[6], has_aux=True)
+    if len(argnums > 0):
+        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=argnums, has_aux=True)
 
     total_energies = []
     aucs = []
@@ -171,52 +177,65 @@ def main(argv) -> None:
             n=data.num_nodes,
             m=data.num_edges,
             embedding_dim=EMBEDDING_DIM,
-        )
-
-        print(NN_AUXILLARY)
+            auxillary_dim=AUXILLARY_DIM)
 
         # run simulation and compute loss, auxillaries and gradient
-        (loss_value, (spring_state, signs_pred)), grads = value_grad_fn(
-            simulation_params_train, #0
-            spring_state, #1
-            spring_params, #2
-            NN_AUXILLARY, #3
-            auxillary_params, #4
-            NN_FORCE, #5
-            force_params, #6
-            edge_index, #7
-            signs, #8
-            train_mask, #9
-            val_mask)
+        if len(argnums) > 0:
+            (loss_value, (spring_state, signs_pred)), grads = value_grad_fn(
+                simulation_params_train, #0
+                spring_state, #1
+                spring_params, #2
+                NN_AUXILLARY, #3
+                auxillary_params, #4
+                NN_FORCE, #5
+                force_params, #6
+                edge_index, #7
+                signs, #8
+                train_mask, #9
+                val_mask)
+        else:
+            loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
+                simulation_params_train, #0
+                spring_state, #1
+                spring_params, #2
+                NN_AUXILLARY, #3
+                auxillary_params, #4
+                NN_FORCE, #5
+                force_params, #6
+                edge_index, #7
+                signs, #8
+                train_mask, #9
+                val_mask)
         
-        if NN_AUXILLARY and NN_FORCE:
-            (nn_auxillary_grad, nn_force_grad) = grads
+        if NN_AUXILLARY and NN_FORCE and OPTIMIZE_SPRING_PARAMS:
+            (nn_auxillary_grad, nn_force_grad, params_grad) = grads
 
-        elif NN_AUXILLARY:
+        elif NN_AUXILLARY and NN_FORCE:
             nn_auxillary_grad = grads
+            assert jnp.sum(jnp.abs(nn_auxillary_grad['Q'])) > 0
 
         elif NN_FORCE:
             nn_force_grad = grads
+            assert jnp.sum(jnp.abs(nn_force_grad['W0'])) > 0
 
-        print(nn_force_grad)
-        
+        # make sure there are no zero gradients 
         # print(f"signs_pred: {signs_pred}")
         # print(f"signs: {signs}")
         # # print(f"springs: {spring_state}")
         # # print(f"auxillaries_params: {auxillaries_params}")
         # # print(f"forces_params: {forces_params}")
+
+        if NN_AUXILLARY:
+            nn_auxillary_update, auxillary_optimizier_state = auxillary_optimizer.update(
+                nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
+        
+            auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
         
         if NN_FORCE:
             nn_force_update, force_optimizier_state = force_optimizer.update(
                 nn_force_grad, force_optimizier_state, force_params)
             
             force_params = optax.apply_updates(force_params, nn_force_update)
-        
-        if NN_AUXILLARY:
-            nn_auxillary_update, auxillary_optimizier_state = auxillary_optimizer.update(
-                nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
-        
-            auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
 
         # print(f"auxillaries_params: {auxillaries_params}")
         # print(f"forces_params: {forces_params}")
@@ -243,14 +262,14 @@ def main(argv) -> None:
         # print(f"enemy_distance: {spring_params.enemy_distance}")
         # print(f"enemy_stiffness: {spring_params.enemy_stiffness}")
 
-        # metrics = sim.evaluate(
-        #     spring_state,
-        #     edge_index,
-        #     signs,
-        #     train_mask,
-        #     val_mask)
+        metrics = sim.evaluate(
+            spring_state,
+            edge_index,
+            signs,
+            train_mask,
+            val_mask)
         
-        # print(metrics)
+        print(metrics)
         
         # aucs.append(metrics.auc)
         # f1_binaries.append(metrics.f1_binary)
@@ -264,6 +283,7 @@ def main(argv) -> None:
         n=data.num_nodes,
         m=data.num_edges,
         embedding_dim=EMBEDDING_DIM,
+        auxillary_dim=AUXILLARY_DIM
     )
 
     training_signs = signs.copy()
@@ -279,8 +299,9 @@ def main(argv) -> None:
         simulation_params=simulation_params_test,
         spring_state=spring_state, 
         spring_params=spring_params,
-        nn_based_forces=True,
+        nn_auxillary=NN_AUXILLARY,
         nn_auxillary_params=auxillary_params,
+        nn_force=NN_FORCE,
         nn_force_params=force_params,
         edge_index=edge_index,
         signs=training_signs)

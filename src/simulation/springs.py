@@ -16,14 +16,18 @@ class SpringParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
-    auxillaries: jnp.ndarray
+    auxillary: jnp.ndarray
 
-def init_spring_state(rng : jax.random.PRNGKey, n : int, m : int, embedding_dim : int) -> SpringState:
+def init_spring_state(
+    rng : jax.random.PRNGKey, 
+    n : int, m : int,
+    embedding_dim : int,
+    auxillary_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
-    auxillaries = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
+    auxillary = jax.random.uniform(rng, (n, auxillary_dim), maxval=1.0, minval=-1.0)
 
-    return SpringState(position, velocity, auxillaries)
+    return SpringState(position, velocity, auxillary)
 
 @partial(jax.jit, static_argnames=["nn_force", "nn_auxillary", "params"])
 def compute_force(
@@ -38,8 +42,8 @@ def compute_force(
     position_i = state.position[edge_index[0]]
     position_j = state.position[edge_index[1]]
 
-    auxillaries_i = state.auxillaries[edge_index[0]]
-    auxillaries_j = state.auxillaries[edge_index[1]]
+    auxillaries_i = state.auxillary[edge_index[0]]
+    auxillaries_j = state.auxillary[edge_index[1]]
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
@@ -53,28 +57,21 @@ def compute_force(
 
     # neural network based forces
     if nn_force and nn_auxillary:
-        decision = mlp(
+        forces = mlp(
             jnp.concatenate([spring_vector, auxillaries_i, auxillaries_j, sign], axis=-1),
             nn_force_params)
-        decision = jnp.argmax(decision, axis=-1) - 1
-        decision = jnp.expand_dims(decision, axis=1)
 
     elif nn_force:
-        decision = mlp(
+        forces = mlp(
             jnp.concatenate([spring_vector, sign], axis=-1),
             nn_force_params)
-        # get categorical decision
-        decision = jnp.argmax(decision, axis=-1) - 1
-        decision = jnp.expand_dims(decision, axis=1)
+        
+        jnp.print(forces.shape)
     
     # social balance theory based forces
     else:
-        decision = sign
-
-    jax.debug.print(f"decision: {decision.shape}")
-
-    forces = jnp.where(decision == 1, attraction, retraction)
-    forces = jnp.where(decision == 0, neutral, forces)
+        forces = jnp.where(sign == 1, attraction, retraction)
+        forces = jnp.where(sign == 0, neutral, forces)
     
     return forces * spring_vector_norm
 

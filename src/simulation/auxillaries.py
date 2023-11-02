@@ -14,8 +14,8 @@ def update_auxillary_state(
     Update the auxillary state using the message passing method.
     """
 
-    auxillaries_i = spring_state.auxillaries[edge_index[0]]
-    auxillaries_j = spring_state.auxillaries[edge_index[1]]
+    auxillaries_i = spring_state.auxillary[edge_index[0]]
+    auxillaries_j = spring_state.auxillary[edge_index[1]]
 
     sign = jnp.expand_dims(sign, axis=1)
 
@@ -24,10 +24,10 @@ def update_auxillary_state(
         jnp.concatenate([auxillaries_j, sign], axis=-1),
         auxillaries_nn_params)
     
-    auxillaries = jnp.zeros_like(spring_state.auxillaries)
+    auxillaries = jnp.zeros_like(spring_state.auxillary)
     auxillaries = auxillaries.at[edge_index[0]].add(auxillaries_i)
 
     return sim.SpringState(
         position=spring_state.position,
         velocity=spring_state.velocity,
-        auxillaries=auxillaries)
+        auxillary=auxillaries)

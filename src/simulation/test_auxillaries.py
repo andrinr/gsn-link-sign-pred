@@ -19,7 +19,7 @@ def loss(params, spring_state, edge_index, signs, iterations, y):
     # print(y_pred.shape)
     # print(y.shape)
 
-    return jnp.mean((spring_state.auxillaries - y)**2), spring_state
+    return jnp.mean((spring_state.auxillary - y)**2), spring_state
         
 def test_bipartition():
     # generate two clusters of points and connect them randomly with edges
@@ -101,7 +101,7 @@ def test_bipartition():
         spring_state = SpringState(
             position=auxillaries,
             velocity=jnp.zeros_like(auxillaries),
-            auxillaries=auxillaries)
+            auxillary=auxillaries)
         
         (loss_value, spring_state), gradient = value_and_grad_fn(
             params, spring_state, edge_index, signs, 5, y)

@@ -101,18 +101,14 @@ def simulate_and_loss(
     # apply same transformation to the actual signs
     signs = jnp.where(signs == 1, 1, 0)
 
-    incorrect_predictions = jnp.mean(jnp.abs((signs - predicted_sign) ** 2))
+    weight_positives = 1 / (jnp.sum(signs == 1) / signs.shape[0])
+    weight_negatives = 1 / (jnp.sum(signs == 0) / signs.shape[0])
 
-    # fraction_positives = jnp.sum
-    # fraction_negatives = 1 - fraction_positives
-
-    # # jax.debug.print(f"fraction_negatives: {fraction_negatives.shape}")
-    # # jax.debug.print(f"fraction_positives: {fraction_positives.shape}")
-
-    # score = 1/fraction_positives * signs * predicted_sign + 1/fraction_negatives * (1 - signs) * (1 - predicted_sign)
-
-    # loss = -jnp.mean(score)
+    incorrect_predictions = jnp.abs((signs - predicted_sign) ** 2)
+    
+    # apply weights to the loss
+    # incorrect_predictions = jnp.where(signs == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
 
     # loss = -f1_macro(signs, predicted_sign)
     
-    return incorrect_predictions, (spring_state, predicted_sign)
+    return jnp.sum(incorrect_predictions), (spring_state, predicted_sign)
