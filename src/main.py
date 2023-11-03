@@ -29,18 +29,18 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     NN_FORCE = True
-    EMBEDDING_DIM = 16
+    EMBEDDING_DIM = 32
     NN_AUXILLARY = True
     AUXILLARY_DIM = 16
     OPTIMIZE_SPRING_PARAMS = False
 
-    DT = 0.02
-    DAMPING = 0.1
-
-    NUM_EPOCHS = 5000
-    PER_EPOCH_SIM_ITERATIONS = 200
-    FINAL_SIM_ITERATIONS = 200
+    NUM_EPOCHS = 500
+    PER_EPOCH_SIM_ITERATIONS = 300
+    FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 6
+
+    DT = 2 / PER_EPOCH_SIM_ITERATIONS
+    DAMPING = DT * 10
 
     DATA_ROOT = 'src/data/'
 
@@ -124,28 +124,35 @@ def main(argv) -> None:
         message_passing_iterations=AUXILLARY_ITERATIONS)
 
     # Create initial values for neural network parameters
-    key_attention, key_mlp, key_training, key_test = random.split(random.PRNGKey(0), 4)
+    key_auxillary, key_force, key_training, key_test = random.split(random.PRNGKey(0), 4)
 
-    auxillary_params = nn.init_attention_params(
-        key=key_attention,
-        input_dimension=AUXILLARY_DIM + 3,
-        output_dimension=AUXILLARY_DIM,
-        factor=1 / AUXILLARY_ITERATIONS)
+    # auxillary_params = nn.init_attention_params(
+    #     key=key_attention,
+    #     input_dimension=AUXILLARY_DIM + 3,
+    #     output_dimension=AUXILLARY_DIM,
+    #     factor= 0.1 / AUXILLARY_ITERATIONS)
+    
+    auxillary_params = nn.init_mlp_params(
+        key=key_auxillary,
+        layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM],
+        factor= 0.5 / AUXILLARY_ITERATIONS)
 
-    layer_0_size = (int(NN_AUXILLARY) * AUXILLARY_DIM * 2) + 4
+    # auxillaries, sign (one hot), difference
+    layer_0_size = (int(NN_AUXILLARY) * AUXILLARY_DIM * 2) + 3 + 1
+    
     print(f"layer_0_size: {layer_0_size}")
     force_params = nn.init_mlp_params(
-        key=key_mlp,
-        layer_dimensions = [layer_0_size, layer_0_size, 1],
-        factor=1 / PER_EPOCH_SIM_ITERATIONS)
+        key=key_force,
+        layer_dimensions = [layer_0_size, 16, 4, 1],
+        factor= 0.5 / PER_EPOCH_SIM_ITERATIONS)
     
     # setup optax optimizers
     if NN_AUXILLARY:
-        auxillary_optimizer = optax.radam(learning_rate=1e-4)
+        auxillary_optimizer = optax.adam(learning_rate=1e-4)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
     if NN_FORCE:
-        force_optimizer = optax.radam(learning_rate=1e-4)
+        force_optimizer = optax.adam(learning_rate=1e-4)
         force_optimizier_state = force_optimizer.init(force_params)
 
     # compute value and grad function of simulation using jax
@@ -211,6 +218,9 @@ def main(argv) -> None:
         elif NN_FORCE:
             nn_force_grad = grads
 
+        print(f"nn_auxillary_grad: {nn_auxillary_grad}")
+        print(f"nn_force_grad: {nn_force_grad}")
+
         # make sure there are no zero gradients 
         # print(f"signs_pred: {signs_pred}")
         # print(f"signs: {signs}")
@@ -235,6 +245,7 @@ def main(argv) -> None:
 
         # if epoch % 30 == 0:
         signs_ = signs * 0.5 + 0.5
+        print(f"epoch: {epoch}")
         print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
         print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")

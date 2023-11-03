@@ -17,6 +17,8 @@ class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
     auxillary: jnp.ndarray
+    edge_force: jnp.ndarray
+    progress : float
 
 def init_spring_state(
     rng : jax.random.PRNGKey, 
@@ -26,13 +28,16 @@ def init_spring_state(
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
     velocity = jnp.zeros((n, embedding_dim))
     auxillary = jax.random.uniform(rng, (n, auxillary_dim), maxval=1.0, minval=-1.0)
-
-    return SpringState(position, velocity, auxillary)
+    edge_force = jnp.zeros((m, embedding_dim))
+    time = 0.0
+    return SpringState(position, velocity, auxillary, edge_force, time)
 
 @partial(jax.jit, static_argnames=["nn_force", "nn_auxillary", "params"])
 def compute_force(
     state : SpringState,
     params : SpringParams, 
+    dt : float,
+    iteration : int,
     nn_auxillary : bool,
     nn_force : bool,
     nn_force_params : dict[jnp.ndarray],
@@ -53,16 +58,20 @@ def compute_force(
     # = jnp.expand_dims(sign, axis=1)
     sign_one_hot = jax.nn.one_hot(sign, 3)
 
-    # neural network based forces
-    if nn_force and nn_auxillary:
-        forces = mlp(
-            jnp.concatenate([auxillaries_i, auxillaries_j, difference, sign_one_hot], axis=-1),
-            nn_force_params) * 10
+    # progress_arr = jnp.full((edge_index.shape[1], 1), state.progress)
+    # dt_arr = jnp.full((edge_index.shape[1], 1), dt)
 
-    elif nn_force:
-        forces = mlp(
-            jnp.concatenate([difference, sign_one_hot], axis=-1),
-            nn_force_params) * 10
+    # neural network based forces
+    if iteration % 10 == 0:
+        if nn_force and nn_auxillary:
+            forces = mlp(
+                jnp.concatenate([auxillaries_i, auxillaries_j, difference, sign_one_hot], axis=-1),
+                nn_force_params) * 10
+
+        elif nn_force:
+            forces = mlp(
+                jnp.concatenate([difference, sign_one_hot], axis=-1),
+                nn_force_params) * 10
     
     # social balance theory based forces
     else:
@@ -83,6 +92,7 @@ def update_spring_state(
     nn_force : bool,
     nn_force_params : dict[jnp.ndarray],
     dt : float,
+    iteration : int,
     damping : float,
     edge_index : jnp.ndarray,
     sign : jnp.ndarray) -> SpringState:
@@ -90,38 +100,42 @@ def update_spring_state(
     Update the spring state using the leapfrog method. 
     This is essentially a simple message passing network implementation. 
     """
-    edge_forces = compute_force(
+    edge_acceleration = compute_force(
         spring_state,
         spring_params, 
+        dt,
+        iteration,
         nn_auxillary,
         nn_force,
         nn_force_params,
         edge_index,
         sign)
     
-    node_forces = jnp.zeros_like(spring_state.position)
-    node_forces = node_forces.at[edge_index[0]].add(edge_forces)
+    node_accererlations = jnp.zeros_like(spring_state.position)
+    node_accererlations = node_accererlations.at[edge_index[0]].add(edge_acceleration)
 
-    velocity = spring_state.velocity + 0.5 * dt * node_forces
+    velocity = spring_state.velocity + 0.5 * dt * node_accererlations
     position = spring_state.position + dt * velocity
 
     spring_state = spring_state._replace(
         position=position,
         velocity=velocity)
 
-    edge_forces = compute_force(
+    edge_acceleration = compute_force(
         spring_state,
         spring_params, 
+        dt,
+        iteration,
         nn_auxillary,
         nn_force,
         nn_force_params,
         edge_index,
         sign)
     
-    node_forces = jnp.zeros_like(spring_state.position)
-    node_forces = node_forces.at[edge_index[0]].add(edge_forces)
+    node_accererlations = jnp.zeros_like(spring_state.position)
+    node_accererlations = node_accererlations.at[edge_index[0]].add(edge_acceleration)
 
-    velocity = velocity + 0.5 * dt * node_forces
+    velocity = velocity + 0.5 * dt * node_accererlations
     velocity = velocity * (1.0 - damping)
 
     spring_state = spring_state._replace(

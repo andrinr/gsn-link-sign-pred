@@ -48,6 +48,7 @@ def simulate(
         nn_force = nn_force,
         nn_force_params = nn_force_params,
         dt = simulation_params.dt,
+        progress = i / simulation_params.iterations,
         damping = simulation_params.damping,
         edge_index = edge_index,
         sign = signs)
