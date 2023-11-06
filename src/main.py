@@ -187,7 +187,7 @@ def main(argv) -> None:
         auxillary_optimizer = optax.adamaxw(learning_rate=1e-4)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-2)
+        force_optimizer = optax.adamaxw(learning_rate=1e-1)
         force_optimizier_state = force_optimizer.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)

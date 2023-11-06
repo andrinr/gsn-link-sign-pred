@@ -55,7 +55,7 @@ The intuition behind this is, that nodes which are connected by a positive edge 
 
 ### Spring Network Simulation
 
-For all positive, neutral and negative edges fixed resting lengths $l^{+}$, $l^{0}$ and $l^{-}$ are defined. The actual length of an edge is denoted as $L_i = \|{X_l - X_k}\|_2$. Furthermore each edge type has a stiffness $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$.
+For all positive, neutral and negative edges fixed resting lengths $l^{+}$, $l^{0}$ and $l^{-}$ are defined. The actual length of an edge is denoted as $L_{l,k} = \|{X_l - X_k}\|_2$. Furthermore each edge type has a stiffness $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$.
 
 The force acting on a node $(v_i)$ from the edge $(v_i, v_j)$ is the partial derivative of the energy with respect to the node position $\frac{\partial E(X_1, X_2) }{\partial X_1} $. We denote the force coming from negative, neutral and positive nodes as $f^{-}_{i,j}$, $f^{0}_{i,j}$ and $f^{-}_{i,j}$. The partial differential equations evaluate to equations:
 
@@ -81,6 +81,25 @@ The method works reasonably well, however it appears to be rather difficult to e
 I have rewritten the entire code and made it JAX comptabile. 
 
 Now the simulation is differentiable and for each simulation run we evaulate a loss function which correlates to the common measures (auc, f1scores). However the loss function must be differentiated, therefore I slightly changed the scoring function (which can be used as an inverse loss function). 
+
+For a predefined distance threshold $d_{th}$, the predicted sign of an edge $(u, v)$ is computed using a sigmoid function:
+
+$\sigma^{'}(u, v) = \frac{1}{1 + e^{ \cdot \||x_u - x_v||_2 - d_{th}}}$
+
+We then compute the loss function as follows:
+
+$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{'}(u, v) - \sigma(u, v))^2 \cdot n(u, v)$
+
+where $n$ is a normalization function which for a positive edge returns one divided by the number of positive edges, for a neutral edge one divided by the number of neutral edges and for a negative edge one divided by the number of negative edges.
+
+$n(u, v) = \begin{cases}
+\frac{1}{|E^{+}|} & \text{if } \sigma(u, v) = 1 \\
+\frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1
+\end{cases}$
+
+
+
+where $d(u, v)$ is the euclidean distance between the node embeddings of $u$ and $v$ and $\alpha$, $\beta$ and $\gamma$ are parameters which can be optimized.
 
 This appears to be working pretty welly and can used instead of the nevergrad blackbox optimization which I have used before, at a fraction of the runtime.
 
