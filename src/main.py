@@ -31,8 +31,8 @@ def main(argv) -> None:
     """
     NN_FORCE = True
     OPTIMIZE_FORCE = True
-    EMBEDDING_DIM = 32
-    AUXILLARY_DIM = 32
+    EMBEDDING_DIM = 64
+    AUXILLARY_DIM = 64
     OPTIMIZE_SPRING_PARAMS = False
 
     assert not (OPTIMIZE_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
@@ -135,8 +135,7 @@ def main(argv) -> None:
             enemy_distance=20.0,
             enemy_stiffness=1.0,
             distance_threshold=10.0)
-
-    print(spring_params)
+        print("no spring params checkpoint found, using default params")
 
     simulation_params_train = sim.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS,
@@ -158,11 +157,13 @@ def main(argv) -> None:
         stream = open(auxillary_checkpoint_path, 'r')
         auxillary_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
         print("loaded auxillary params checkpoint")
+
     else:
         auxillary_params = nn.init_mlp_params(
             key=key_auxillary,
             layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM,  AUXILLARY_DIM, AUXILLARY_DIM],
             factor= 0.5 / AUXILLARY_ITERATIONS)
+        print("no auxillary params checkpoint found, using default params")
 
     # auxillaries, sign (one hot), difference
     layer_0_size = (AUXILLARY_DIM * 2) + 3
@@ -179,13 +180,14 @@ def main(argv) -> None:
             key=key_force,
             layer_dimensions = [layer_0_size, layer_0_size, layer_0_size, 64, 16, 8, 3],
             factor= 0.5 / PER_EPOCH_SIM_ITERATIONS)
+        print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adam(learning_rate=1e-5)
+        auxillary_optimizer = optax.adamaxw(learning_rate=1e-4)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
-        force_optimizer = optax.adam(learning_rate=1e-3)
+        force_optimizer = optax.adamaxw(learning_rate=1e-2)
         force_optimizier_state = force_optimizer.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
