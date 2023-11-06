@@ -1,4 +1,132 @@
-enemy_distance: 21.65107669586487
-enemy_stiffness: 5.63279383096726
-neutral_distance: 11.03036410324108
-neutral_stiffness: 3.302332439243652
+distance_threshold: !!python/object/apply:jax._src.array._reconstruct_array
+- &id001 !!python/name:numpy.core.multiarray._reconstruct ''
+- !!python/tuple
+  - &id002 !!python/name:numpy.ndarray ''
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - &id003 !!python/object/apply:numpy.dtype
+    args:
+    - f4
+    - false
+    - true
+    state: !!python/tuple
+    - 3
+    - <
+    - null
+    - null
+    - null
+    - -1
+    - -1
+    - 0
+  - false
+  - !!binary |
+    CAzpQA==
+- named_shape: &id004 {}
+  weak_type: false
+enemy_distance: !!python/object/apply:jax._src.array._reconstruct_array
+- *id001
+- !!python/tuple
+  - *id002
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - *id003
+  - false
+  - !!binary |
+    shj2Pw==
+- named_shape: *id004
+  weak_type: false
+enemy_stiffness: !!python/object/apply:jax._src.array._reconstruct_array
+- *id001
+- !!python/tuple
+  - *id002
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - *id003
+  - false
+  - !!binary |
+    QIN+vQ==
+- named_shape: *id004
+  weak_type: false
+friend_distance: !!python/object/apply:jax._src.array._reconstruct_array
+- *id001
+- !!python/tuple
+  - *id002
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - *id003
+  - false
+  - !!binary |
+    7mu6Pw==
+- named_shape: *id004
+  weak_type: false
+friend_stiffness: !!python/object/apply:jax._src.array._reconstruct_array
+- *id001
+- !!python/tuple
+  - *id002
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - *id003
+  - false
+  - !!binary |
+    HrQLvw==
+- named_shape: *id004
+  weak_type: false
+neutral_distance: !!python/object/apply:jax._src.array._reconstruct_array
+- *id001
+- !!python/tuple
+  - *id002
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - *id003
+  - false
+  - !!binary |
+    jVRSQA==
+- named_shape: *id004
+  weak_type: false
+neutral_stiffness: !!python/object/apply:jax._src.array._reconstruct_array
+- *id001
+- !!python/tuple
+  - *id002
+  - !!python/tuple
+    - 0
+  - !!binary |
+    Yg==
+- !!python/tuple
+  - 1
+  - !!python/tuple []
+  - *id003
+  - false
+  - !!binary |
+    kpumvg==
+- named_shape: *id004
+  weak_type: false
