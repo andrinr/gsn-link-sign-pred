@@ -53,6 +53,12 @@ We compute a node embedding $x_u \in \mathbb{R}^d$ for each node $u \in V$. The 
 
 The intuition behind this is, that nodes which are connected by a positive edge should be close to each other, while nodes which are connected by a negative edge should be far away from each other.
 
+We can see simple result of this in the following figure:
+
+![Results](tribes_embeddings.png)
+
+You can observe that all the tribes are grouped in 3 clusters. The tribes in the same cluster are connected only connected by positive edges, while the tribes in different clusters are connected by negative edges. The tribes dataset is a very simple dataset, and can be solved with only 2 dimensional node embeddings with a 100% accuracy using a 80% train and 20% test split. However for more complex dataset the number of dimensions needs to be increased to encode more complex relationships.
+
 ### Spring Network Simulation
 
 For all positive, neutral and negative edges fixed resting lengths $l^{+}$, $l^{0}$ and $l^{-}$ are defined. The actual length of an edge is denoted as $L_{l,k} = \|{X_l - X_k}\|_2$. Furthermore each edge type has a stiffness $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$.
@@ -97,17 +103,34 @@ $n(u, v) = \begin{cases}
 \frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1
 \end{cases}$
 
+This loss function is differentiable and can be used to optimize any parameter of the simulation.
+
+In an initial version I simply optimized for the parameters: 
+
+$d_{th}$, $l^{+}$, $l^{0}$, $l^{-}$, $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$
+
+Where I have obtained the following values:
+
+| Parameter | Value |
+| --- | --- |
+| $d_{th}$ | 14.420479774475098 |
+| $l^{+}$ | 9.82265567779541 |
+| $l^{0}$ | 16.775850296020508 |
+| $l^{-}$ | 20.94917106628418 |
+| $\alpha^{+}$ | 7.730042457580566 |
+| $\alpha^{0}$ | 1.1881768703460693 |
+| $\alpha^{-}$ | 14.80991268157959 |
+
+Which significantly improved the results and works a lot faster than the blackbock optimization method whic I have used before.
 
 
-where $d(u, v)$ is the euclidean distance between the node embeddings of $u$ and $v$ and $\alpha$, $\beta$ and $\gamma$ are parameters which can be optimized.
+### Message Passing Network
 
-This appears to be working pretty welly and can used instead of the nevergrad blackbox optimization which I have used before, at a fraction of the runtime.
+As of now it is clear that if an edge has a positive sign, this results in a force which pulls the two nodes together. If an edge has a negative sign, this results in a force which pushes the two nodes apart. 
 
-Since I have this implemented now, I could potentially use this pipeline to optimzie other parameters than the $l^+$, $l^0$, $l^-$ and $\alpha^+$, $\alpha^0$, $\alpha^-$ parameters.
+However there might be more complex dynamics at play which are not reflected in the social balance theory. Therefore we want to learn a function, which for a given edge, decides weather the two nodes should be pulled together, pushed apart or stay at a neutral distance.
 
-### Graph Transformer Network
-
-We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a graph transformer network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to compute the forces.
+We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a graph transformer network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to decide on the forces acting on the nodes.
 
 A single prediction then looks as follows:
 
