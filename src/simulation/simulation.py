@@ -108,6 +108,6 @@ def simulate_and_loss(
     # apply weights to the loss
     incorrect_predictions = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
 
-    loss = jnp.sum(incorrect_predictions)
+    loss = jnp.mean(incorrect_predictions)
     
     return loss, (spring_state, predicted_sign)

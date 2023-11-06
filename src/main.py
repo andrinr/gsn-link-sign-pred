@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import jax.profiler
 import optax
 import os
+import pickle
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
@@ -165,7 +166,7 @@ def main(argv) -> None:
         auxillary_optimizer = optax.adam(learning_rate=1e-5)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
-        force_optimizer = optax.adam(learning_rate=1e-4)
+        force_optimizer = optax.adam(learning_rate=1e-3)
         force_optimizier_state = force_optimizer.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
