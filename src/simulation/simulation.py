@@ -86,16 +86,13 @@ def simulate_and_loss(
     position_i = spring_state.position[edge_index[0]]
     position_j = spring_state.position[edge_index[1]]
 
-    distance = jnp.linalg.norm(position_i - position_j, axis=1) - spring_params.distance_threshold
+    distance = jnp.linalg.norm(position_j - position_i, axis=1) - spring_params.distance_threshold
 
     # apply sigmoid function to get sign (0 for negative, 1 for positive)
-    predicted_sign = 1 / (1 + jnp.exp(-distance))
+    predicted_sign = 1 / (1 + jnp.exp(distance))
 
     # apply same transformation to the actual signs
     sign = sign * 0.5 + 0.5
-
-    print(predicted_sign)
-    print(sign)
 
     incorrect_predictions = (sign - predicted_sign) ** 2
 

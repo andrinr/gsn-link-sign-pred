@@ -28,21 +28,21 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
-    NN_FORCE = False
+    NN_FORCE = True
     EMBEDDING_DIM = 32
     AUXILLARY_DIM = 32
-    OPTIMIZE_SPRING_PARAMS = True
+    OPTIMIZE_SPRING_PARAMS = False
 
     assert not (NN_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
 
     NUM_EPOCHS = 100
-    PER_EPOCH_SIM_ITERATIONS = 300
+    PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 10
     FORCE_INTERVAL = 20
 
-    DT = 0.01
-    DAMPING = 0.1
+    DT = 0.05
+    DAMPING = 0.05
 
     DATA_ROOT = 'src/data/'
 
@@ -51,7 +51,7 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".XX"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    dataset_names = ['Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions', 'Tribes']
+    dataset_names = ['Tribes', 'Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
         inquirer.List('dataset',
             message="Choose a dataset",
@@ -119,11 +119,11 @@ def main(argv) -> None:
         spring_params = sim.SpringParams(
             friend_distance=1.0,
             friend_stiffness=1.0,
-            neutral_distance=2.0,
-            neutral_stiffness=1.0,
-            enemy_distance=3.0,
+            neutral_distance=10.0,
+            neutral_stiffness=0.5,
+            enemy_distance=20.0,
             enemy_stiffness=1.0,
-            distance_threshold=2.0)
+            distance_threshold=10.0)
     
     simulation_params_train = sim.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS,
@@ -156,9 +156,9 @@ def main(argv) -> None:
     
     # setup optax optimizers
     if NN_FORCE:
-        auxillary_optimizer = optax.adam(learning_rate=1e-5)
+        auxillary_optimizer = optax.adam(learning_rate=1e-2)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
-        force_optimizer = optax.adam(learning_rate=1e-5)
+        force_optimizer = optax.adam(learning_rate=1e-2)
         force_optimizier_state = force_optimizer.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
@@ -242,13 +242,15 @@ def main(argv) -> None:
             
             spring_params = optax.apply_updates(spring_params, params_update)
 
-        # if epoch % 30 == 0:
-        print(signs_pred)
-        print(spring_params)
-        print(params_grad)
+            print(signs)
+            print(spring_state.force_decision)
+            print(signs_pred)
+            print(spring_params)
+            print(params_grad)
+
         signs_ = signs * 0.5 + 0.5
         print(f"epoch: {epoch}")
-        # print(f"predictions: {signs_pred}")
+        print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
         print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
 
@@ -266,17 +268,35 @@ def main(argv) -> None:
         # f1_micros.append(metrics.f1_micro)
         # f1_macros.append(metrics.f1_macro)
 
+    # # plot the embeddings
+    # plt.scatter(spring_state.position[:, 0], spring_state.position[:, 1])
+    # # add edges to plot
+    # for i in range(edge_index.shape[1]):
+    #     plt.plot(
+    #         [spring_state.position[edge_index[0, i], 0], spring_state.position[edge_index[1, i], 0]],
+    #         [spring_state.position[edge_index[0, i], 1], spring_state.position[edge_index[1, i], 1]],
+    #         color= 'blue' if signs[i] == 1 else 'red',
+    #         alpha=0.5)
+        
+    # # add legend for edges
+    # plt.plot([], [], color='blue', label='positive')
+    # plt.plot([], [], color='red', label='negative')
+    # plt.legend()
+
+    # plt.show()
+
     # write spring params to file, the file is still a traced jax object
     if OPTIMIZE_SPRING_PARAMS:
         with open("src/params.yaml", 'w') as file:
             params_dict = {}
-            params_dict['friend_distance'] = spring_params.friend_distance[0]
-            params_dict['friend_stiffness'] = spring_params.friend_stiffness[0]
-            params_dict['neutral_distance'] = spring_params.neutral_distance[0]
-            params_dict['neutral_stiffness'] = spring_params.neutral_stiffness[0]
-            params_dict['enemy_distance'] = spring_params.enemy_distance[0]
-            params_dict['enemy_stiffness'] = spring_params.enemy_stiffness[0]
-            params_dict['distance_threshold'] = spring_params.distance_threshold[0]
+            # get value from jax traced array
+            params_dict['friend_distance'] = spring_params.friend_distance.item()
+            params_dict['friend_stiffness'] = spring_params.friend_stiffness.item()
+            params_dict['neutral_distance'] = spring_params.neutral_distance.item()
+            params_dict['neutral_stiffness'] = spring_params.neutral_stiffness.item()
+            params_dict['enemy_distance'] = spring_params.enemy_distance.item()
+            params_dict['enemy_stiffness'] = spring_params.enemy_stiffness.item()
+            params_dict['distance_threshold'] = spring_params.distance_threshold.item()
 
             print(params_dict)
 
