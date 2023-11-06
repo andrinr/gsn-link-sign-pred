@@ -26,12 +26,23 @@ def mlp(
 
     for i in range(num_params):
         x = jnp.dot(x, params[f'W{i}']) + params[f'b{i}']
-
-        if i != num_params - 1:
-            x = jax.nn.relu(x)
-
-        else:
-            x = jax.nn.softmax(x)
+        x = jax.nn.relu(x)
         
+    return x
 
+def mlp_softmax (
+    x : jnp.ndarray,
+    params : dict[jnp.ndarray]) -> jnp.ndarray:
+
+    # get all params with W in the name
+    num_params = len([key for key in params.keys() if 'W' in key])
+
+    for i in range(num_params):
+        x = jnp.dot(x, params[f'W{i}']) + params[f'b{i}']
+
+        if i == num_params - 1:
+            x = jax.nn.softmax(x)
+        else:
+         x = jax.nn.relu(x)
+        
     return x

@@ -2,12 +2,16 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple, Optional
 from functools import partial
-from neural import mlp
+from neural import mlp, mlp_softmax
 import simulation as sim
+
+EPSILON = 1e-6
 
 def init_spring_state(
     rng : jax.random.PRNGKey, 
     n : int, m : int,
+    min : float,
+    max : float,
     embedding_dim : int,
     auxillary_dim : int) -> sim.SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
@@ -34,7 +38,7 @@ def force_decision(
     auxillaries_i = spring_state.auxillary[edge_index[0]]
     auxillaries_j = spring_state.auxillary[edge_index[1]]
 
-    decision = mlp(
+    decision = mlp_softmax(
         jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot], axis=-1),
         nn_force_params)
 
@@ -53,7 +57,7 @@ def compute_acceleration(
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
-    spring_vector_norm = spring_vector / (distance + 0.001)
+    spring_vector_norm = spring_vector / (distance + EPSILON)
 
     attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
     neutral = (distance - params.neutral_distance) * params.neutral_stiffness

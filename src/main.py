@@ -35,13 +35,13 @@ def main(argv) -> None:
 
     assert not (NN_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
 
-    NUM_EPOCHS = 100
+    NUM_EPOCHS = 500
     PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 10
     FORCE_INTERVAL = 20
 
-    DT = 0.05
+    DT = 0.01
     DAMPING = 0.05
 
     DATA_ROOT = 'src/data/'
@@ -134,16 +134,16 @@ def main(argv) -> None:
     # Create initial values for neural network parameters
     key_auxillary, key_force, key_training, key_test = random.split(random.PRNGKey(0), 4)
 
-    auxillary_params = nn.init_attention_params(
-        key=key_auxillary,
-        input_dimension=AUXILLARY_DIM + 3,
-        output_dimension=AUXILLARY_DIM,
-        factor= 0.1 / AUXILLARY_ITERATIONS)
-    
-    # auxillary_params = nn.init_mlp_params(
+    # auxillary_params = nn.init_attention_params(
     #     key=key_auxillary,
-    #     layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM,  AUXILLARY_DIM, AUXILLARY_DIM],
-    #     factor= 0.5 / AUXILLARY_ITERATIONS)
+    #     input_dimension=AUXILLARY_DIM + 3,
+    #     output_dimension=AUXILLARY_DIM,
+    #     factor= 0.01 / AUXILLARY_ITERATIONS)
+    
+    auxillary_params = nn.init_mlp_params(
+        key=key_auxillary,
+        layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM,  AUXILLARY_DIM, AUXILLARY_DIM],
+        factor= 0.5 / AUXILLARY_ITERATIONS)
 
     # auxillaries, sign (one hot), difference
     layer_0_size = (AUXILLARY_DIM * 2) + 3
@@ -156,9 +156,9 @@ def main(argv) -> None:
     
     # setup optax optimizers
     if NN_FORCE:
-        auxillary_optimizer = optax.adam(learning_rate=1e-2)
+        auxillary_optimizer = optax.adam(learning_rate=1e-5)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
-        force_optimizer = optax.adam(learning_rate=1e-2)
+        force_optimizer = optax.adam(learning_rate=1e-3)
         force_optimizier_state = force_optimizer.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
@@ -181,6 +181,8 @@ def main(argv) -> None:
         # take new key each time to avoid overfitting to specific initial conditions
         spring_state = sim.init_spring_state(
             rng=epochs_keys[epoch],
+            min=-spring_params.distance_threshold,
+            max=spring_params.distance_threshold,
             n=data.num_nodes,
             m=data.num_edges,
             embedding_dim=EMBEDDING_DIM,
@@ -199,6 +201,7 @@ def main(argv) -> None:
                 signs, #7
                 train_mask, #8
                 val_mask)
+            
         if OPTIMIZE_SPRING_PARAMS:
             (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
                 simulation_params_train, #0
@@ -224,7 +227,6 @@ def main(argv) -> None:
                 train_mask, #8
                 val_mask)
 
-
         if NN_FORCE:
             nn_auxillary_update, auxillary_optimizier_state = auxillary_optimizer.update(
                 nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
@@ -249,6 +251,7 @@ def main(argv) -> None:
             print(params_grad)
 
         signs_ = signs * 0.5 + 0.5
+
         print(f"epoch: {epoch}")
         print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
@@ -306,6 +309,8 @@ def main(argv) -> None:
         rng=key_test,
         n=data.num_nodes,
         m=data.num_edges,
+        min=-spring_params.distance_threshold,
+        max=spring_params.distance_threshold,
         embedding_dim=EMBEDDING_DIM,
         auxillary_dim=AUXILLARY_DIM
     )
