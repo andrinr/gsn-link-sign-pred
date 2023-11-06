@@ -30,15 +30,16 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     NN_FORCE = True
+    OPTIMIZE_FORCE = True
     EMBEDDING_DIM = 32
     AUXILLARY_DIM = 32
     OPTIMIZE_SPRING_PARAMS = False
 
-    assert not (NN_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
-
+    assert not (OPTIMIZE_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
+    assert not (not NN_FORCE and OPTIMIZE_FORCE), "Cannot optimize force without using NN force"
     NUM_EPOCHS = 1000
 
-    if not NN_FORCE and not OPTIMIZE_SPRING_PARAMS:
+    if not OPTIMIZE_FORCE and not OPTIMIZE_SPRING_PARAMS:
         NUM_EPOCHS = 1
 
     PER_EPOCH_SIM_ITERATIONS = 200
@@ -49,7 +50,9 @@ def main(argv) -> None:
     DT = 0.01
     DAMPING = 0.05
 
-    DATA_ROOT = 'src/data/'
+    DATA_PATH = 'src/data/'
+    CECKPOINT_PATH = 'checkpoints/'
+
 
     # Deactivate preallocation of memory to avoid OOM errors
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -81,17 +84,17 @@ def main(argv) -> None:
     pre_transform = T.Compose([])
     match dataset_name:
         case "BitcoinOTC":
-            dataset = BitcoinO(root=DATA_ROOT, pre_transform=pre_transform)
+            dataset = BitcoinO(root=DATA_PATH, pre_transform=pre_transform)
         case "Bitcoin_Alpha":
-            dataset = BitcoinA(root=DATA_ROOT, pre_transform=pre_transform)
+            dataset = BitcoinA(root=DATA_PATH, pre_transform=pre_transform)
         case "WikiRFA":
-            dataset = WikiRFA(root=DATA_ROOT, pre_transform=pre_transform)
+            dataset = WikiRFA(root=DATA_PATH, pre_transform=pre_transform)
         case "Slashdot":
-            dataset = Slashdot(root=DATA_ROOT, pre_transform=pre_transform)
+            dataset = Slashdot(root=DATA_PATH, pre_transform=pre_transform)
         case "Epinions":
-            dataset = Epinions(root=DATA_ROOT, pre_transform=pre_transform)
+            dataset = Epinions(root=DATA_PATH, pre_transform=pre_transform)
         case "Tribes":
-            dataset = Tribes(root=DATA_ROOT, pre_transform=pre_transform)
+            dataset = Tribes(root=DATA_PATH, pre_transform=pre_transform)
 
     data = dataset[0]
     if not is_undirected(data.edge_index):
@@ -116,10 +119,13 @@ def main(argv) -> None:
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
 
-    if os.path.exists("src/params.yaml"):
-        stream = open("src/params.yaml", 'r')
+    params_path = f"{CECKPOINT_PATH}params.yaml"
+    print(params_path)
+    if os.path.exists(params_path):
+        stream = open(params_path, 'r')
         spring_params = yaml.load(stream, Loader=yaml.FullLoader)
         spring_params = sim.SpringParams(**spring_params)
+        print("loaded spring params checkpoint")
     else:
         spring_params = sim.SpringParams(
             friend_distance=1.0,
@@ -147,22 +153,35 @@ def main(argv) -> None:
     #     output_dimension=AUXILLARY_DIM,
     #     factor= 0.01 / AUXILLARY_ITERATIONS)
     
-    auxillary_params = nn.init_mlp_params(
-        key=key_auxillary,
-        layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM,  AUXILLARY_DIM, AUXILLARY_DIM],
-        factor= 0.5 / AUXILLARY_ITERATIONS)
+    auxillary_checkpoint_path = f"{CECKPOINT_PATH}auxillary_params_{AUXILLARY_DIM}.yaml"
+    if os.path.exists(auxillary_checkpoint_path):
+        stream = open(auxillary_checkpoint_path, 'r')
+        auxillary_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
+        print("loaded auxillary params checkpoint")
+    else:
+        auxillary_params = nn.init_mlp_params(
+            key=key_auxillary,
+            layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM,  AUXILLARY_DIM, AUXILLARY_DIM],
+            factor= 0.5 / AUXILLARY_ITERATIONS)
 
     # auxillaries, sign (one hot), difference
     layer_0_size = (AUXILLARY_DIM * 2) + 3
     
     print(f"layer_0_size: {layer_0_size}")
-    force_params = nn.init_mlp_params(
-        key=key_force,
-        layer_dimensions = [layer_0_size, layer_0_size, layer_0_size, 64, 16, 8, 3],
-        factor= 0.5 / PER_EPOCH_SIM_ITERATIONS)
+    # params including embdding size
+    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}x{AUXILLARY_DIM}.yaml"
+    if os.path.exists(force_params_name):
+        stream = open(force_params_name, 'r')
+        force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
+        print("loaded force params checkpoint")
+    else:
+        force_params = nn.init_mlp_params(
+            key=key_force,
+            layer_dimensions = [layer_0_size, layer_0_size, layer_0_size, 64, 16, 8, 3],
+            factor= 0.5 / PER_EPOCH_SIM_ITERATIONS)
     
     # setup optax optimizers
-    if NN_FORCE:
+    if OPTIMIZE_FORCE:
         auxillary_optimizer = optax.adam(learning_rate=1e-5)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
 
@@ -197,7 +216,7 @@ def main(argv) -> None:
             auxillary_dim=AUXILLARY_DIM)
 
         # run simulation and compute loss, auxillaries and gradient
-        if NN_FORCE:
+        if OPTIMIZE_FORCE:
             (loss_value, (spring_state, signs_pred)), (nn_auxillary_grad, nn_force_grad) = value_grad_fn(
                 simulation_params_train, #0
                 spring_state, #1
@@ -235,7 +254,7 @@ def main(argv) -> None:
                 train_mask, #8
                 val_mask)
 
-        if NN_FORCE:
+        if OPTIMIZE_FORCE:
             nn_auxillary_update, auxillary_optimizier_state = auxillary_optimizer.update(
                 nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
         
@@ -298,28 +317,47 @@ def main(argv) -> None:
 
     # write spring params to file, the file is still a traced jax object
     if OPTIMIZE_SPRING_PARAMS:
-        with open("src/params.yaml", 'w') as file:
-            params_dict = {}
-            # get value from jax traced array
-            params_dict['friend_distance'] = spring_params.friend_distance.item()
-            params_dict['friend_stiffness'] = spring_params.friend_stiffness.item()
-            params_dict['neutral_distance'] = spring_params.neutral_distance.item()
-            params_dict['neutral_stiffness'] = spring_params.neutral_stiffness.item()
-            params_dict['enemy_distance'] = spring_params.enemy_distance.item()
-            params_dict['enemy_stiffness'] = spring_params.enemy_stiffness.item()
-            params_dict['distance_threshold'] = spring_params.distance_threshold.item()
+        # ask user if they want to save the parameters
+        questions = [
+            inquirer.List('save',
+                message="Do you want to save the spring parameters?",
+                choices=['Yes', 'No'],
+            ),
+        ]
+        answers = inquirer.prompt(questions)
+        if answers['save'] == 'Yes':
+            with open("src/params.yaml", 'w') as file:
+                params_dict = {}
+                # get value from jax traced array
+                params_dict['friend_distance'] = spring_params.friend_distance.item()
+                params_dict['friend_stiffness'] = spring_params.friend_stiffness.item()
+                params_dict['neutral_distance'] = spring_params.neutral_distance.item()
+                params_dict['neutral_stiffness'] = spring_params.neutral_stiffness.item()
+                params_dict['enemy_distance'] = spring_params.enemy_distance.item()
+                params_dict['enemy_stiffness'] = spring_params.enemy_stiffness.item()
+                params_dict['distance_threshold'] = spring_params.distance_threshold.item()
 
-            print(params_dict)
+                print(params_dict)
 
-            yaml.dump(params_dict, file)
+                yaml.dump(params_dict, file)
 
     # Store the trained parameters in a file
-    if NN_FORCE:
-        with open("src/auxillary_params.yaml", 'w') as file:
-            yaml.dump(auxillary_params, file)
+    if OPTIMIZE_FORCE:
+        # ask user if they want to save the parameters
+        questions = [
+            inquirer.List('save',
+                message="Do you want to save the neural network parameters?",
+                choices=['Yes', 'No'],
+            ),
+        ]
+        answers = inquirer.prompt(questions)
+        if answers['save'] == 'Yes':
+                
+            with open(auxillary_checkpoint_path, 'w') as file:
+                yaml.dump(auxillary_params, file)
 
-        with open("src/force_params.yaml", 'w') as file:
-            yaml.dump(force_params, file)
+            with open(force_params_name, 'w') as file:
+                yaml.dump(force_params, file)
 
     spring_state = sim.init_spring_state(
         rng=key_test,
