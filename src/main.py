@@ -35,7 +35,11 @@ def main(argv) -> None:
 
     assert not (NN_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
 
-    NUM_EPOCHS = 500
+    NUM_EPOCHS = 1000
+
+    if not NN_FORCE and not OPTIMIZE_SPRING_PARAMS:
+        NUM_EPOCHS = 1
+
     PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 10
@@ -124,7 +128,9 @@ def main(argv) -> None:
             enemy_distance=20.0,
             enemy_stiffness=1.0,
             distance_threshold=10.0)
-    
+
+    print(spring_params)
+
     simulation_params_train = sim.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS,
         dt=DT,
@@ -158,7 +164,8 @@ def main(argv) -> None:
     if NN_FORCE:
         auxillary_optimizer = optax.adam(learning_rate=1e-5)
         auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
-        force_optimizer = optax.adam(learning_rate=1e-3)
+
+        force_optimizer = optax.adam(learning_rate=1e-4)
         force_optimizier_state = force_optimizer.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
@@ -304,7 +311,15 @@ def main(argv) -> None:
             print(params_dict)
 
             yaml.dump(params_dict, file)
-            
+
+    # Store the trained parameters in a file
+    if NN_FORCE:
+        with open("src/auxillary_params.yaml", 'w') as file:
+            yaml.dump(auxillary_params, file)
+
+        with open("src/force_params.yaml", 'w') as file:
+            yaml.dump(force_params, file)
+
     spring_state = sim.init_spring_state(
         rng=key_test,
         n=data.num_nodes,
