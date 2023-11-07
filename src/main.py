@@ -35,10 +35,10 @@ def main(argv) -> None:
     AUXILLARY_DIM = 16
     OPTIMIZE_SPRING_PARAMS = False
     
-    NUM_EPOCHS = 400
-    NUM_EPOCHS_GRADIENT_ACCUMULATION = 2
+    NUM_EPOCHS = 50
+    NUM_EPOCHS_GRADIENT_ACCUMULATION = 1
 
-    PER_EPOCH_SIM_ITERATIONS = 400
+    PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 10
 
@@ -58,9 +58,9 @@ def main(argv) -> None:
         NUM_EPOCHS = 1
 
     # Deactivate preallocation of memory to avoid OOM errors
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
-    #os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".XX"
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
+    #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".90"
+    #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     dataset_names = ['Tribes', 'Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
@@ -187,18 +187,18 @@ def main(argv) -> None:
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adamaxw(learning_rate=1e-4)
+        auxillary_optimizer = optax.adamaxw(learning_rate=1e-5)
         auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-1)
+        force_optimizer = optax.adamaxw(learning_rate=1e-4)
         force_multi_step = optax.MultiSteps(force_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
 
     if OPTIMIZE_SPRING_PARAMS:
-        params_optimizer = optax.adamaxw(learning_rate=0.0)
+        params_optimizer = optax.adamaxw(learning_rate=0.1)
         params_multi_step = optax.MultiSteps(params_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
         params_optimizier_state = params_multi_step.init(spring_params)  
 

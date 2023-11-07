@@ -132,7 +132,7 @@ As of now it is clear that if an edge has a positive sign, this results in a for
 
 However there might be more complex dynamics at play which are not reflected in the social balance theory. Therefore we want to learn a function, which for a given edge, decides weather the two nodes should be pulled together, pushed apart or stay at a neutral distance.
 
-We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a graph transformer network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to decide on the forces acting on the nodes.
+We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to decide on the forces acting on the nodes.
 
 The message passing network can be seen as a function which for each node $v_i$ computes an auxillary information vector $m_i \in \mathbb{R}^d$. The auxillary information vector is computed by passing a message from each neighbor $v_j$ to the node $v_i$. The message is computed as follows:
 
@@ -152,6 +152,10 @@ $M(m_{j}^{(t)}) = M_k(M_{k-1}(...M_1(m_{j}^{(t)})...))$
 
 #### Force Computation Network
 
+After a fixed number of message passing iterations are completed and the auxillary vector for each node is given, network $T$ computes the forces acting on each node. The network $T$ takes the auxillary information vector $m_i$ of each node $v_i$, the sign of the edge $(v_i, v_j)$ and the positions of the nodes $X_i$ and $X_j$ as input and computes the forces $f_{i,j}$ and $f_{j,i}$ acting on the nodes $v_i$ and $v_j$ respectively. The network $T$ can be described as follows:
+
+$T(m_i, m_j, \sigma_{i,j}, X_i, X_j) = (f_{i,j}, f_{j,i})$
+
 A single prediction then looks as follows:
 
 1. Compute the auxillary information vector for each node using a fixed number of iterations of the message passing network $M$.
@@ -163,6 +167,9 @@ The network can be trained as follows:
 
 We predict the node embeddings using the above method, we then compute a loss and propagate thrue the entire network to update the weights of the message passing network $M$ and the graph transformer network $T$.
 
+## Training
+
+The training process of the neural networks is challenging as a single simulation run takes up to a minute on my machine on all of the datasets. Therefore we use the Tribes dataset as a pretraining and then finetune the network on the other datasets. This saves a lot of time as the Tribes dataset is very small and can be simulated very quickly.
 
 ## Results
 
@@ -170,7 +177,7 @@ We predict the node embeddings using the above method, we then compute a loss an
 
 ![Results](results.png)
 
-### Energy minima and score corrlations
+### Energy minima and score correlations
 
 Generally a decrease in energy in the system correlates with a better performance of the method. However the effect is much more pronounced in the beginning of the method.
 

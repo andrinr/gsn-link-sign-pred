@@ -4,7 +4,7 @@ from functools import partial
 import simulation as sim
 import neural as nn
 
-@partial(jax.jit)
+# @partial(jax.jit)
 def update_auxillary_state(
     spring_state : sim.SpringState, 
     auxillaries_nn_params : dict[jnp.ndarray],

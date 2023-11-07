@@ -11,8 +11,8 @@ def init_mlp_params(
     params = {}
 
     for i, (key, (input_dimension, output_dimension)) in enumerate(zip(keys, zip(layer_dimensions[:-1], layer_dimensions[1:]))):
-        params[f'W{i}'] = jax.random.normal(key=key, shape=(input_dimension, output_dimension)) * factor
-        params[f'b{i}'] = jnp.zeros(output_dimension)
+        params[f'W{i}'] = jax.random.normal(key=key, shape=(input_dimension, output_dimension), dtype=jnp.float16) * factor
+        params[f'b{i}'] = jnp.zeros(output_dimension, dtype=jnp.float16)
 
     return params
 

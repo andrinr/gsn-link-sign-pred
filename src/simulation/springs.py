@@ -20,7 +20,7 @@ def init_spring_state(
     edge_force = jnp.zeros((m, embedding_dim))
     return sim.SpringState(position, velocity, auxillary, edge_force)
 
-@partial(jax.jit, static_argnames=["nn_force"])
+# @partial(jax.jit, static_argnames=["nn_force"])
 def force_decision(
         spring_state : sim.SpringState,
         nn_force : bool,
@@ -46,7 +46,7 @@ def force_decision(
         force_decision = decision
     )
 
-@partial(jax.jit, static_argnames=[])
+# @partial(jax.jit, static_argnames=[])
 def compute_acceleration(
     params : sim.SpringParams,
     state : sim.SpringState,
@@ -71,7 +71,7 @@ def compute_acceleration(
     
     return acceleration * spring_vector_norm
 
-@partial(jax.jit, static_argnames=["simulation_params"])
+# @partial(jax.jit, static_argnames=["simulation_params"])
 def update_spring_state(
     simulation_params : sim.SimulationParams,
     spring_params : sim.SpringParams,

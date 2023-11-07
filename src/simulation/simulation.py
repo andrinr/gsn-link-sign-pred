@@ -5,7 +5,7 @@ from functools import partial
 import simulation as sim
 import optax
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary"])
+# @partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary"])
 def simulate(
     simulation_params : sim.SimulationParams,
     spring_state : sim.SpringState,
