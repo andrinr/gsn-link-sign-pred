@@ -32,27 +32,30 @@ def main(argv) -> None:
     NN_FORCE = True
     OPTIMIZE_FORCE = True
     EMBEDDING_DIM = 64
-    AUXILLARY_DIM = 64
+    AUXILLARY_DIM = 16
     OPTIMIZE_SPRING_PARAMS = False
+    
+    NUM_EPOCHS = 400
+    NUM_EPOCHS_GRADIENT_ACCUMULATION = 2
 
-    assert not (OPTIMIZE_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
-    assert not (not NN_FORCE and OPTIMIZE_FORCE), "Cannot optimize force without using NN force"
-    NUM_EPOCHS = 1000
-
-    if not OPTIMIZE_FORCE and not OPTIMIZE_SPRING_PARAMS:
-        NUM_EPOCHS = 1
-
-    PER_EPOCH_SIM_ITERATIONS = 200
+    PER_EPOCH_SIM_ITERATIONS = 400
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 10
-    FORCE_INTERVAL = 20
+
+    MIN = -10.0
+    MAX = 10.0
 
     DT = 0.01
-    DAMPING = 0.05
+    DAMPING = 0.3
 
     DATA_PATH = 'src/data/'
     CECKPOINT_PATH = 'checkpoints/'
 
+    assert not (OPTIMIZE_FORCE and OPTIMIZE_SPRING_PARAMS), "Cannot optimize spring params and use NN force at the same time"
+    assert not (not NN_FORCE and OPTIMIZE_FORCE), "Cannot optimize force without using NN force"
+
+    if not OPTIMIZE_FORCE and not OPTIMIZE_SPRING_PARAMS:
+        NUM_EPOCHS = 1
 
     # Deactivate preallocation of memory to avoid OOM errors
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -119,7 +122,7 @@ def main(argv) -> None:
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
 
-    params_path = f"{CECKPOINT_PATH}params.yaml"
+    params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     print(params_path)
     if os.path.exists(params_path):
         stream = open(params_path, 'r')
@@ -128,13 +131,13 @@ def main(argv) -> None:
         print("loaded spring params checkpoint")
     else:
         spring_params = sim.SpringParams(
-            friend_distance=1.0,
-            friend_stiffness=1.0,
+            friend_distance=5.0,
+            friend_stiffness=0.3,
             neutral_distance=10.0,
-            neutral_stiffness=0.5,
+            neutral_stiffness=0.3,
             enemy_distance=20.0,
-            enemy_stiffness=1.0,
-            distance_threshold=10.0)
+            enemy_stiffness=0.3,
+            distance_threshold=4.0)
         print("no spring params checkpoint found, using default params")
 
     simulation_params_train = sim.SimulationParams(
@@ -161,7 +164,7 @@ def main(argv) -> None:
     else:
         auxillary_params = nn.init_mlp_params(
             key=key_auxillary,
-            layer_dimensions = [AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM * 2 + 3, AUXILLARY_DIM,  AUXILLARY_DIM, AUXILLARY_DIM],
+            layer_dimensions = [AUXILLARY_DIM * 2 + 3,  AUXILLARY_DIM, AUXILLARY_DIM],
             factor= 0.5 / AUXILLARY_ITERATIONS)
         print("no auxillary params checkpoint found, using default params")
 
@@ -178,23 +181,26 @@ def main(argv) -> None:
     else:
         force_params = nn.init_mlp_params(
             key=key_force,
-            layer_dimensions = [layer_0_size, layer_0_size, layer_0_size, 64, 16, 8, 3],
+            layer_dimensions = [layer_0_size, layer_0_size, 64, 16, 3],
             factor= 0.5 / PER_EPOCH_SIM_ITERATIONS)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
         auxillary_optimizer = optax.adamaxw(learning_rate=1e-4)
-        auxillary_optimizier_state = auxillary_optimizer.init(auxillary_params)
+        auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+        auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
         force_optimizer = optax.adamaxw(learning_rate=1e-1)
-        force_optimizier_state = force_optimizer.init(force_params)
+        force_multi_step = optax.MultiSteps(force_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+        force_optimizier_state = force_multi_step.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
 
     if OPTIMIZE_SPRING_PARAMS:
-        params_optimizer = optax.adam(learning_rate=0.1)
-        params_optimizier_state = params_optimizer.init(spring_params)  
+        params_optimizer = optax.adamaxw(learning_rate=0.0)
+        params_multi_step = optax.MultiSteps(params_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+        params_optimizier_state = params_multi_step.init(spring_params)  
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=2, has_aux=True)
 
@@ -203,15 +209,23 @@ def main(argv) -> None:
     f1_binaries = []
     f1_micros = []
     f1_macros = []
+
+    loss_hist = []
+    metrics_hist = []
+    loss_mov_avg = 0.0
+    if OPTIMIZE_SPRING_PARAMS:
+        spring_hist = []    
+
+    epochs = range(NUM_EPOCHS)
     
     epochs_keys = random.split(key_training, NUM_EPOCHS)
-    for epoch in range(NUM_EPOCHS):
+    for epoch in epochs:
         # initialize spring state
         # take new key each time to avoid overfitting to specific initial conditions
         spring_state = sim.init_spring_state(
             rng=epochs_keys[epoch],
-            min=-spring_params.distance_threshold,
-            max=spring_params.distance_threshold,
+            min=MIN,
+            max=MAX,
             n=data.num_nodes,
             m=data.num_edges,
             embedding_dim=EMBEDDING_DIM,
@@ -255,37 +269,26 @@ def main(argv) -> None:
                 signs, #7
                 train_mask, #8
                 val_mask)
+            
 
         if OPTIMIZE_FORCE:
-            nn_auxillary_update, auxillary_optimizier_state = auxillary_optimizer.update(
+            nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
                 nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
         
             auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
         
-            nn_force_update, force_optimizier_state = force_optimizer.update(
+            nn_force_update, force_optimizier_state = force_multi_step.update(
                 nn_force_grad, force_optimizier_state, force_params)
             
             force_params = optax.apply_updates(force_params, nn_force_update)
 
         if OPTIMIZE_SPRING_PARAMS:
-            params_update, params_optimizier_state = params_optimizer.update(
+            params_update, params_optimizier_state = params_multi_step.update(
                 params_grad, params_optimizier_state, spring_params)
             
             spring_params = optax.apply_updates(spring_params, params_update)
 
-            print(signs)
-            print(spring_state.force_decision)
-            print(signs_pred)
-            print(spring_params)
-            print(params_grad)
-
         signs_ = signs * 0.5 + 0.5
-
-        print(f"epoch: {epoch}")
-        print(f"predictions: {signs_pred}")
-        print(f"loss: {loss_value}")
-        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
-
         metrics = sim.evaluate(
             spring_state,
             edge_index,
@@ -293,12 +296,24 @@ def main(argv) -> None:
             train_mask,
             val_mask)
         
-        print(metrics)
-        
-        # aucs.append(metrics.auc)
-        # f1_binaries.append(metrics.f1_binary)
-        # f1_micros.append(metrics.f1_micro)
-        # f1_macros.append(metrics.f1_macro)
+        loss_mov_avg += loss_value
+
+        if epoch % NUM_EPOCHS_GRADIENT_ACCUMULATION == 0:
+            loss_mov_avg = loss_mov_avg / NUM_EPOCHS_GRADIENT_ACCUMULATION
+            print(metrics)
+            print(f"epoch: {epoch}")
+            print(f"predictions: {signs_pred}")
+            print(f"loss: {loss_value}")
+            print(f"loss_mov_avg: {loss_mov_avg}")
+            print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
+
+            loss_hist.append(loss_mov_avg)
+            metrics_hist.append(metrics)
+
+            loss_mov_avg = 0.0
+
+            if OPTIMIZE_SPRING_PARAMS:
+                spring_hist.append(spring_params)
 
     # # plot the embeddings
     # plt.scatter(spring_state.position[:, 0], spring_state.position[:, 1])
@@ -316,6 +331,34 @@ def main(argv) -> None:
     # plt.legend()
 
     # plt.show()
+
+    # plot loss over time
+    spaced_epochs = range(0, NUM_EPOCHS, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+    plt.plot(spaced_epochs, loss_hist)
+    plt.title('Loss')
+    plt.show()
+
+    # plot metrics over time
+    plt.plot(spaced_epochs, [metrics.auc for metrics in metrics_hist])
+    plt.plot(spaced_epochs, [metrics.f1_binary for metrics in metrics_hist])
+    plt.plot(spaced_epochs, [metrics.f1_micro for metrics in metrics_hist])
+    plt.plot(spaced_epochs, [metrics.f1_macro for metrics in metrics_hist])
+    plt.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
+    plt.title('Measures')
+    plt.show()
+
+    # plot spring params over time
+    if OPTIMIZE_SPRING_PARAMS:
+        plt.plot(spaced_epochs, [spring_params.friend_distance for spring_params in spring_hist])
+        plt.plot(spaced_epochs, [spring_params.friend_stiffness for spring_params in spring_hist])
+        plt.plot(spaced_epochs, [spring_params.neutral_distance for spring_params in spring_hist])
+        plt.plot(spaced_epochs, [spring_params.neutral_stiffness for spring_params in spring_hist])
+        plt.plot(spaced_epochs, [spring_params.enemy_distance for spring_params in spring_hist])
+        plt.plot(spaced_epochs, [spring_params.enemy_stiffness for spring_params in spring_hist])
+        plt.plot(spaced_epochs, [spring_params.distance_threshold for spring_params in spring_hist])
+        plt.legend(['friend_distance', 'friend_stiffness', 'neutral_distance', 'neutral_stiffness', 'enemy_distance', 'enemy_stiffness', 'distance_threshold'])
+        plt.title('Spring params')
+        plt.show()
 
     # write spring params to file, the file is still a traced jax object
     if OPTIMIZE_SPRING_PARAMS:
@@ -365,8 +408,8 @@ def main(argv) -> None:
         rng=key_test,
         n=data.num_nodes,
         m=data.num_edges,
-        min=-spring_params.distance_threshold,
-        max=spring_params.distance_threshold,
+        min=MIN,
+        max=MAX,
         embedding_dim=EMBEDDING_DIM,
         auxillary_dim=AUXILLARY_DIM
     )

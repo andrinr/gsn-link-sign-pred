@@ -53,9 +53,9 @@ We compute a node embedding $x_u \in \mathbb{R}^d$ for each node $u \in V$. The 
 
 The intuition behind this is, that nodes which are connected by a positive edge should be close to each other, while nodes which are connected by a negative edge should be far away from each other.
 
-We can see simple result of this in the following figure:
+The plotted node embeddiings for the tribes dataset are shown below:
 
-![Results](tribes_embeddings.png)
+![Results](img/tribes_embeddings.png)
 
 You can observe that all the tribes are grouped in 3 clusters. The tribes in the same cluster are connected only connected by positive edges, while the tribes in different clusters are connected by negative edges. The tribes dataset is a very simple dataset, and can be solved with only 2 dimensional node embeddings with a 100% accuracy using a 80% train and 20% test split. However for more complex dataset the number of dimensions needs to be increased to encode more complex relationships.
 
@@ -103,13 +103,7 @@ $n(u, v) = \begin{cases}
 \frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1
 \end{cases}$
 
-This loss function is differentiable and can be used to optimize any parameter of the simulation.
-
-In an initial version I simply optimized for the parameters: 
-
-$d_{th}$, $l^{+}$, $l^{0}$, $l^{-}$, $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$
-
-Where I have obtained the following values:
+We used JAX for every computation in the function, this allows use to take the simulation derivative with respect any specified parameter. This yields a gradient which can be used to optimize the parameters of the simulation. Initially the loss was applied to the spring parameters $d_{th}$, $l^{+}$, $l^{0}$, $l^{-}$, $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$ with the following results:
 
 | Parameter | Value |
 | --- | --- |
@@ -121,7 +115,15 @@ Where I have obtained the following values:
 | $\alpha^{0}$ | 1.1881768703460693 |
 | $\alpha^{-}$ | 14.80991268157959 |
 
-Which significantly improved the results and works a lot faster than the blackbock optimization method whic I have used before.
+We can see how the network learns, with a 16 dimensional embedding on the Bitcoin Alpha dataset:
+
+![Results](img/loss_spring_params_16.png)
+
+The main reason why the loss and the measures are so 'jagged' is that the initial condiations of the node positions are randomized for each epoch. 
+
+![Results](img/measures_spring_params_16.png)
+
+![Results](img/spring_params_16.png)
 
 
 ### Message Passing Network
@@ -131,6 +133,24 @@ As of now it is clear that if an edge has a positive sign, this results in a for
 However there might be more complex dynamics at play which are not reflected in the social balance theory. Therefore we want to learn a function, which for a given edge, decides weather the two nodes should be pulled together, pushed apart or stay at a neutral distance.
 
 We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a graph transformer network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to decide on the forces acting on the nodes.
+
+The message passing network can be seen as a function which for each node $v_i$ computes an auxillary information vector $m_i \in \mathbb{R}^d$. The auxillary information vector is computed by passing a message from each neighbor $v_j$ to the node $v_i$. The message is computed as follows:
+
+$m_{i}^{(t+1)} = \sum_{j} M(m_{j}^{(t)})$
+
+where $N(i)$ is the set of neighbors of node $v_i$ and $\sigma_{i,j}$ is the sign of the edge $(v_i, v_j)$. The function $M$ is a fully connected neural network with $k$ hidden layers and $d$ hidden units per layer. The function $M$ is shared across all nodes.
+
+Each layer can be described as a function $M_i$ which works as follows:
+
+$M_i(m_{j}^{(t)}) = activation(W_{i} \cdot m_{j}^{(t)} + b_{i})$
+
+where $W_{i} \in \mathbb{R}^{d \times d}$ and $b_{i} \in \mathbb{R}^{d}$ are the weights and biases of the $i$-th layer respectively and $activation$ is a non-linear activation function.
+
+The full message passing network $M$ can be described as follows:
+
+$M(m_{j}^{(t)}) = M_k(M_{k-1}(...M_1(m_{j}^{(t)})...))$
+
+#### Force Computation Network
 
 A single prediction then looks as follows:
 
