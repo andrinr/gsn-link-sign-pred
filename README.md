@@ -43,7 +43,9 @@ run ```pytest``` in the ```src``` folder.
 
 ### Task Definition
 
-We are given a signed network $G = (V, E, \sigma)$, where $V$ is the set of nodes, $E$ is the set of edges and $\sigma: E \rightarrow \{-1, 1\}$ is the sign function. The task is to predict the sign of a given edge $(u, v) \in E$.
+We are given a signed network $G = (V, E, \sigma)$, where $V$ is the set of nodes and $E$ is the set of edges. Finally for each edge $(i, j)$ there is a sign which denotes a positive or a negative relationship between the two nodes. Formally we introduce a sign function $\sigma: V \times V \rightarrow \{-1, 0, 1\}$, which maps an edge $(i, j) \in E$ to a sign $\sigma(i, j) \in \{-1, 0, 1\}$.
+
+The task is to predict the sign of an edge $(u, v) \in E_{test}$, where $E_{test} \subset E$ is a set of edges which are not known to the algorithm.
 
 To do so we randomly sample a set of edges $E_{test} \subset E$ and set the sign to a neutral value 0. We want to find a function $f: V \times V \rightarrow \mathbb{R}$, which maps an edge $(u, v) \in E_{test}$ to a sign $\sigma(u, v) \in \{-1, 1\}$.
 
@@ -61,23 +63,39 @@ You can observe that all the tribes are grouped in 3 clusters. The tribes in the
 
 ### Spring Network Simulation
 
-For all positive, neutral and negative edges fixed resting lengths $l^{+}$, $l^{0}$ and $l^{-}$ are defined. The actual length of an edge is denoted as $L_{l,k} = \|{X_l - X_k}\|_2$. Furthermore each edge type has a stiffness $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$.
+We denote $x_i$ as the position of a node $i$. In this context the term position and embedding are used interchangably, as in the end of the algorithm, the position is direclty used as an embedding. Furthermore we use $N_i$ to denote the set of neighbors of node $i$ and $N^{+}_i$ to denote the set of neighbors of node $i$ which are connected by a positive edge. The sets $N^{-}_i$ and $N^{0}_i$ are defined analogously. Furthermore we store a velocity $v_i$ for each node $i$.
 
-The force acting on a node $(v_i)$ from the edge $(v_i, v_j)$ is the partial derivative of the energy with respect to the node position $\frac{\partial E(X_1, X_2) }{\partial X_1} $. We denote the force coming from negative, neutral and positive nodes as $f^{-}_{i,j}$, $f^{0}_{i,j}$ and $f^{-}_{i,j}$. The partial differential equations evaluate to equations:
+For all positive, neutral and negative edges fixed resting lengths $l^{+}$, $l^{0}$ and $l^{-}$ are defined. Furthermore each edge type has a stiffness $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$.
 
-$$f^{-}_{i,j} = \alpha^{-} \times min(l^{-} - L_i, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+The force acting on a node $(v_i)$ from the edge $(v_i, v_j)$ is the partial derivative of the energy with respect to the node position $\frac{\partial E(x_i, x_j) }{\partial x_i} $. We denote the force coming from negative, neutral and positive nodes as $f^{-}_{i,j}$, $f^{0}_{i,j}$ and $f^{-}_{i,j}$. The partial differential equations evaluate to equations:
 
-$$f^{0}_{i,j} = \alpha^{0} \times (l^{0} - L_i, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+$$f^{-}_{i,j} = \alpha^{-} \cdot min(l^{-} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
 
-$$f^{+}_{i,j} = \alpha^{+} \times max(l^{+} - L_i, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+$$f^{0}_{i,j} = \alpha^{0} \cdot (l^{0} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
 
-where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$, $l^{0}$ and $l^{+}$ are the thresholds for the negative, neutral and positive force respectively. $\alpha^{-}$, $\alpha^{0}$ and $\alpha^{+}$ are the scaling factors for the negative, neutral and positive force respectively.
+$$f^{+}_{i,j} = \alpha^{+} \cdot max(l^{+} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+
+Therefore the total force acting on a node $v_i$ is:
+
+$$f_i = \sum_{j \in N^-(i)} f^{-}_{i,j} + \sum_{j \in N^0(i)} f^{0}_{i,j} + \sum_{j \in N^+(i)} f^{+}_{i,j}$$
+
+The total force acting on a node $v_i$ is then used to update the position of the node $v_i$ using the kick drift kick method. We use the notation $x_i(t)$ to denote the position of node $v_i$ at time $t$ and $v_i(t)$ to denote the velocity of node $v_i$ at time $t$. To avoid divergence of the simulation, we use a viscous damping factor $d$.
+
+$$v_i(t + \frac{h}{2}) = v_i(t) + \frac{h}{2} \cdot f_i(t) - d \cdot \|{v_i(t)}\|_2$$
+
+$$x_i(t + h) = x_i(t) + h \cdot v_i(t + \frac{h}{2})$$
+
+$$v_i(t + h) = v_i(t + \frac{h}{2}) + \frac{h}{2} \cdot f_i(t + h) - d \cdot \|{v_i(t + \frac{h}{2})}\|_2$$
+
+where $h$ is the size of a timestep.
+
+The simulation is run for a fixed number of iterations. After the simulation has converged, the node positions are used as node embeddings. To predict a sign of an edge $(u, v) \in E_{test}$, we simply take the distance between the two embeddings $x_u$ and $x_v$ and compare it to a threshold. If the distance is below the threshold, we predict a positive sign, otherwise we predict a negative sign.
+
+Now how do we find the optimal parameters for the simulation? Either we use educated guesses, but this is not very efficient. Since we can fully differentiate the simulation, we can use gradient descent to optimize the parameters of the simulation. 
 
 ### Differentiable Simulation for Parameter Optimization
 
-I have rewritten the entire code and made it JAX comptabile. 
-
-Now the simulation is differentiable and for each simulation run we evaulate a loss function which correlates to the common measures (auc, f1scores). However the loss function must be differentiated, therefore I slightly changed the scoring function (which can be used as an inverse loss function). 
+Using automatic differentiation we are able to compute the derivative of the simulation with respect any input parameter. This allows us to optimize the parameters of the simulation using gradient descent. We use the following loss function to optimize the parameters of the simulation:
 
 For a predefined distance threshold $d_{th}$, the predicted sign of an edge $(u, v)$ is computed using a sigmoid function:
 
@@ -85,11 +103,11 @@ $$\sigma^{\prime}(u, v) = \frac{1}{1 + e^{ \|{x_u - x_v}\|_2 - d_{th}}}$$
 
 We then compute the loss function as follows:
 
-$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot n(u, v)$$
+$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot \phi(u, v)$$
 
 where $n$ is a normalization function which for a positive edge returns one divided by the number of positive edges, for a neutral edge one divided by the number of neutral edges and for a negative edge one divided by the number of negative edges.
 
-$$n(u, v) = \begin{cases} 
+$$\phi(u, v) = \begin{cases} 
 \frac{1}{|E^{+}|} & \text{if } \sigma(u, v) = 1 \\ 
 \frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1 
 \end{cases}$$
@@ -116,6 +134,13 @@ The main reason why the loss and the measures are so 'jagged' is that the initia
 ![Results](img/measures_spring_params_16.png)
 
 ![Results](img/spring_params_16.png)
+
+### Message Passing Neural Networks (MPNN)
+
+Let $N_{u}$ denote the neighborhood of a node $u$. We define a MPNN layer as:
+
+$$h
+
 
 
 ### Neural Network for local pattern recognition
