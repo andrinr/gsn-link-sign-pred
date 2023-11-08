@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax
 from typing import NamedTuple, Optional
 from functools import partial
-from neural import mlp, mlp_softmax
+import neural as nn
 import simulation as sim
 
 EPSILON = 1e-6
@@ -38,7 +38,7 @@ def force_decision(
     auxillaries_i = spring_state.auxillary[edge_index[0]]
     auxillaries_j = spring_state.auxillary[edge_index[1]]
 
-    decision = mlp_softmax(
+    decision = nn.mlp_forces(
         jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot], axis=-1),
         nn_force_params)
 

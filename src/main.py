@@ -166,12 +166,6 @@ def main(argv) -> None:
 
     # Create initial values for neural network parameters
     key_auxillary, key_force, key_training, key_test = random.split(random.PRNGKey(0), 4)
-
-    # auxillary_params = nn.init_attention_params(
-    #     key=key_auxillary,
-    #     input_dimension=AUXILLARY_DIM + 3,
-    #     output_dimension=AUXILLARY_DIM,
-    #     factor= 0.01 / AUXILLARY_ITERATIONS)
     
     auxillary_checkpoint_path = f"{CECKPOINT_PATH}auxillary_params_{AUXILLARY_DIM}.yaml"
     if os.path.exists(auxillary_checkpoint_path):
@@ -180,10 +174,10 @@ def main(argv) -> None:
         print("loaded auxillary params checkpoint")
 
     else:
-        auxillary_params = nn.init_mlp_params(
+        auxillary_params = nn.init_gnn_params(
             key=key_auxillary,
-            layer_dimensions = [AUXILLARY_DIM * 2 + 3,  AUXILLARY_DIM, AUXILLARY_DIM],
-            factor= 0.5 / AUXILLARY_ITERATIONS)
+            factor=0.1,
+            auxilliary_dimension=AUXILLARY_DIM)
         print("no auxillary params checkpoint found, using default params")
 
     # auxillaries, sign (one hot), difference
@@ -197,10 +191,10 @@ def main(argv) -> None:
         force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
         print("loaded force params checkpoint")
     else:
-        force_params = nn.init_mlp_params(
+        force_params = nn.init_force_params(
             key=key_force,
-            layer_dimensions = [layer_0_size, layer_0_size, 64, 16, 3],
-            factor= 0.5 / PER_EPOCH_SIM_ITERATIONS)
+            auxillary_dim = AUXILLARY_DIM,
+            factor= 0.1)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers

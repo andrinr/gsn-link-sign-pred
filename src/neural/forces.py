@@ -1,37 +1,44 @@
 import jax
 import jax.numpy as jnp
 
-def init_attention_params(
-  key : jax.random.PRNGKey,
-  input_dimension : int,
-  output_dimension : int) -> dict[jnp.ndarray]:
+def init_force_params(
+    key : jax.random.PRNGKey,
+    factor : float,    
+    auxillary_dim : int) -> dict[jnp.ndarray]:
 
-  key0, key1, key2 = jax.random.split(key, num=3)
+    keys = jax.random.split(key, num=2)
 
-  return {
-    'Q': jax.random.normal(shape=(input_dimension, output_dimension), key=key0),
-    'K': jax.random.normal(shape=(input_dimension, output_dimension), key=key1),
-    'V':jax.random.normal(shape=(input_dimension, output_dimension), key=key2),
-  }
+    params = {}
+
+    # layer 0
+    params[f'W{0}'] = jax.random.normal(
+        key=keys[0], shape=(auxillary_dim * 2 + 3, auxillary_dim * 2 + 3), dtype=jnp.float32) * factor
+    params[f'b{0}'] = jnp.zeros(auxillary_dim * 2 + 3, dtype=jnp.float32)
+
+    # layer 1
+    params[f'W{1}'] = jax.random.normal(
+        key=keys[1], shape=(auxillary_dim * 2 + 3, auxillary_dim), dtype=jnp.float32) * factor
+    params[f'b{1}'] = jnp.zeros(auxillary_dim, dtype=jnp.float32)
+
+    # layer 2
+    params[f'W{2}'] = jax.random.normal(
+        key=keys[1], shape=(auxillary_dim, 3), dtype=jnp.float32) * factor
+    params[f'b{2}'] = jnp.zeros(3, dtype=jnp.float32)
+
+    return params
 
 @jax.jit
-def compute_force(
-    position_i : jnp.ndarray,
-    position_j : jnp.ndarray,
-    auxillaries_i : jnp.ndarray,
-    auxillaries_j : jnp.ndarray,
-    sign : jnp.ndarray,
+def mlp_forces(
+    x : jnp.ndarray,
     params : dict[jnp.ndarray]) -> jnp.ndarray:
-  
-  vector = position_j - position_i
-  
-  other_node = jnp.concatenate([position_i, auxillaries_i, sign], axis=-1)
-  self_node = jnp.concatenate([position_j, auxillaries_j], axis=-1)
 
-  q = jnp.dot(self_node, params['Q'])
-  k = jnp.dot(other_node, params['K'])
-  v = jnp.dot(other_node, params['V'])
+    x = jnp.dot(x, params[f'W{0}']) + params[f'b{0}']
+    x = jax.nn.relu(x)
 
-  score_softmax = jnp.dot(q, k.T) / jnp.sqrt(params['Q'].shape[1])
+    x = jnp.dot(x, params[f'W{1}']) + params[f'b{1}']
+    x = jax.nn.relu(x)
 
-  return score_softmax * v
+    x = jnp.dot(x, params[f'W{2}']) + params[f'b{2}']
+    x = jax.nn.softmax(x)
+
+   
