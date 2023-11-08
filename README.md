@@ -81,11 +81,11 @@ Now the simulation is differentiable and for each simulation run we evaulate a l
 
 For a predefined distance threshold $d_{th}$, the predicted sign of an edge $(u, v)$ is computed using a sigmoid function:
 
-$$\sigma^{'}(u, v) = \frac{1}{1 + e^{ \cdot \||x_u - x_v||_2 - d_{th}}}$$
+$$\sigma^{\prime}(u, v) = \frac{1}{1 + e^{ \cdot \||x_u - x_v||_2 - d_{th}}}$$
 
 We then compute the loss function as follows:
 
-$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{'}(u, v) - \sigma(u, v))^2 \cdot n(u, v)$$
+$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot n(u, v)$$
 
 where $n$ is a normalization function which for a positive edge returns one divided by the number of positive edges, for a neutral edge one divided by the number of neutral edges and for a negative edge one divided by the number of negative edges.
 
@@ -128,23 +128,23 @@ We train two neural networks, a message passing network $M$ which generated an a
 
 The message passing network can be seen as a function which for each node $v_i$ computes an auxillary information vector $m_i \in \mathbb{R}^d$. The auxillary information vector is computed by passing a message from each neighbor $v_j$ to the node $v_i$. The message is computed as follows:
 
-$m_{i}^{(t+1)} = \sum_{j} M(m_{j}^{(t)})$
+$$m_{i}^{(t+1)} = \sum_{j} M(m_{j}^{(t)})$$
 
 where $N(i)$ is the set of neighbors of node $v_i$ and $\sigma_{i,j}$ is the sign of the edge $(v_i, v_j)$. The function $M$ is a fully connected neural network with $k$ hidden layers and $d$ hidden units per layer. The function $M$ is shared across all nodes.
 
 Each layer can be described as a function $M_i$ which works as follows:
 
-$M_i(m_{j}^{(t)}) = activation(W_{i} \cdot m_{j}^{(t)} + b_{i})$
+$$M_i(m_{j}^{(t)}) = activation(W_{i} \cdot m_{j}^{(t)} + b_{i})$$
 
 where $W_{i} \in \mathbb{R}^{d \times d}$ and $b_{i} \in \mathbb{R}^{d}$ are the weights and biases of the $i$-th layer respectively and $activation$ is a non-linear activation function.
 
 The full message passing network $M$ can be described as follows:
 
-$M(m_{j}^{(t)}) = M_k(M_{k-1}(...M_1(m_{j}^{(t)})...))$
+$$M(m_{j}^{(t)}) = M_k(M_{k-1}(...M_1(m_{j}^{(t)})...))$$
 
 After a fixed number of message passing iterations are completed and the auxillary vector for each node is given, network $T$ computes the forces acting on each node. The network $T$ takes the auxillary information vector $m_i$ of each node $v_i$, the sign of the edge $(v_i, v_j)$ and the positions of the nodes $X_i$ and $X_j$ as input and computes the forces $f_{i,j}$ and $f_{j,i}$ acting on the nodes $v_i$ and $v_j$ respectively. The network $T$ can be described as follows:
 
-$T(m_i, m_j, \sigma_{i,j}, X_i, X_j) = (f_{i,j}, f_{j,i})$
+$$T(m_i, m_j, \sigma_{i,j}, X_i, X_j) = (f_{i,j}, f_{j,i})$$
 
 A single prediction then looks as follows:
 
