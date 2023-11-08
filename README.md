@@ -91,7 +91,7 @@ where $h$ is the size of a timestep.
 
 The simulation is run for a fixed number of iterations. After the simulation has converged, the node positions are used as node embeddings. To predict a sign of an edge $(u, v) \in E_{test}$, we simply take the distance between the two embeddings $x_u$ and $x_v$ and compare it to a threshold. If the distance is below the threshold, we predict a positive sign, otherwise we predict a negative sign.
 
-Now how do we find the optimal parameters for the simulation? Either we use educated guesses, but this is not very efficient. Since we can fully differentiate the simulation, we can use gradient descent to optimize the parameters of the simulation. 
+Now how do we find the optimal parameters for the simulation? Either we use educated guesses, but this is not very efficient. 
 
 ### Differentiable Simulation for Parameter Optimization
 
@@ -103,11 +103,11 @@ $$\sigma^{\prime}(u, v) = \frac{1}{1 + e^{ \|{x_u - x_v}\|_2 - d_{th}}}$$
 
 We then compute the loss function as follows:
 
-$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot \phi(u, v)$$
+$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot \psi(u, v)$$
 
 where $n$ is a normalization function which for a positive edge returns one divided by the number of positive edges, for a neutral edge one divided by the number of neutral edges and for a negative edge one divided by the number of negative edges.
 
-$$\phi(u, v) = \begin{cases} 
+$$\psi(u, v) = \begin{cases} 
 \frac{1}{|E^{+}|} & \text{if } \sigma(u, v) = 1 \\ 
 \frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1 
 \end{cases}$$
@@ -135,11 +135,21 @@ The main reason why the loss and the measures are so 'jagged' is that the initia
 
 ![Results](img/spring_params_16.png)
 
-### Message Passing Neural Networks (MPNN)
+### Message Passing Neural Network for local pattern recognition
 
-Let $N_{u}$ denote the neighborhood of a node $u$. We define a MPNN layer as:
+As of now we have hardcoded the forces acting on a node as:
 
-$$h
+$$f_i = \sum_{j \in N^-(i)} f^{-}_{i,j} + \sum_{j \in N^0(i)} f^{0}_{i,j} + \sum_{j \in N^+(i)} f^{+}_{i,j}$$ 
+
+The above assumption is based on the social balance theory and does apply to many dynamics in networks. (Add some sort of evidence?)
+However there might be more complex patterns in the network, which we are not able to capture with the above method. Therefore we are looking for a function $S$, which given an edge $(u, v)$ and two auxillary information vectors $m_u$ and $m_v$ for the nodes $u$ and $v$ respectively, computes values $s^{-}$, $s^{0}$ and $s^{+}$ which denote the strength of the positive and negative relationship between the two nodes. We then compute the forces acting on the nodes as follows:
+
+$$f_i = \sum_{j \in N} f^{-}_{i,j} \cdot s^{-} + f^{+}_{i,j} \cdot s^{+} + f^{0}_{i,j} \cdot s^{0}$$
+
+The auxillary vectors $m_i \in \mathbb{R}^d$ are computed using a message passing neural network. The network is trained to predict the sign of an edge $(u, v)$ given the auxillary vectors $m_u$ and $m_v$ for the nodes $u$ and $v$ respectively. The network is trained using the following loss function:
+
+
+, this results in a force which pulls the two nodes together. If an edge has a negative sign, this results in a force which pushes the two nodes apart. We are simply applying the social balance theory. Howoever this is a simple model, and theory it could be possible, that more complex patterns exist. In the next step we are trying to find such patterns using a neural network and the above described simulation derivative.
 
 
 
