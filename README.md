@@ -115,15 +115,15 @@ $$\omega(u, v) = \begin{cases}
 
 We used JAX for every computation in the function, this allows use to take the simulation derivative with respect any specified parameter. This yields a gradient which can be used to optimize the parameters of the simulation. Initially the loss was applied to the spring parameters $d_{th}$, $l^{+}$, $l^{0}$, $l^{-}$, $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$ with the following results:
 
-| Parameter | Value |
-| --- | --- |
-| $d_{th}$ | 14.420479774475098 |
-| $l^{+}$ | 9.82265567779541 |
-| $l^{0}$ | 16.775850296020508 |
-| $l^{-}$ | 20.94917106628418 |
-| $\alpha^{+}$ | 7.730042457580566 |
-| $\alpha^{0}$ | 1.1881768703460693 |
-| $\alpha^{-}$ | 14.80991268157959 |
+| Parameter | Value | Description |
+| --- | --- | --- |
+| $d_{th}$ | 14.420479774475098 | Distance threshold for the sigmoid function. |
+| $l^{+}$ | 9.82265567779541 | Resting length of a positive edge. |
+| $l^{0}$ | 16.775850296020508 | Resting length of a neutral edge. |
+| $l^{-}$ | 20.94917106628418 | Resting length of a negative edge. |
+| $\alpha^{+}$ | 7.730042457580566 | Stiffness of a positive edge. |
+| $\alpha^{0}$ | 1.1881768703460693 | Stiffness of a neutral edge. |
+| $\alpha^{-}$ | 14.80991268157959 | Stiffness of a negative edge. |
 
 We can see how the network learns, with a 16 dimensional embedding on the Bitcoin Alpha dataset:
 
@@ -148,7 +148,7 @@ $$f_i = \sum_{j \in N} f^{-}_{i,j} \cdot s^{-} + f^{+}_{i,j} \cdot s^{+} + f^{0}
 
 The auxillary vectors $m_i \in \mathbb{R}^d$ are computed using a message passing neural network $A$. 
 
-#### Message Passing Neural Network
+#### Message Passing Neural Network $A$
 
 A message passing neural network is a neural network which is applied for each node on all of its input edges. This neural network is usually applied for several recursive iterations, which leads to information propagating thrue the graph. The auxillary information vectors $m_i$ are initialized as random vectors. 
 
@@ -158,6 +158,23 @@ $m_i(t+1) = \Phi \left[ m_i(t), \mathop{\bigoplus}\limits_{j \in N_i} \Psi \left
 
 where $\Phi$ and $\Psi$ are neural networks and $\oplus$ is a permutation invariant aggregation function. Examples for aggregation functions are sum, mean, max, min, etc.
 
+#### Force decision network $B$
+
+Network $B$ maps between two nodes $u$ and $v$ and their auxillary information vectors $m_u$ and $m_v$ to a vector $s \in \mathbb{R}^3$, which denotes the strength of the positive and negative relationship between the two nodes. The network is defined as follows:
+
+$$s = B(m_u, m_v, \sigma(u, v))$$
+
+#### Training Step
+
+A trainig step of the entire process then looks as follows:
+
+1. Sample $x_i$ and $m_i$ for all nodes $i \in V$ from a normal distribution. Initialize $v_i$ to zero.
+2. Run the message passing neural network $A$ for a fixed number of iterations.
+3. Run the force decision network $B$ for all edges $(u, v) \in E$. 
+4. Run the spring network simulation for a fixed number of iterations.
+5. Predict the sign of an edge $(u, v)$ using the distance between $x_u$ and $x_v$.
+6. Compute the loss and update the parameters of the message passing neural network $A$ and the force decision network $B$ using gradient descent.
+7. Repeat from step 1.
 
 ## Training
 
