@@ -125,7 +125,7 @@ We used JAX for every computation in the function, this allows use to take the s
 | $\alpha^{0}$ | 1.1881768703460693 | Stiffness of a neutral edge. |
 | $\alpha^{-}$ | 14.80991268157959 | Stiffness of a negative edge. |
 
-We can see how the network learns, with a 16 dimensional embedding on the Bitcoin Alpha dataset:
+We can see how the gradient descent improves the parameters, with a 16 dimensional embedding on the Bitcoin Alpha dataset:
 
 ![Results](img/loss_spring_params_16.png)
 
