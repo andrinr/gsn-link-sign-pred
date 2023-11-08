@@ -2,7 +2,7 @@
 import sys, getopt
 import torch_geometric.transforms as T
 from torch_geometric.utils import is_undirected
-from torch_geometric.loader import NeighborLoader
+from torch_geometric.loader import ClusterData, ClusterLoader
 import yaml
 import inquirer
 from jax import random, value_and_grad
@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
 import os
+from tqdm import tqdm
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
@@ -35,12 +36,12 @@ def main(argv) -> None:
     OPTIMIZE_SPRING_PARAMS = False
     
     NUM_EPOCHS = 50
-    GRADIENT_ACCUMULATION = 8
-    BATCH_SIZE = 32
+    GRADIENT_ACCUMULATION = 1
+    BATCH_SIZE = 8
 
     PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
-    AUXILLARY_ITERATIONS = 10
+    AUXILLARY_ITERATIONS = 4
 
     MIN = -10.0
     MAX = 10.0
@@ -110,21 +111,32 @@ def main(argv) -> None:
     print(f"num_nodes: {num_nodes}")
     print(f"num_edges: {num_edges}")
 
-    loader = NeighborLoader(data, num_neighbors=16, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, directed=False)
+    cluster_data = ClusterData(
+        data, 
+        num_parts=BATCH_SIZE)
+    
+    loader = ClusterLoader(cluster_data)
 
     batches = []
     for batch in loader:
-        data, train_mask, val_mask, test_mask = permute_split(batch, 0.1, 0.8)
+        batch_data, train_mask, val_mask, test_mask = permute_split(batch, 0.1, 0.8)
 
-        num_nodes = data.num_nodes
+        print(batch_data)
+
+        num_nodes = batch_data.num_nodes
+
+        print(f"num_nodes: {num_nodes}")
+
+        if num_nodes < 32:
+            continue
         
         train_mask = jnp.array(train_mask)
         val_mask = jnp.array(val_mask)
         test_mask = jnp.array(test_mask)
 
         # convert to jnp arrays from torch tensors
-        edge_index = jnp.array(data.edge_index)
-        signs = jnp.array(data.edge_attr)
+        edge_index = jnp.array(batch_data.edge_index)
+        signs = jnp.array(batch_data.edge_attr)
 
         batches.append((edge_index, signs, num_nodes, train_mask, val_mask, test_mask))
 
@@ -194,18 +206,18 @@ def main(argv) -> None:
     # setup optax optimizers
     if OPTIMIZE_FORCE:
         auxillary_optimizer = optax.adamaxw(learning_rate=1e-5)
-        auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+        auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
         force_optimizer = optax.adamaxw(learning_rate=1e-4)
-        force_multi_step = optax.MultiSteps(force_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+        force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
 
     if OPTIMIZE_SPRING_PARAMS:
         params_optimizer = optax.adamaxw(learning_rate=0.1)
-        params_multi_step = optax.MultiSteps(params_optimizer, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+        params_multi_step = optax.MultiSteps(params_optimizer, GRADIENT_ACCUMULATION)
         params_optimizier_state = params_multi_step.init(spring_params)  
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=2, has_aux=True)
@@ -228,6 +240,9 @@ def main(argv) -> None:
     for epoch_index in epochs:
         for batch_index, (edge_index, signs, num_nodes, train_mask, val_mask, test_mask) in enumerate(batches):
 
+            print(f"epoch: {epoch_index} batch: {batch_index}")
+            print(f"num_nodes: {num_nodes}")
+            print(f"num_edges: {signs.shape[0]}")
             num_edges = signs.shape[0] // 2
 
             # initialize spring state
@@ -307,22 +322,23 @@ def main(argv) -> None:
             
             loss_mov_avg += loss_value
 
-        if epoch_index % BATCH_SIZE == 0:
-            loss_mov_avg = loss_mov_avg / BATCH_SIZE
-            print(metrics)
-            print(f"epoch: {epoch_index} batch: {batch_index}")
-            print(f"predictions: {signs_pred}")
-            print(f"loss: {loss_value}")
-            print(f"loss_mov_avg: {loss_mov_avg}")
-            print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
+            print(loss_value)
 
-            loss_hist.append(loss_mov_avg)
-            metrics_hist.append(metrics)
+        loss_mov_avg = loss_mov_avg / BATCH_SIZE
+        print(metrics)
+        print(f"epoch: {epoch_index} batch: {batch_index}")
+        print(f"predictions: {signs_pred}")
+        print(f"loss: {loss_value}")
+        print(f"loss_mov_avg: {loss_mov_avg}")
+        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
 
-            loss_mov_avg = 0.0
+        loss_hist.append(loss_mov_avg)
+        metrics_hist.append(metrics)
 
-            if OPTIMIZE_SPRING_PARAMS:
-                spring_hist.append(spring_params)
+        loss_mov_avg = 0.0
+
+        if OPTIMIZE_SPRING_PARAMS:
+            spring_hist.append(spring_params)
 
     # # plot the embeddings
     # plt.scatter(spring_state.position[:, 0], spring_state.position[:, 1])

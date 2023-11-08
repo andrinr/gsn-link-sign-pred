@@ -73,15 +73,6 @@ $f^{+}_{i,j} = \alpha^{+} \times max(l^{+} - L_i, 0) \frac{X_j - X_i}{\|{ X_j - 
 
 where $L_i$ is the number of negative edges connected to node $v_i$ and $l^{-}$, $l^{0}$ and $l^{+}$ are the thresholds for the negative, neutral and positive force respectively. $\alpha^{-}$, $\alpha^{0}$ and $\alpha^{+}$ are the scaling factors for the negative, neutral and positive force respectively.
 
-### Current State
-
-The method works reasonably well, however it appears to be rather difficult to extend upon it. There are some areas where the method could be improved:
-
-1. Find better paramters for the simulation to increase the results.
-2. Optimize the simulation runtime to underline the fact, that the method is way faster than other methods.
-3. Find theories other than the social balance theory, that could be implemented using a spring network simulation.
-4. Apply the method to other datasets.
-
 ### Differentiable Simulation for Parameter Optimization
 
 I have rewritten the entire code and made it JAX comptabile. 
@@ -126,11 +117,11 @@ The main reason why the loss and the measures are so 'jagged' is that the initia
 ![Results](img/spring_params_16.png)
 
 
-### Message Passing Network
+### Neural Network for local pattern recognition
 
-As of now it is clear that if an edge has a positive sign, this results in a force which pulls the two nodes together. If an edge has a negative sign, this results in a force which pushes the two nodes apart. 
+As of now it is clear that if an edge has a positive sign, this results in a force which pulls the two nodes together. If an edge has a negative sign, this results in a force which pushes the two nodes apart. We are simply applying the social balance theory. Howoever this is a simple model, and theory it could be possible, that more complex patterns exist. In the next step we are trying to find such patterns using a neural network and the above described simulation derivative.
 
-However there might be more complex dynamics at play which are not reflected in the social balance theory. Therefore we want to learn a function, which for a given edge, decides weather the two nodes should be pulled together, pushed apart or stay at a neutral distance.
+We want to learn a function, which for a given edge, decides weather the two nodes should be pulled together, pushed apart or stay at a neutral distance.
 
 We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to decide on the forces acting on the nodes.
 
@@ -149,8 +140,6 @@ where $W_{i} \in \mathbb{R}^{d \times d}$ and $b_{i} \in \mathbb{R}^{d}$ are the
 The full message passing network $M$ can be described as follows:
 
 $M(m_{j}^{(t)}) = M_k(M_{k-1}(...M_1(m_{j}^{(t)})...))$
-
-#### Force Computation Network
 
 After a fixed number of message passing iterations are completed and the auxillary vector for each node is given, network $T$ computes the forces acting on each node. The network $T$ takes the auxillary information vector $m_i$ of each node $v_i$, the sign of the edge $(v_i, v_j)$ and the positions of the nodes $X_i$ and $X_j$ as input and computes the forces $f_{i,j}$ and $f_{j,i}$ acting on the nodes $v_i$ and $v_j$ respectively. The network $T$ can be described as follows:
 
@@ -186,3 +175,11 @@ Generally a decrease in energy in the system correlates with a better performanc
 
 ### Correlation between energy 
 ![Results](ratio_energy.png)
+
+
+## Sources:
+
+For aggregation methods and graph subsampling:
+@book{hamilton_ying_leskovec, title={Inductive Representation Learning on Large Graphs}, url={https://arxiv.org/pdf/1706.02216.pdf}, author={Hamilton, William and Ying, Rex and Leskovec, Jure} }
+
+‌

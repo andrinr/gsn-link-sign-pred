@@ -41,8 +41,6 @@ def simulate(
         sign=sign
     )
 
-    print(spring_state.force_decision)
-
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         simulation_params = simulation_params, 
