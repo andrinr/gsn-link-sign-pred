@@ -77,7 +77,7 @@ $$f^{+}_{i,j} = \alpha^{+} \cdot max(l^{+} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - 
 
 Therefore the total force acting on a node $v_i$ is:
 
-$$f_i = \sum_{j \in N^-(i)} f^{-}_{i,j} + \sum_{j \in N^0(i)} f^{0}_{i,j} + \sum_{j \in N^+(i)} f^{+}_{i,j}$$
+$$f_i = \sum_{j \in N^{-}_i} f^{-}_{i,j} + \sum_{j \in N^{0}_i} f^{0}_{i,j} + \sum_{j \in N^{+}_i} f^{+}_{i,j}$$
 
 The total force acting on a node $v_i$ is then used to update the position of the node $v_i$ using the kick drift kick method. We use the notation $x_i(t)$ to denote the position of node $v_i$ at time $t$ and $v_i(t)$ to denote the velocity of node $v_i$ at time $t$. To avoid divergence of the simulation, we use a viscous damping factor $d$.
 
@@ -139,7 +139,7 @@ The main reason why the loss and the measures are so 'jagged' is that the initia
 
 As of now we have hardcoded the forces acting on a node as:
 
-$$f_i = \sum_{j \in N^-(i)} f^{-}_{i,j} + \sum_{j \in N^0(i)} f^{0}_{i,j} + \sum_{j \in N^+(i)} f^{+}_{i,j}$$ 
+$$f_i = \sum_{j \in N^{-}_i} f^{-}_{i,j} + \sum_{j \in N^{0}_i} f^{0}_{i,j} + \sum_{j \in N^{+}_i} f^{+}_{i,j}$$
 
 The above assumption is based on the social balance theory and does apply to many dynamics in networks. (Add some sort of evidence?)
 However there might be more complex patterns in the network, which we are not able to capture with the above method. Therefore we are looking for a function $B$, which given an edge $(u, v)$ and two auxillary information vectors $m_u$ and $m_v$ for the nodes $u$ and $v$ respectively, computes values $s^{-}$, $s^{0}$ and $s^{+}$ which denote the strength of the positive and negative relationship between the two nodes. We then compute the forces acting on the nodes as follows:
@@ -154,7 +154,7 @@ A message passing neural network is a neural network which is applied for each n
 
 A single step of a message passing neural network on a node $i$ is defined as follows:
 
-$m_i(t+1) = \Phi \left[ m_i(t), \mathop{\bigoplus}\limits_{j \in N_i} \Psi \left( m_i(t), m_j(t), \sigma(i, j) \right) \right]$
+$$m_i(t+1) = \Phi \left[ m_i(t), \mathop{\bigoplus}\limits_{j \in N_i} \Psi \left( m_i(t), m_j(t), \sigma(i, j) \right) \right]$$
 
 where $\Phi$ and $\Psi$ are neural networks and $\oplus$ is a permutation invariant aggregation function. Examples for aggregation functions are sum, mean, max, min, etc.
 
