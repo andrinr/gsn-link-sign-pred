@@ -89,7 +89,10 @@ $l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{'}(u, v) - \sigma(u, v))^2 \cdot
 
 where $n$ is a normalization function which for a positive edge returns one divided by the number of positive edges, for a neutral edge one divided by the number of neutral edges and for a negative edge one divided by the number of negative edges.
 
-$$n(u, v) = \begin{cases} \frac{1}{|E^{+}|} & \text{if } \sigma(u, v) = 1 \\ \frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1 \end{cases}$$
+$$n(u, v) = \begin{cases} 
+\frac{1}{|E^{+}|} & \text{if } \sigma(u, v) = 1 \\ 
+\frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1 
+\end{cases}$$
 
 
 We used JAX for every computation in the function, this allows use to take the simulation derivative with respect any specified parameter. This yields a gradient which can be used to optimize the parameters of the simulation. Initially the loss was applied to the spring parameters $d_{th}$, $l^{+}$, $l^{0}$, $l^{-}$, $\alpha^{+}$, $\alpha^{0}$ and $\alpha^{-}$ with the following results:
