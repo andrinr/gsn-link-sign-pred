@@ -43,8 +43,7 @@ def main(argv) -> None:
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 4
 
-    MIN = -10.0
-    MAX = 10.0
+    INIT_POS_RANGE = 10.0
 
     DT = 0.01
     DAMPING = 0.3
@@ -243,8 +242,7 @@ def main(argv) -> None:
             # take new key each time to avoid overfitting to specific initial conditions
             spring_state = sim.init_spring_state(
                 rng=epochs_keys[epoch_index],
-                min=MIN,
-                max=MAX,
+                range=INIT_POS_RANGE,
                 n=num_nodes,
                 m=num_edges,
                 embedding_dim=EMBEDDING_DIM,
@@ -427,8 +425,7 @@ def main(argv) -> None:
         rng=key_test,
         n=data.num_nodes,
         m=data.num_edges,
-        min=MIN,
-        max=MAX,
+        range=INIT_POS_RANGE,
         embedding_dim=EMBEDDING_DIM,
         auxillary_dim=AUXILLARY_DIM
     )

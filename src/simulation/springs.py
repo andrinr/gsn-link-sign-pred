@@ -10,13 +10,12 @@ EPSILON = 1e-6
 def init_spring_state(
     rng : jax.random.PRNGKey, 
     n : int, m : int,
-    min : float,
-    max : float,
+    range : float,
     embedding_dim : int,
     auxillary_dim : int) -> sim.SpringState:
-    position = jax.random.uniform(rng, (n, embedding_dim), maxval=1.0, minval=-1.0)
+    position = jax.random.uniform(rng, (n, embedding_dim), maxval=range, minval=-range)
     velocity = jnp.zeros((n, embedding_dim))
-    auxillary = jax.random.uniform(rng, (n, auxillary_dim), maxval=1.0, minval=-1.0)
+    auxillary = jax.random.uniform(rng, (n, auxillary_dim), maxval=range, minval=-range)
     edge_force = jnp.zeros((m, embedding_dim))
     return sim.SpringState(position, velocity, auxillary, edge_force)
 

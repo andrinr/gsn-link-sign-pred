@@ -1,6 +1,6 @@
 # *SpringE*: Fast Node Representation Generation for Link Sign Prediction
 
-A signed network is a graph where each edge represent either a positive or negative relationship between its two nodes. This paper proposes \textit{SpringE}, which is able to capture crucial information about the local node environment using low dimensional feature vectors. Contrary to other methods, no neural network is used, which greatly increases the runtime of the given method. 
+A signed network is a graph where each edge represent either a positive or negative relationship between its two nodes. This paper proposes $\textit{SpringE}$, which is able to capture crucial information about the local node environment using low dimensional feature vectors. Contrary to other methods, no neural network is used, which greatly increases the runtime of the given method. 
 
 ## Requirements
 
@@ -8,19 +8,17 @@ You can try to install to setup the environment using the ```environment.yaml```
 
 If that does not work, you can install the following packages manually:
 
-- tqdm
-- numpy
-- scipy
-- pyg-nightly (Many unreleased features are used, so you need to install the nightly version)
-- skikit-learn
-- torch
-- pyyaml
-- pandas
+- Python 3.11 (very new version sometimes not supported by torch)
+- jax ( install with GPU support if possible)
+- pytorch
+- pytorch-geometric
+- optax
 - matplotlib
-- nevergrad
-- networkx (Install direclty from source as unreleased features are used.)
-
-In order to use the GPU, you need to install CUDA and PyTorch with CUDA support.
+- yaml
+- pytest
+- tqdm
+- scipy
+- pandas
 
 ## Running the code
 
