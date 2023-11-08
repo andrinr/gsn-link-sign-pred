@@ -103,11 +103,11 @@ $$\sigma^{\prime}(u, v) = \frac{1}{1 + e^{ \|{x_u - x_v}\|_2 - d_{th}}}$$
 
 We then compute the loss function as follows:
 
-$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot \psi(u, v)$$
+$$l = \frac{1}{|E|} \sum_{(u, v) \in E} (\sigma^{\prime}(u, v) - \sigma(u, v))^2 \cdot \omega(u, v)$$
 
 where $n$ is a normalization function which for a positive edge returns one divided by the number of positive edges, for a neutral edge one divided by the number of neutral edges and for a negative edge one divided by the number of negative edges.
 
-$$\psi(u, v) = \begin{cases} 
+$$\omega(u, v) = \begin{cases} 
 \frac{1}{|E^{+}|} & \text{if } \sigma(u, v) = 1 \\ 
 \frac{1}{|E^{-}|} & \text{if } \sigma(u, v) = -1 
 \end{cases}$$
@@ -142,55 +142,22 @@ As of now we have hardcoded the forces acting on a node as:
 $$f_i = \sum_{j \in N^-(i)} f^{-}_{i,j} + \sum_{j \in N^0(i)} f^{0}_{i,j} + \sum_{j \in N^+(i)} f^{+}_{i,j}$$ 
 
 The above assumption is based on the social balance theory and does apply to many dynamics in networks. (Add some sort of evidence?)
-However there might be more complex patterns in the network, which we are not able to capture with the above method. Therefore we are looking for a function $S$, which given an edge $(u, v)$ and two auxillary information vectors $m_u$ and $m_v$ for the nodes $u$ and $v$ respectively, computes values $s^{-}$, $s^{0}$ and $s^{+}$ which denote the strength of the positive and negative relationship between the two nodes. We then compute the forces acting on the nodes as follows:
+However there might be more complex patterns in the network, which we are not able to capture with the above method. Therefore we are looking for a function $B$, which given an edge $(u, v)$ and two auxillary information vectors $m_u$ and $m_v$ for the nodes $u$ and $v$ respectively, computes values $s^{-}$, $s^{0}$ and $s^{+}$ which denote the strength of the positive and negative relationship between the two nodes. We then compute the forces acting on the nodes as follows:
 
 $$f_i = \sum_{j \in N} f^{-}_{i,j} \cdot s^{-} + f^{+}_{i,j} \cdot s^{+} + f^{0}_{i,j} \cdot s^{0}$$
 
-The auxillary vectors $m_i \in \mathbb{R}^d$ are computed using a message passing neural network. The network is trained to predict the sign of an edge $(u, v)$ given the auxillary vectors $m_u$ and $m_v$ for the nodes $u$ and $v$ respectively. The network is trained using the following loss function:
+The auxillary vectors $m_i \in \mathbb{R}^d$ are computed using a message passing neural network $A$. 
 
+#### Message Passing Neural Network
 
-, this results in a force which pulls the two nodes together. If an edge has a negative sign, this results in a force which pushes the two nodes apart. We are simply applying the social balance theory. Howoever this is a simple model, and theory it could be possible, that more complex patterns exist. In the next step we are trying to find such patterns using a neural network and the above described simulation derivative.
+A message passing neural network is a neural network which is applied for each node on all of its input edges. This neural network is usually applied for several recursive iterations, which leads to information propagating thrue the graph. The auxillary information vectors $m_i$ are initialized as random vectors. 
 
+A single step of a message passing neural network on a node $i$ is defined as follows:
 
+$m_i(t+1) = \Phi \left[ m_i(t), \mathop{\bigoplus}\limits_{j \in N_i} \Psi \left( m_i(t), m_j(t), \sigma(i, j) \right) \right]$
 
-### Neural Network for local pattern recognition
+where $\Phi$ and $\Psi$ are neural networks and $\oplus$ is a permutation invariant aggregation function. Examples for aggregation functions are sum, mean, max, min, etc.
 
-As of now it is clear that if an edge has a positive sign, this results in a force which pulls the two nodes together. If an edge has a negative sign, this results in a force which pushes the two nodes apart. We are simply applying the social balance theory. Howoever this is a simple model, and theory it could be possible, that more complex patterns exist. In the next step we are trying to find such patterns using a neural network and the above described simulation derivative.
-
-We want to learn a function, which for a given edge, decides weather the two nodes should be pulled together, pushed apart or stay at a neutral distance.
-
-We train two neural networks, a message passing network $M$ which generated an auxillary information vector for each node and a network $T$ which takes the auxillary information vector, the edge signs and positions of the nodes to decide on the forces acting on the nodes.
-
-The message passing network can be seen as a function which for each node $v_i$ computes an auxillary information vector $m_i \in \mathbb{R}^d$. The auxillary information vector is computed by passing a message from each neighbor $v_j$ to the node $v_i$. The message is computed as follows:
-
-$$m_{i}^{(t+1)} = \sum_{j} M(m_{j}^{(t)})$$
-
-where $N(i)$ is the set of neighbors of node $v_i$ and $\sigma_{i,j}$ is the sign of the edge $(v_i, v_j)$. The function $M$ is a fully connected neural network with $k$ hidden layers and $d$ hidden units per layer. The function $M$ is shared across all nodes.
-
-Each layer can be described as a function $M_i$ which works as follows:
-
-$$M_i(m_{j}^{(t)}) = activation(W_{i} \cdot m_{j}^{(t)} + b_{i})$$
-
-where $W_{i} \in \mathbb{R}^{d \times d}$ and $b_{i} \in \mathbb{R}^{d}$ are the weights and biases of the $i$-th layer respectively and $activation$ is a non-linear activation function.
-
-The full message passing network $M$ can be described as follows:
-
-$$M(m_{j}^{(t)}) = M_k(M_{k-1}(...M_1(m_{j}^{(t)})...))$$
-
-After a fixed number of message passing iterations are completed and the auxillary vector for each node is given, network $T$ computes the forces acting on each node. The network $T$ takes the auxillary information vector $m_i$ of each node $v_i$, the sign of the edge $(v_i, v_j)$ and the positions of the nodes $X_i$ and $X_j$ as input and computes the forces $f_{i,j}$ and $f_{j,i}$ acting on the nodes $v_i$ and $v_j$ respectively. The network $T$ can be described as follows:
-
-$$T(m_i, m_j, \sigma_{i,j}, X_i, X_j) = (f_{i,j}, f_{j,i})$$
-
-A single prediction then looks as follows:
-
-1. Compute the auxillary information vector for each node using a fixed number of iterations of the message passing network $M$.
-2. Compute the forces using the graph transformer network $T$.
-3. Advance the simulation using the computed forces.
-4. Repeat 2. and 3. until the simulation has converged.
-
-The network can be trained as follows:
-
-We predict the node embeddings using the above method, we then compute a loss and propagate thrue the entire network to update the weights of the message passing network $M$ and the graph transformer network $T$.
 
 ## Training
 
