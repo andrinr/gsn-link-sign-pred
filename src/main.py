@@ -2,15 +2,14 @@
 import sys, getopt
 import torch_geometric.transforms as T
 from torch_geometric.utils import is_undirected
+from torch_geometric.loader import NeighborLoader
 import yaml
 import inquirer
 from jax import random, value_and_grad
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-import jax.profiler
 import optax
 import os
-import pickle
 
 # Local dependencies
 from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
@@ -36,7 +35,8 @@ def main(argv) -> None:
     OPTIMIZE_SPRING_PARAMS = False
     
     NUM_EPOCHS = 50
-    NUM_EPOCHS_GRADIENT_ACCUMULATION = 1
+    GRADIENT_ACCUMULATION = 8
+    BATCH_SIZE = 32
 
     PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
@@ -72,7 +72,7 @@ def main(argv) -> None:
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
 
-    opts,i = getopt.getopt(argv,"s:h:d:i:p:o",
+    opts,batch_index = getopt.getopt(argv,"s:h:d:i:p:o",
         ["embedding_size=","time_step=", "damping=", "iterations="])
     for opt, arg in opts:
         if opt == '-s':
@@ -110,17 +110,23 @@ def main(argv) -> None:
     print(f"num_nodes: {num_nodes}")
     print(f"num_edges: {num_edges}")
 
-    # Permute data and create masks
-    # the edges are arranged as follows: training, validation, test
-    data, train_mask, val_mask, test_mask = permute_split(data, 0.1, 0.8)
+    loader = NeighborLoader(data, num_neighbors=16, batch_size=BATCH_SIZE, shuffle=False, num_workers=8, directed=False)
 
-    train_mask = jnp.array(train_mask)
-    val_mask = jnp.array(val_mask)
-    test_mask = jnp.array(test_mask)
-    
-    # convert to jnp arrays from torch tensors
-    edge_index = jnp.array(data.edge_index)
-    signs = jnp.array(data.edge_attr)
+    batches = []
+    for batch in loader:
+        data, train_mask, val_mask, test_mask = permute_split(batch, 0.1, 0.8)
+
+        num_nodes = data.num_nodes
+        
+        train_mask = jnp.array(train_mask)
+        val_mask = jnp.array(val_mask)
+        test_mask = jnp.array(test_mask)
+
+        # convert to jnp arrays from torch tensors
+        edge_index = jnp.array(data.edge_index)
+        signs = jnp.array(data.edge_attr)
+
+        batches.append((edge_index, signs, num_nodes, train_mask, val_mask, test_mask))
 
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     print(params_path)
@@ -219,89 +225,92 @@ def main(argv) -> None:
     epochs = range(NUM_EPOCHS)
     
     epochs_keys = random.split(key_training, NUM_EPOCHS)
-    for epoch in epochs:
-        # initialize spring state
-        # take new key each time to avoid overfitting to specific initial conditions
-        spring_state = sim.init_spring_state(
-            rng=epochs_keys[epoch],
-            min=MIN,
-            max=MAX,
-            n=data.num_nodes,
-            m=data.num_edges,
-            embedding_dim=EMBEDDING_DIM,
-            auxillary_dim=AUXILLARY_DIM)
+    for epoch_index in epochs:
+        for batch_index, (edge_index, signs, num_nodes, train_mask, val_mask, test_mask) in enumerate(batches):
 
-        # run simulation and compute loss, auxillaries and gradient
-        if OPTIMIZE_FORCE:
-            (loss_value, (spring_state, signs_pred)), (nn_auxillary_grad, nn_force_grad) = value_grad_fn(
-                simulation_params_train, #0
-                spring_state, #1
-                spring_params, #2
-                NN_FORCE, #3
-                auxillary_params, #4
-                force_params, #5
-                edge_index, #6
-                signs, #7
-                train_mask, #8
+            num_edges = signs.shape[0] // 2
+
+            # initialize spring state
+            # take new key each time to avoid overfitting to specific initial conditions
+            spring_state = sim.init_spring_state(
+                rng=epochs_keys[epoch_index],
+                min=MIN,
+                max=MAX,
+                n=num_nodes,
+                m=num_edges,
+                embedding_dim=EMBEDDING_DIM,
+                auxillary_dim=AUXILLARY_DIM)
+
+            # run simulation and compute loss, auxillaries and gradient
+            if OPTIMIZE_FORCE:
+                (loss_value, (spring_state, signs_pred)), (nn_auxillary_grad, nn_force_grad) = value_grad_fn(
+                    simulation_params_train, #0
+                    spring_state, #1
+                    spring_params, #2
+                    NN_FORCE, #3
+                    auxillary_params, #4
+                    force_params, #5
+                    edge_index, #6
+                    signs, #7
+                    train_mask, #8
+                    val_mask)
+                
+            if OPTIMIZE_SPRING_PARAMS:
+                (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
+                    simulation_params_train, #0
+                    spring_state, #1
+                    spring_params, #2
+                    NN_FORCE, #3
+                    auxillary_params, #4
+                    force_params, #5
+                    edge_index, #6
+                    signs, #7
+                    train_mask, #8
+                    val_mask)
+            else:
+                loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
+                    simulation_params_train, #0
+                    spring_state, #1
+                    spring_params, #2
+                    NN_FORCE, #3
+                    auxillary_params, #4
+                    force_params, #5
+                    edge_index, #6
+                    signs, #7
+                    train_mask, #8
+                    val_mask)
+                
+            if OPTIMIZE_FORCE:
+                nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
+                    nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
+            
+                auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
+            
+                nn_force_update, force_optimizier_state = force_multi_step.update(
+                    nn_force_grad, force_optimizier_state, force_params)
+                
+                force_params = optax.apply_updates(force_params, nn_force_update)
+
+            if OPTIMIZE_SPRING_PARAMS:
+                params_update, params_optimizier_state = params_multi_step.update(
+                    params_grad, params_optimizier_state, spring_params)
+                
+                spring_params = optax.apply_updates(spring_params, params_update)
+
+            signs_ = signs * 0.5 + 0.5
+            metrics = sim.evaluate(
+                spring_state,
+                edge_index,
+                signs,
+                train_mask,
                 val_mask)
             
-        if OPTIMIZE_SPRING_PARAMS:
-            (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
-                simulation_params_train, #0
-                spring_state, #1
-                spring_params, #2
-                NN_FORCE, #3
-                auxillary_params, #4
-                force_params, #5
-                edge_index, #6
-                signs, #7
-                train_mask, #8
-                val_mask)
-        else:
-            loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
-                simulation_params_train, #0
-                spring_state, #1
-                spring_params, #2
-                NN_FORCE, #3
-                auxillary_params, #4
-                force_params, #5
-                edge_index, #6
-                signs, #7
-                train_mask, #8
-                val_mask)
-            
+            loss_mov_avg += loss_value
 
-        if OPTIMIZE_FORCE:
-            nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
-                nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
-        
-            auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
-        
-            nn_force_update, force_optimizier_state = force_multi_step.update(
-                nn_force_grad, force_optimizier_state, force_params)
-            
-            force_params = optax.apply_updates(force_params, nn_force_update)
-
-        if OPTIMIZE_SPRING_PARAMS:
-            params_update, params_optimizier_state = params_multi_step.update(
-                params_grad, params_optimizier_state, spring_params)
-            
-            spring_params = optax.apply_updates(spring_params, params_update)
-
-        signs_ = signs * 0.5 + 0.5
-        metrics = sim.evaluate(
-            spring_state,
-            edge_index,
-            signs,
-            train_mask,
-            val_mask)
-        
-        loss_mov_avg += loss_value
-
-        if epoch % NUM_EPOCHS_GRADIENT_ACCUMULATION == 0:
-            loss_mov_avg = loss_mov_avg / NUM_EPOCHS_GRADIENT_ACCUMULATION
+        if epoch_index % BATCH_SIZE == 0:
+            loss_mov_avg = loss_mov_avg / BATCH_SIZE
             print(metrics)
-            print(f"epoch: {epoch}")
+            print(f"epoch: {epoch_index} batch: {batch_index}")
             print(f"predictions: {signs_pred}")
             print(f"loss: {loss_value}")
             print(f"loss_mov_avg: {loss_mov_avg}")
@@ -333,7 +342,7 @@ def main(argv) -> None:
     # plt.show()
 
     # plot loss over time
-    spaced_epochs = range(0, NUM_EPOCHS, NUM_EPOCHS_GRADIENT_ACCUMULATION)
+    spaced_epochs = range(NUM_EPOCHS)
     plt.plot(spaced_epochs, loss_hist)
     plt.title('Loss')
     plt.show()
