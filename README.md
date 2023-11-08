@@ -81,7 +81,7 @@ Now the simulation is differentiable and for each simulation run we evaulate a l
 
 For a predefined distance threshold $d_{th}$, the predicted sign of an edge $(u, v)$ is computed using a sigmoid function:
 
-$$\sigma^{\prime}(u, v) = \frac{1}{1 + e^{ \cdot \||x_u - x_v||_2 - d_{th}}}$$
+$$\sigma^{\prime}(u, v) = \frac{1}{1 + e^{ \|{x_u - x_v}\|_2 - d_{th}}}$$
 
 We then compute the loss function as follows:
 
