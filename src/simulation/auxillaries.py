@@ -26,7 +26,7 @@ def update_auxillary_state(
     # mean aggregation
     auxillaries = jnp.zeros_like(spring_state.auxillary)
     auxillaries = auxillaries.at[edge_index[0]].add(auxillaries_i)
-    auxillaries = auxillaries / jnp.expand_dims(jnp.bincount(edge_index[0]), axis=-1)
+    auxillaries = auxillaries / jnp.expand_dims(, axis=-1)
    
     auxillaries = nn.gnn_phi(
         jnp.concatenate([auxillaries, spring_state.auxillary], axis=-1),

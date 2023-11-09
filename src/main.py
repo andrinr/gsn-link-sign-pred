@@ -1,22 +1,20 @@
 # External dependencies
-import sys, getopt
-import torch_geometric.transforms as T
+import sys
+import inquirer
 from torch_geometric.utils import is_undirected
 from torch_geometric.loader import ClusterData, ClusterLoader
 import yaml
-import inquirer
 from jax import random, value_and_grad
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
 import os
-from tqdm import tqdm
+import torch_geometric.transforms as T
 
 # Local dependencies
-from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
-from graph import permute_split
 import simulation as sim
 import neural as nn
+from helpers import get_dataset, to_SignedGraph
 
 def main(argv) -> None:
     """
@@ -29,25 +27,26 @@ def main(argv) -> None:
     -o : int (default=0)
         Number of iterations for the optimizer
     """
+    # Simulation parameters
     NN_FORCE = True
     OPTIMIZE_FORCE = True
+    OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 64
     AUXILLARY_DIM = 16
-    OPTIMIZE_SPRING_PARAMS = False
-    
-    NUM_EPOCHS = 50
-    GRADIENT_ACCUMULATION = 1
-    BATCH_SIZE = 8
-
-    PER_EPOCH_SIM_ITERATIONS = 200
-    FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
-    AUXILLARY_ITERATIONS = 4
-
     INIT_POS_RANGE = 10.0
-
     DT = 0.01
     DAMPING = 0.3
 
+    # Training parameters
+    NUM_EPOCHS = 50
+    GRADIENT_ACCUMULATION = 1
+    BATCH_SIZE = 8
+    PER_EPOCH_SIM_ITERATIONS = 200
+    FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
+    AUXILLARY_ITERATIONS = 4
+    GRAPH_PARTITIONING = False
+
+    # Paths
     DATA_PATH = 'src/data/'
     CECKPOINT_PATH = 'checkpoints/'
 
@@ -62,44 +61,7 @@ def main(argv) -> None:
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".90"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    dataset_names = ['Tribes', 'Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
-    questions = [
-        inquirer.List('dataset',
-            message="Choose a dataset",
-            choices=dataset_names,
-        ),
-    ]
-    answers = inquirer.prompt(questions)
-    dataset_name = answers['dataset']
-
-    opts,batch_index = getopt.getopt(argv,"s:h:d:i:p:o",
-        ["embedding_size=","time_step=", "damping=", "iterations="])
-    for opt, arg in opts:
-        if opt == '-s':
-            EMBEDDING_DIM = int(arg)
-        elif opt == '-h':
-            DT = int(arg)
-        elif opt == '-d':
-            DAMPING = int(arg)
-        elif opt == '-i':
-            FINAL_SIM_ITERATIONS = int(arg)
-
-    pre_transform = T.Compose([])
-    match dataset_name:
-        case "BitcoinOTC":
-            dataset = BitcoinO(root=DATA_PATH, pre_transform=pre_transform)
-        case "Bitcoin_Alpha":
-            dataset = BitcoinA(root=DATA_PATH, pre_transform=pre_transform)
-        case "WikiRFA":
-            dataset = WikiRFA(root=DATA_PATH, pre_transform=pre_transform)
-        case "Slashdot":
-            dataset = Slashdot(root=DATA_PATH, pre_transform=pre_transform)
-        case "Epinions":
-            dataset = Epinions(root=DATA_PATH, pre_transform=pre_transform)
-        case "Tribes":
-            dataset = Tribes(root=DATA_PATH, pre_transform=pre_transform)
-
-    data = dataset[0]
+    data = get_dataset(DATA_PATH, argv) 
     if not is_undirected(data.edge_index):
         transform = T.ToUndirected(reduce="min")
         data = transform(data)
@@ -110,34 +72,21 @@ def main(argv) -> None:
     print(f"num_nodes: {num_nodes}")
     print(f"num_edges: {num_edges}")
 
-    cluster_data = ClusterData(
-        data, 
-        num_parts=BATCH_SIZE)
-    
-    loader = ClusterLoader(cluster_data)
-
     batches = []
-    for batch in loader:
-        batch_data, train_mask, val_mask, test_mask = permute_split(batch, 0.1, 0.8)
-
-        print(batch_data)
-
-        num_nodes = batch_data.num_nodes
-
-        print(f"num_nodes: {num_nodes}")
-
-        if num_nodes < 32:
-            continue
+    if GRAPH_PARTITIONING:
+        cluster_data = ClusterData(
+            data, 
+            num_parts=BATCH_SIZE)
         
-        train_mask = jnp.array(train_mask)
-        val_mask = jnp.array(val_mask)
-        test_mask = jnp.array(test_mask)
-
-        # convert to jnp arrays from torch tensors
-        edge_index = jnp.array(batch_data.edge_index)
-        signs = jnp.array(batch_data.edge_attr)
-
-        batches.append((edge_index, signs, num_nodes, train_mask, val_mask, test_mask))
+        loader = ClusterLoader(cluster_data)
+        for batch in loader:
+            signedGraph = to_SignedGraph(batch)
+            batches.append(signedGraph)
+            
+    else:
+        signedGraph = to_SignedGraph(data)
+        batches.append(signedGraph)
+        
 
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     print(params_path)
@@ -215,12 +164,6 @@ def main(argv) -> None:
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=2, has_aux=True)
 
-    total_energies = []
-    aucs = []
-    f1_binaries = []
-    f1_micros = []
-    f1_macros = []
-
     loss_hist = []
     metrics_hist = []
     loss_mov_avg = 0.0
@@ -231,12 +174,12 @@ def main(argv) -> None:
     
     epochs_keys = random.split(key_training, NUM_EPOCHS)
     for epoch_index in epochs:
-        for batch_index, (edge_index, signs, num_nodes, train_mask, val_mask, test_mask) in enumerate(batches):
+        for batch_index, graph in enumerate(batches):
 
             print(f"epoch: {epoch_index} batch: {batch_index}")
             print(f"num_nodes: {num_nodes}")
-            print(f"num_edges: {signs.shape[0]}")
-            num_edges = signs.shape[0] // 2
+            print(f"num_edges: {graph.sign.shape[0]}")
+            num_edges = graph.sign.shape[0] // 2
 
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
@@ -257,10 +200,10 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    edge_index, #6
-                    signs, #7
-                    train_mask, #8
-                    val_mask)
+                    graph.edge_index, #6
+                    graph.sign, #7
+                    graph.train_mask, #8
+                    graph.val_mask)
                 
             if OPTIMIZE_SPRING_PARAMS:
                 (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
@@ -270,10 +213,10 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    edge_index, #6
-                    signs, #7
-                    train_mask, #8
-                    val_mask)
+                    graph.edge_index, #6
+                    graph.sign, #7
+                    graph.train_mask, #8
+                    graph.val_mask)
             else:
                 loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
                     simulation_params_train, #0
@@ -282,10 +225,10 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    edge_index, #6
-                    signs, #7
-                    train_mask, #8
-                    val_mask)
+                    graph.edge_index, #6
+                    graph.sign, #7
+                    graph.train_mask, #8
+                    graph.val_mask)
                 
             if OPTIMIZE_FORCE:
                 nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
@@ -304,13 +247,13 @@ def main(argv) -> None:
                 
                 spring_params = optax.apply_updates(spring_params, params_update)
 
-            signs_ = signs * 0.5 + 0.5
+            signs_ = graph.signs * 0.5 + 0.5
             metrics = sim.evaluate(
                 spring_state,
-                edge_index,
-                signs,
-                train_mask,
-                val_mask)
+                graph.edge_index,
+                graph.signs,
+                graph.train_mask,
+                graph.val_mask)
             
             loss_mov_avg += loss_value
 
@@ -322,7 +265,7 @@ def main(argv) -> None:
         print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
         print(f"loss_mov_avg: {loss_mov_avg}")
-        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {signs.shape[0]}")
+        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {graph.sign.shape[0]}")
 
         loss_hist.append(loss_mov_avg)
         metrics_hist.append(metrics)
@@ -350,29 +293,29 @@ def main(argv) -> None:
     # plt.show()
 
     # plot loss over time
-    spaced_epochs = range(NUM_EPOCHS)
-    plt.plot(spaced_epochs, loss_hist)
+    epochs = range(NUM_EPOCHS)
+    plt.plot(epochs, loss_hist)
     plt.title('Loss')
     plt.show()
 
     # plot metrics over time
-    plt.plot(spaced_epochs, [metrics.auc for metrics in metrics_hist])
-    plt.plot(spaced_epochs, [metrics.f1_binary for metrics in metrics_hist])
-    plt.plot(spaced_epochs, [metrics.f1_micro for metrics in metrics_hist])
-    plt.plot(spaced_epochs, [metrics.f1_macro for metrics in metrics_hist])
+    plt.plot(epochs, [metrics.auc for metrics in metrics_hist])
+    plt.plot(epochs, [metrics.f1_binary for metrics in metrics_hist])
+    plt.plot(epochs, [metrics.f1_micro for metrics in metrics_hist])
+    plt.plot(epochs, [metrics.f1_macro for metrics in metrics_hist])
     plt.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
     plt.title('Measures')
     plt.show()
 
     # plot spring params over time
     if OPTIMIZE_SPRING_PARAMS:
-        plt.plot(spaced_epochs, [spring_params.friend_distance for spring_params in spring_hist])
-        plt.plot(spaced_epochs, [spring_params.friend_stiffness for spring_params in spring_hist])
-        plt.plot(spaced_epochs, [spring_params.neutral_distance for spring_params in spring_hist])
-        plt.plot(spaced_epochs, [spring_params.neutral_stiffness for spring_params in spring_hist])
-        plt.plot(spaced_epochs, [spring_params.enemy_distance for spring_params in spring_hist])
-        plt.plot(spaced_epochs, [spring_params.enemy_stiffness for spring_params in spring_hist])
-        plt.plot(spaced_epochs, [spring_params.distance_threshold for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.friend_distance for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.friend_stiffness for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.neutral_distance for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.neutral_stiffness for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.enemy_distance for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.enemy_stiffness for spring_params in spring_hist])
+        plt.plot(epochs, [spring_params.distance_threshold for spring_params in spring_hist])
         plt.legend(['friend_distance', 'friend_stiffness', 'neutral_distance', 'neutral_stiffness', 'enemy_distance', 'enemy_stiffness', 'distance_threshold'])
         plt.title('Spring params')
         plt.show()
@@ -430,24 +373,24 @@ def main(argv) -> None:
         auxillary_dim=AUXILLARY_DIM
     )
 
-    training_signs = signs.copy()
-    training_signs = training_signs.at[train_mask].set(0)
+    # training_signs = graphsigns.copy()
+    # training_signs = training_signs.at[train_mask].set(0)
 
-    simulation_params_test = sim.SimulationParams(
-        iterations=FINAL_SIM_ITERATIONS,
-        dt=DT,
-        damping=DAMPING,
-        message_passing_iterations=1)
+    # simulation_params_test = sim.SimulationParams(
+    #     iterations=FINAL_SIM_ITERATIONS,
+    #     dt=DT,
+    #     damping=DAMPING,
+    #     message_passing_iterations=1)
 
-    spring_state = sim.simulate(
-        simulation_params=simulation_params_test,
-        spring_state=spring_state, 
-        spring_params=spring_params,
-        nn_force=NN_FORCE,
-        nn_auxillary_params=auxillary_params,
-        nn_force_params=force_params,
-        edge_index=edge_index,
-        sign=training_signs)
+    # spring_state = sim.simulate(
+    #     simulation_params=simulation_params_test,
+    #     spring_state=spring_state, 
+    #     spring_params=spring_params,
+    #     nn_force=NN_FORCE,
+    #     nn_auxillary_params=auxillary_params,
+    #     nn_force_params=force_params,
+    #     edge_index=edge_index,
+    #     sign=training_signs)
 
     # metrics = sim.evaluate(
     #     spring_state,

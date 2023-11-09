@@ -1,9 +1,8 @@
 import jax.numpy as jnp
 import jax
-from typing import NamedTuple
 from functools import partial
 import simulation as sim
-import optax
+from helpers import SignedGraph
 
 # @partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary"])
 def simulate(
@@ -13,8 +12,7 @@ def simulate(
     nn_force : bool,
     nn_auxillary_params : dict,
     nn_force_params : dict,
-    edge_index : jnp.ndarray,
-    sign : jnp.ndarray) -> sim.SpringState:
+    graph : SignedGraph) -> sim.SpringState:
 
     state = sim.SimulationState(0, 0)
 
@@ -23,8 +21,8 @@ def simulate(
         auxillary_update = lambda i, state: sim.update_auxillary_state(
             spring_state = state,
             auxillaries_nn_params = nn_auxillary_params,
-            edge_index = edge_index,
-            sign = sign)
+            edge_index = graph.edge_index,
+            sign = graph.sign)
         
         # jax.debug.print(f"message_passing_iterations: {simulation_params.message_passing_iterations}") 
         spring_state = jax.lax.fori_loop(
@@ -37,16 +35,15 @@ def simulate(
         spring_state=spring_state,
         nn_force=nn_force,
         nn_force_params=nn_force_params,
-        edge_index=edge_index,
-        sign=sign
-    )
+        edge_index=graph.edge_index,
+        sign=graph.sign)
 
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         simulation_params = simulation_params, 
         spring_params = spring_params,
         spring_state = state,
-        edge_index = edge_index)
+        edge_index = graph.edge_index)
 
     spring_state = jax.lax.fori_loop(
         0, 
@@ -64,13 +61,11 @@ def simulate_and_loss(
     nn_force : bool,
     nn_auxillary_params : dict,
     nn_force_params : dict,
-    edge_index : jnp.ndarray,
-    sign : jnp.ndarray,
-    training_mask : jnp.ndarray,
-    validation_mask : jnp.ndarray) -> sim.SpringState:
+    graph : SignedGraph) -> sim.SpringState:
 
     training_signs = sign.copy()
-    training_signs = jnp.where(training_mask, training_signs, 0)
+    training_signs = jnp.where(graph.train_mask, training_signs, 0)
+    training_graph = graph._replace(sign=training_signs)
 
     spring_state = simulate(
         simulation_params = simulation_params,
@@ -79,11 +74,10 @@ def simulate_and_loss(
         nn_force = nn_force,
         nn_auxillary_params = nn_auxillary_params,
         nn_force_params = nn_force_params,
-        edge_index = edge_index,
-        sign = training_signs)
+        graph=training_graph)
 
-    position_i = spring_state.position[edge_index[0]]
-    position_j = spring_state.position[edge_index[1]]
+    position_i = spring_state.position[graph.edge_index[0]]
+    position_j = spring_state.position[graph.edge_index[1]]
 
     distance = jnp.linalg.norm(position_j - position_i, axis=1) - spring_params.distance_threshold
 
@@ -91,7 +85,7 @@ def simulate_and_loss(
     predicted_sign = 1 / (1 + jnp.exp(distance))
 
     # apply same transformation to the actual signs
-    sign = sign * 0.5 + 0.5
+    sign = graph.sign * 0.5 + 0.5
 
     incorrect_predictions = (sign - predicted_sign) ** 2
 

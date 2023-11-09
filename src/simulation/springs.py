@@ -1,7 +1,5 @@
 import jax.numpy as jnp
 import jax
-from typing import NamedTuple, Optional
-from functools import partial
 import neural as nn
 import simulation as sim
 
