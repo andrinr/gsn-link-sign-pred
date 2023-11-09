@@ -52,8 +52,8 @@ def get_dataset(data_path : str, argv : list) -> Data:
 class SignedGraph(NamedTuple):
     edge_index : jnp.ndarray
     sign : jnp.ndarray
-    num_nodes : int
     node_degrees : jnp.ndarray
+    num_nodes : int
     train_mask : jnp.ndarray
     test_mask : jnp.ndarray
     val_mask : jnp.ndarray
@@ -73,4 +73,4 @@ def to_SignedGraph(data : Data) -> SignedGraph:
 
     node_degrees = jnp.bincount(edge_index[0])
 
-    return SignedGraph(edge_index, signs, num_nodes, train_mask, test_mask, val_mask)
+    return SignedGraph(edge_index, signs, node_degrees, num_nodes, train_mask, test_mask, val_mask)

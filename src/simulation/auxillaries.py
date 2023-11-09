@@ -3,21 +3,23 @@ import jax
 from functools import partial
 import simulation as sim
 import neural as nn
+from helpers import SignedGraph
+
+EPSILON = 1e-6
 
 # @partial(jax.jit)
 def update_auxillary_state(
     spring_state : sim.SpringState, 
     auxillaries_nn_params : dict[jnp.ndarray],
-    edge_index : jnp.ndarray,
-    sign : jnp.ndarray) -> sim.SpringState:
+    graph : SignedGraph) -> sim.SpringState:
     """
     Update the auxillary state using the message passing method.
     """
 
-    auxillaries_i = spring_state.auxillary[edge_index[0]]
-    auxillaries_j = spring_state.auxillary[edge_index[1]]
+    auxillaries_i = spring_state.auxillary[graph.edge_index[0]]
+    auxillaries_j = spring_state.auxillary[graph.edge_index[1]]
 
-    sign_one_hot = jax.nn.one_hot(sign, 3)
+    sign_one_hot = jax.nn.one_hot(graph.sign, 3)
 
     auxillaries_i = nn.gnn_psi(
         jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot], axis=-1),
@@ -25,8 +27,9 @@ def update_auxillary_state(
 
     # mean aggregation
     auxillaries = jnp.zeros_like(spring_state.auxillary)
-    auxillaries = auxillaries.at[edge_index[0]].add(auxillaries_i)
-    auxillaries = auxillaries / jnp.expand_dims(, axis=-1)
+    auxillaries = auxillaries.at[graph.edge_index[0]].add(auxillaries_i)
+    # avoid division by zero
+    auxillaries = auxillaries / jnp.expand_dims(graph.node_degrees + EPSILON , axis=-1)
    
     auxillaries = nn.gnn_phi(
         jnp.concatenate([auxillaries, spring_state.auxillary], axis=-1),

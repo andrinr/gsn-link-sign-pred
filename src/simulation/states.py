@@ -1,5 +1,6 @@
 from typing import NamedTuple
 import jax.numpy as jnp
+import jax
 
 class SpringParams(NamedTuple):
     friend_distance: float
@@ -15,6 +16,18 @@ class SpringState(NamedTuple):
     velocity: jnp.ndarray
     auxillary: jnp.ndarray
     force_decision: jnp.ndarray
+    
+def init_spring_state(
+    rng : jax.random.PRNGKey, 
+    n : int, m : int,
+    range : float,
+    embedding_dim : int,
+    auxillary_dim : int) -> SpringState:
+    position = jax.random.uniform(rng, (n, embedding_dim), maxval=range, minval=-range)
+    velocity = jnp.zeros((n, embedding_dim))
+    auxillary = jax.random.uniform(rng, (n, auxillary_dim), maxval=range, minval=-range)
+    force_decision = jnp.zeros((m, 3))
+    return SpringState(position, velocity, auxillary, force_decision)
 
 class SimulationState(NamedTuple):
     iteration : int

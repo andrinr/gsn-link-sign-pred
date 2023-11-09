@@ -14,15 +14,12 @@ def simulate(
     nn_force_params : dict,
     graph : SignedGraph) -> sim.SpringState:
 
-    state = sim.SimulationState(0, 0)
-
     if nn_force:
         # capture the auxillaries_nn_params in the closure
         auxillary_update = lambda i, state: sim.update_auxillary_state(
             spring_state = state,
             auxillaries_nn_params = nn_auxillary_params,
-            edge_index = graph.edge_index,
-            sign = graph.sign)
+            graph = graph)
         
         # jax.debug.print(f"message_passing_iterations: {simulation_params.message_passing_iterations}") 
         spring_state = jax.lax.fori_loop(
@@ -35,15 +32,16 @@ def simulate(
         spring_state=spring_state,
         nn_force=nn_force,
         nn_force_params=nn_force_params,
-        edge_index=graph.edge_index,
-        sign=graph.sign)
+        graph = graph)
+    
+    print(spring_state.force_decision.shape)
 
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         simulation_params = simulation_params, 
         spring_params = spring_params,
-        spring_state = state,
-        edge_index = graph.edge_index)
+        spring_state = spring_state,
+        graph = graph)
 
     spring_state = jax.lax.fori_loop(
         0, 
@@ -53,7 +51,7 @@ def simulate(
     
     return spring_state
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_force"])
 def simulate_and_loss(
     simulation_params : sim.SimulationParams,
     spring_state : sim.SpringState,
@@ -63,7 +61,7 @@ def simulate_and_loss(
     nn_force_params : dict,
     graph : SignedGraph) -> sim.SpringState:
 
-    training_signs = sign.copy()
+    training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
     training_graph = graph._replace(sign=training_signs)
 

@@ -28,14 +28,14 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     # Simulation parameters
-    NN_FORCE = True
-    OPTIMIZE_FORCE = True
+    NN_FORCE = False
+    OPTIMIZE_FORCE = False
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 64
     AUXILLARY_DIM = 16
-    INIT_POS_RANGE = 10.0
+    INIT_POS_RANGE = 1.0
     DT = 0.01
-    DAMPING = 0.3
+    DAMPING = 0.1
 
     # Training parameters
     NUM_EPOCHS = 50
@@ -124,7 +124,7 @@ def main(argv) -> None:
     else:
         auxillary_params = nn.init_gnn_params(
             key=key_auxillary,
-            factor=0.1,
+            factor=0.3,
             auxilliary_dimension=AUXILLARY_DIM)
         print("no auxillary params checkpoint found, using default params")
 
@@ -142,16 +142,16 @@ def main(argv) -> None:
         force_params = nn.init_force_params(
             key=key_force,
             auxillary_dim = AUXILLARY_DIM,
-            factor= 0.1)
+            factor= 0.3)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adamaxw(learning_rate=1e-5)
+        auxillary_optimizer = optax.adamaxw(learning_rate=1e-2)
         auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-4)
+        force_optimizer = optax.adamaxw(learning_rate=1e-2)
         force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
@@ -166,9 +166,7 @@ def main(argv) -> None:
 
     loss_hist = []
     metrics_hist = []
-    loss_mov_avg = 0.0
-    if OPTIMIZE_SPRING_PARAMS:
-        spring_hist = []    
+    spring_hist = []    
 
     epochs = range(NUM_EPOCHS)
     
@@ -190,6 +188,8 @@ def main(argv) -> None:
                 m=num_edges,
                 embedding_dim=EMBEDDING_DIM,
                 auxillary_dim=AUXILLARY_DIM)
+            
+            print(spring_state)
 
             # run simulation and compute loss, auxillaries and gradient
             if OPTIMIZE_FORCE:
@@ -200,10 +200,7 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    graph.edge_index, #6
-                    graph.sign, #7
-                    graph.train_mask, #8
-                    graph.val_mask)
+                    graph)
                 
             if OPTIMIZE_SPRING_PARAMS:
                 (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
@@ -213,10 +210,7 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    graph.edge_index, #6
-                    graph.sign, #7
-                    graph.train_mask, #8
-                    graph.val_mask)
+                    graph)
             else:
                 loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
                     simulation_params_train, #0
@@ -225,10 +219,7 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    graph.edge_index, #6
-                    graph.sign, #7
-                    graph.train_mask, #8
-                    graph.val_mask)
+                    graph)
                 
             if OPTIMIZE_FORCE:
                 nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
@@ -241,56 +232,53 @@ def main(argv) -> None:
                 
                 force_params = optax.apply_updates(force_params, nn_force_update)
 
+                # print(f"nn_auxillary_grad: {nn_auxillary_grad}")
+                # print(f"nn_force_grad: {nn_force_grad}")
+
             if OPTIMIZE_SPRING_PARAMS:
                 params_update, params_optimizier_state = params_multi_step.update(
                     params_grad, params_optimizier_state, spring_params)
                 
                 spring_params = optax.apply_updates(spring_params, params_update)
 
-            signs_ = graph.signs * 0.5 + 0.5
+            print(spring_state)
             metrics = sim.evaluate(
                 spring_state,
                 graph.edge_index,
-                graph.signs,
+                graph.sign,
                 graph.train_mask,
                 graph.val_mask)
-            
-            loss_mov_avg += loss_value
-
-            print(loss_value)
-
-        loss_mov_avg = loss_mov_avg / BATCH_SIZE
+        
         print(metrics)
         print(f"epoch: {epoch_index} batch: {batch_index}")
         print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
-        print(f"loss_mov_avg: {loss_mov_avg}")
-        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), signs_))} out of {graph.sign.shape[0]}")
+        sign_ = graph.sign * 0.5 + 0.5
+        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))} out of {graph.sign.shape[0]}")
 
-        loss_hist.append(loss_mov_avg)
+        loss_hist.append(loss_value)
         metrics_hist.append(metrics)
-
-        loss_mov_avg = 0.0
 
         if OPTIMIZE_SPRING_PARAMS:
             spring_hist.append(spring_params)
 
-    # # plot the embeddings
-    # plt.scatter(spring_state.position[:, 0], spring_state.position[:, 1])
-    # # add edges to plot
-    # for i in range(edge_index.shape[1]):
-    #     plt.plot(
-    #         [spring_state.position[edge_index[0, i], 0], spring_state.position[edge_index[1, i], 0]],
-    #         [spring_state.position[edge_index[0, i], 1], spring_state.position[edge_index[1, i], 1]],
-    #         color= 'blue' if signs[i] == 1 else 'red',
-    #         alpha=0.5)
+    # plot the embeddings
+    plt.scatter(spring_state.position[:, 0], spring_state.position[:, 1])
+    sign = data.edge_attr
+    # add edges to plot
+    for i in range(data.edge_index.shape[1]):
+        plt.plot(
+            [spring_state.position[data.edge_index[0, i], 0], spring_state.position[data.edge_index[1, i], 0]],
+            [spring_state.position[data.edge_index[0, i], 1], spring_state.position[data.edge_index[1, i], 1]],
+            color= 'blue' if sign[i] == 1 else 'red',
+            alpha=0.5)
         
-    # # add legend for edges
-    # plt.plot([], [], color='blue', label='positive')
-    # plt.plot([], [], color='red', label='negative')
-    # plt.legend()
+    # add legend for edges
+    plt.plot([], [], color='blue', label='positive')
+    plt.plot([], [], color='red', label='negative')
+    plt.legend()
 
-    # plt.show()
+    plt.show()
 
     # plot loss over time
     epochs = range(NUM_EPOCHS)

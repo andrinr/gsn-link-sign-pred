@@ -41,4 +41,6 @@ def mlp_forces(
     x = jnp.dot(x, params[f'W{2}']) + params[f'b{2}']
     x = jax.nn.softmax(x)
 
+    return x
+
    
