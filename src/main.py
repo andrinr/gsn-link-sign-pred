@@ -6,6 +6,7 @@ from torch_geometric.loader import ClusterData, ClusterLoader
 import yaml
 from jax import random, value_and_grad
 import jax.numpy as jnp
+import jax
 import matplotlib.pyplot as plt
 import optax
 import os
@@ -14,7 +15,9 @@ import torch_geometric.transforms as T
 # Local dependencies
 import simulation as sim
 import neural as nn
-from helpers import get_dataset, to_SignedGraph, plot_embedding
+from io_helpers import get_dataset
+from plot_helpers import plot_embedding
+from graph import to_SignedGraph
 
 def main(argv) -> None:
     """
@@ -28,23 +31,23 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     # Simulation parameters
-    NN_FORCE = False
-    OPTIMIZE_FORCE = False
-    OPTIMIZE_SPRING_PARAMS = True
-    EMBEDDING_DIM = 2
+    NN_FORCE = True
+    OPTIMIZE_FORCE = True
+    OPTIMIZE_SPRING_PARAMS = False
+    EMBEDDING_DIM = 64
     AUXILLARY_DIM = 16
     INIT_POS_RANGE = 2.0
-    DT = 0.01
+    DT = 0.03
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 50
+    NUM_EPOCHS = 100
     GRADIENT_ACCUMULATION = 1
     BATCH_SIZE = 8
     PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 4
-    GRAPH_PARTITIONING = False
+    GRAPH_PARTITIONING = True
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -61,13 +64,15 @@ def main(argv) -> None:
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".90"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    data = get_dataset(DATA_PATH, argv) 
-    if not is_undirected(data.edge_index):
+    jax.config.update("jax_enable_x64", True)
+    
+    dataset = get_dataset(DATA_PATH, argv) 
+    if not is_undirected(dataset.edge_index):
         transform = T.ToUndirected(reduce="min")
-        data = transform(data)
+        dataset = transform(dataset)
 
-    num_nodes = data.num_nodes
-    num_edges = data.num_edges
+    num_nodes = dataset.num_nodes
+    num_edges = dataset.num_edges
 
     print(f"num_nodes: {num_nodes}")
     print(f"num_edges: {num_edges}")
@@ -75,7 +80,7 @@ def main(argv) -> None:
     batches = []
     if GRAPH_PARTITIONING:
         cluster_data = ClusterData(
-            data, 
+            dataset, 
             num_parts=BATCH_SIZE)
         
         loader = ClusterLoader(cluster_data)
@@ -84,13 +89,12 @@ def main(argv) -> None:
             batches.append(signedGraph)
             
     else:
-        signedGraph = to_SignedGraph(data)
+        signedGraph = to_SignedGraph(dataset)
         batches.append(signedGraph)
 
-    data = to_SignedGraph(data)
+    graph = to_SignedGraph(dataset)
         
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
-    print(params_path)
     if os.path.exists(params_path):
         stream = open(params_path, 'r')
         spring_params = yaml.load(stream, Loader=yaml.FullLoader)
@@ -114,7 +118,7 @@ def main(argv) -> None:
         message_passing_iterations=AUXILLARY_ITERATIONS)
 
     # Create initial values for neural network parameters
-    key_auxillary, key_force, key_training, key_test = random.split(random.PRNGKey(0), 4)
+    key_auxillary, key_force, key_training, key_test = random.split(random.PRNGKey(2), 4)
     
     auxillary_checkpoint_path = f"{CECKPOINT_PATH}auxillary_params_{AUXILLARY_DIM}.yaml"
     if os.path.exists(auxillary_checkpoint_path):
@@ -159,7 +163,7 @@ def main(argv) -> None:
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
 
     if OPTIMIZE_SPRING_PARAMS:
-        params_optimizer = optax.adamaxw(learning_rate=0.1)
+        params_optimizer = optax.adamaxw(learning_rate=1e-2)
         params_multi_step = optax.MultiSteps(params_optimizer, GRADIENT_ACCUMULATION)
         params_optimizier_state = params_multi_step.init(spring_params)  
 
@@ -173,12 +177,12 @@ def main(argv) -> None:
     
     epochs_keys = random.split(key_training, NUM_EPOCHS)
     for epoch_index in epochs:
-        for batch_index, graph in enumerate(batches):
+        for batch_index, batch_graph in enumerate(batches):
 
             print(f"epoch: {epoch_index} batch: {batch_index}")
             print(f"num_nodes: {num_nodes}")
-            print(f"num_edges: {graph.sign.shape[0]}")
-            num_edges = graph.sign.shape[0] // 2
+            print(f"num_edges: {batch_graph.sign.shape[0]}")
+            num_edges = batch_graph.sign.shape[0] // 2
 
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
@@ -189,8 +193,6 @@ def main(argv) -> None:
                 m=num_edges,
                 embedding_dim=EMBEDDING_DIM,
                 auxillary_dim=AUXILLARY_DIM)
-            
-            print(spring_state)
 
             # run simulation and compute loss, auxillaries and gradient
             if OPTIMIZE_FORCE:
@@ -201,7 +203,7 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    graph)
+                    batch_graph)
                 
             if OPTIMIZE_SPRING_PARAMS:
                 (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
@@ -211,7 +213,7 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    graph)
+                    batch_graph)
             else:
                 loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
                     simulation_params_train, #0
@@ -220,7 +222,7 @@ def main(argv) -> None:
                     NN_FORCE, #3
                     auxillary_params, #4
                     force_params, #5
-                    graph)
+                    batch_graph)
                 
             if OPTIMIZE_FORCE:
                 nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
@@ -244,17 +246,17 @@ def main(argv) -> None:
 
         metrics = sim.evaluate(
             spring_state,
-            graph.edge_index,
-            graph.sign,
-            graph.train_mask,
-            graph.val_mask)
+            batch_graph.edge_index,
+            batch_graph.sign,
+            batch_graph.train_mask,
+            batch_graph.val_mask)
         
         print(metrics)
         print(f"epoch: {epoch_index} batch: {batch_index}")
         print(f"predictions: {signs_pred}")
         print(f"loss: {loss_value}")
-        sign_ = graph.sign * 0.5 + 0.5
-        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))} out of {graph.sign.shape[0]}")
+        sign_ = batch_graph.sign * 0.5 + 0.5
+        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))} out of {batch_graph.sign.shape[0]}")
 
         loss_hist.append(loss_value)
         metrics_hist.append(metrics)
@@ -312,8 +314,6 @@ def main(argv) -> None:
                 params_dict['enemy_stiffness'] = spring_params.enemy_stiffness.item()
                 params_dict['distance_threshold'] = spring_params.distance_threshold.item()
 
-                print(params_dict)
-
                 yaml.dump(params_dict, file)
 
     # Store the trained parameters in a file
@@ -336,8 +336,8 @@ def main(argv) -> None:
 
     spring_state = sim.init_spring_state(
         rng=key_test,
-        n=data.num_nodes,
-        m=data.num_edges,
+        n=graph.num_nodes,
+        m=graph.num_edges,
         range=INIT_POS_RANGE,
         embedding_dim=EMBEDDING_DIM,
         auxillary_dim=AUXILLARY_DIM
@@ -354,8 +354,6 @@ def main(argv) -> None:
 
     initial_embeddings = spring_state.position.copy()
 
-    print(spring_params)
-
     spring_state = sim.simulate(
         simulation_params=simulation_params_test,
         spring_state=spring_state, 
@@ -363,25 +361,20 @@ def main(argv) -> None:
         nn_force=NN_FORCE,
         nn_auxillary_params=auxillary_params,
         nn_force_params=force_params,
-        graph=data)
+        graph=graph)
 
     metrics = sim.evaluate(
         spring_state,
-        data.edge_index,
-        data.sign,
-        data.train_mask,
-        data.test_mask)
+        graph.edge_index,
+        graph.sign,
+        graph.train_mask,
+        graph.test_mask)
 
-   # create two subplots side by side
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-
-    # plot the embeddings
-    plot_embedding(initial_embeddings, data, ax1)
-    ax1.set_title('Initial embeddings')
-
-    plot_embedding(spring_state.position, data, ax2)
-    ax2.set_title('Final embeddings')
-    plt.show()
+    # create new plot
+    # fig, ax = plt.subplots(1, 1)
+    # plot_embedding(spring_state, spring_params, graph, ax)
+    # ax.set_title('Final embeddings')
+    # plt.show()
 
     # # create four subplots
     # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)

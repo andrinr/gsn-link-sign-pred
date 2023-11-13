@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax
 from functools import partial
 import simulation as sim
-from helpers import SignedGraph
+from graph import SignedGraph
 
 # @partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary"])
 def simulate(
@@ -49,6 +49,21 @@ def simulate(
     
     return spring_state
 
+def predict(
+    spring_state : sim.SpringState,
+    spring_params : sim.SpringParams,
+    graph : SignedGraph
+):
+    position_i = spring_state.position[graph.edge_index[0]]
+    position_j = spring_state.position[graph.edge_index[1]]
+
+    distance = jnp.linalg.norm(position_j - position_i, axis=1) - spring_params.distance_threshold
+
+    # apply sigmoid function to get sign (0 for negative, 1 for positive)
+    predicted_sign = 1 / (1 + jnp.exp(distance))
+
+    return predicted_sign
+
 @partial(jax.jit, static_argnames=["simulation_params", "nn_force"])
 def simulate_and_loss(
     simulation_params : sim.SimulationParams,
@@ -72,13 +87,10 @@ def simulate_and_loss(
         nn_force_params = nn_force_params,
         graph=training_graph)
 
-    position_i = spring_state.position[graph.edge_index[0]]
-    position_j = spring_state.position[graph.edge_index[1]]
-
-    distance = jnp.linalg.norm(position_j - position_i, axis=1) - spring_params.distance_threshold
-
-    # apply sigmoid function to get sign (0 for negative, 1 for positive)
-    predicted_sign = 1 / (1 + jnp.exp(distance))
+    predicted_sign = predict(
+        spring_state = spring_state,
+        spring_params = spring_params,
+        graph = graph)
 
     # apply same transformation to the actual signs
     sign = graph.sign * 0.5 + 0.5
@@ -95,7 +107,10 @@ def simulate_and_loss(
     
     # apply weights to the loss
     incorrect_predictions = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
+    # only consider the training / validation nodes
+    # incorrect_predictions = jnp.where(graph.test_mask, 0, incorrect_predictions)
 
+    # MSE loss
     loss = jnp.mean(incorrect_predictions)
     
     return loss, (spring_state, predicted_sign)

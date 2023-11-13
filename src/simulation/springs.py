@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import jax
 import neural as nn
 import simulation as sim
-from helpers import SignedGraph
+from graph import SignedGraph
 from functools import partial
 
 EPSILON = 1e-6
@@ -33,7 +33,7 @@ def force_decision(
     )
 
 # @partial(jax.jit, static_argnames=[])
-def compute_acceleration(
+def force(
     params : sim.SpringParams,
     state : sim.SpringState,
     graph : SignedGraph) -> jnp.ndarray:
@@ -57,6 +57,9 @@ def compute_acceleration(
     
     return acceleration * spring_vector_norm
 
+def damping(spring_state : sim.SpringState, simulation_params : sim.SimulationParams) -> jnp.ndarray:
+    return -spring_state.velocity * (1.0 - simulation_params.damping)
+
 #@partial(jax.jit, static_argnames=["simulation_params"])
 def update_spring_state(
     simulation_params : sim.SimulationParams,
@@ -67,20 +70,21 @@ def update_spring_state(
     Update the spring state using the kick drift kick integratoin scheme. 
     This is essentially a simple message passing network implementation. 
     """
-    edge_acceleration = compute_acceleration(
+    edge_acceleration = force(
         spring_params,
         spring_state,
         graph)
 
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
+    node_damping = damping(spring_state, simulation_params)
 
-    velocity_half = spring_state.velocity + 0.5 * simulation_params.dt * node_accelerations
+    velocity_half = spring_state.velocity + 0.5 * simulation_params.dt * (node_accelerations + node_damping)
     position_full = spring_state.position + simulation_params.dt * velocity_half
 
     spring_state = spring_state._replace(position=position_full)
 
-    edge_acceleration = compute_acceleration(
+    edge_acceleration = force(
         spring_params,
         spring_state,
         graph)
@@ -88,7 +92,7 @@ def update_spring_state(
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
 
-    velocity_full = velocity_half + 0.5 * simulation_params.dt * node_accelerations
+    velocity_full = velocity_half + 0.5 * simulation_params.dt * (node_accelerations + node_damping)
     # velocity = velocity * (1.0 - simulation_params.damping)
 
     spring_state = spring_state._replace(velocity=velocity_full)

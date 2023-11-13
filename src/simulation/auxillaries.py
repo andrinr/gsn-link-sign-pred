@@ -3,7 +3,7 @@ import jax
 from functools import partial
 import simulation as sim
 import neural as nn
-from helpers import SignedGraph
+from graph import SignedGraph
 
 EPSILON = 1e-6
 
