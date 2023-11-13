@@ -6,7 +6,9 @@ from typing import NamedTuple
 import jax.numpy as jnp
 from graph import permute_split
 import torch_geometric.transforms as T
-
+import matplotlib.pyplot as plt
+from simulation import SpringState
+    
 def get_dataset(data_path : str, argv : list) -> Data:
     dataset_names = ['Tribes', 'Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
@@ -54,14 +56,32 @@ class SignedGraph(NamedTuple):
     sign : jnp.ndarray
     node_degrees : jnp.ndarray
     num_nodes : int
+    num_edges : int
     train_mask : jnp.ndarray
     test_mask : jnp.ndarray
     val_mask : jnp.ndarray
+
+def plot_embedding(embeddings : jnp.ndarray, graph : SignedGraph, axis : plt.Axes):
+        # plot the embeddings
+    axis.scatter(embeddings[:, 0], embeddings[:, 1])
+    # add edges to plot
+    for i in range(graph.edge_index.shape[1]):
+        axis.plot(
+            [embeddings[graph.edge_index[0, i], 0], embeddings[graph.edge_index[1, i], 0]],
+            [embeddings[graph.edge_index[0, i], 1], embeddings[graph.edge_index[1, i], 1]],
+            color= 'blue' if graph.sign[i] == 1 else 'red',
+            alpha=0.5)
+        
+    # add legend for edges
+    axis.plot([], [], color='blue', label='positive')
+    axis.plot([], [], color='red', label='negative')
+    axis.legend()
 
 def to_SignedGraph(data : Data) -> SignedGraph:
     data, train_mask, val_mask, test_mask = permute_split(data, 0.1, 0.8)
 
     num_nodes = data.num_nodes
+    num_edges = data.num_edges
 
     train_mask = jnp.array(train_mask)
     val_mask = jnp.array(val_mask)
@@ -73,4 +93,12 @@ def to_SignedGraph(data : Data) -> SignedGraph:
 
     node_degrees = jnp.bincount(edge_index[0])
 
-    return SignedGraph(edge_index, signs, node_degrees, num_nodes, train_mask, test_mask, val_mask)
+    return SignedGraph(
+        edge_index, 
+        signs, 
+        node_degrees, 
+        num_nodes, 
+        num_edges, 
+        train_mask,
+        test_mask, 
+        val_mask)

@@ -14,7 +14,7 @@ import torch_geometric.transforms as T
 # Local dependencies
 import simulation as sim
 import neural as nn
-from helpers import get_dataset, to_SignedGraph
+from helpers import get_dataset, to_SignedGraph, plot_embedding
 
 def main(argv) -> None:
     """
@@ -30,10 +30,10 @@ def main(argv) -> None:
     # Simulation parameters
     NN_FORCE = False
     OPTIMIZE_FORCE = False
-    OPTIMIZE_SPRING_PARAMS = False
-    EMBEDDING_DIM = 64
+    OPTIMIZE_SPRING_PARAMS = True
+    EMBEDDING_DIM = 2
     AUXILLARY_DIM = 16
-    INIT_POS_RANGE = 1.0
+    INIT_POS_RANGE = 2.0
     DT = 0.01
     DAMPING = 0.1
 
@@ -86,8 +86,9 @@ def main(argv) -> None:
     else:
         signedGraph = to_SignedGraph(data)
         batches.append(signedGraph)
-        
 
+    data = to_SignedGraph(data)
+        
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     print(params_path)
     if os.path.exists(params_path):
@@ -241,13 +242,12 @@ def main(argv) -> None:
                 
                 spring_params = optax.apply_updates(spring_params, params_update)
 
-            print(spring_state)
-            metrics = sim.evaluate(
-                spring_state,
-                graph.edge_index,
-                graph.sign,
-                graph.train_mask,
-                graph.val_mask)
+        metrics = sim.evaluate(
+            spring_state,
+            graph.edge_index,
+            graph.sign,
+            graph.train_mask,
+            graph.val_mask)
         
         print(metrics)
         print(f"epoch: {epoch_index} batch: {batch_index}")
@@ -261,24 +261,6 @@ def main(argv) -> None:
 
         if OPTIMIZE_SPRING_PARAMS:
             spring_hist.append(spring_params)
-
-    # plot the embeddings
-    plt.scatter(spring_state.position[:, 0], spring_state.position[:, 1])
-    sign = data.edge_attr
-    # add edges to plot
-    for i in range(data.edge_index.shape[1]):
-        plt.plot(
-            [spring_state.position[data.edge_index[0, i], 0], spring_state.position[data.edge_index[1, i], 0]],
-            [spring_state.position[data.edge_index[0, i], 1], spring_state.position[data.edge_index[1, i], 1]],
-            color= 'blue' if sign[i] == 1 else 'red',
-            alpha=0.5)
-        
-    # add legend for edges
-    plt.plot([], [], color='blue', label='positive')
-    plt.plot([], [], color='red', label='negative')
-    plt.legend()
-
-    plt.show()
 
     # plot loss over time
     epochs = range(NUM_EPOCHS)
@@ -364,30 +346,42 @@ def main(argv) -> None:
     # training_signs = graphsigns.copy()
     # training_signs = training_signs.at[train_mask].set(0)
 
-    # simulation_params_test = sim.SimulationParams(
-    #     iterations=FINAL_SIM_ITERATIONS,
-    #     dt=DT,
-    #     damping=DAMPING,
-    #     message_passing_iterations=1)
+    simulation_params_test = sim.SimulationParams(
+        iterations=FINAL_SIM_ITERATIONS,
+        dt=DT,
+        damping=DAMPING,
+        message_passing_iterations=AUXILLARY_ITERATIONS)
 
-    # spring_state = sim.simulate(
-    #     simulation_params=simulation_params_test,
-    #     spring_state=spring_state, 
-    #     spring_params=spring_params,
-    #     nn_force=NN_FORCE,
-    #     nn_auxillary_params=auxillary_params,
-    #     nn_force_params=force_params,
-    #     edge_index=edge_index,
-    #     sign=training_signs)
+    initial_embeddings = spring_state.position.copy()
 
-    # metrics = sim.evaluate(
-    #     spring_state,
-    #     edge_index,
-    #     signs,
-    #     train_mask,
-    #     test_mask)
+    print(spring_params)
 
-    # print(metrics)
+    spring_state = sim.simulate(
+        simulation_params=simulation_params_test,
+        spring_state=spring_state, 
+        spring_params=spring_params,
+        nn_force=NN_FORCE,
+        nn_auxillary_params=auxillary_params,
+        nn_force_params=force_params,
+        graph=data)
+
+    metrics = sim.evaluate(
+        spring_state,
+        data.edge_index,
+        data.sign,
+        data.train_mask,
+        data.test_mask)
+
+   # create two subplots side by side
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    # plot the embeddings
+    plot_embedding(initial_embeddings, data, ax1)
+    ax1.set_title('Initial embeddings')
+
+    plot_embedding(spring_state.position, data, ax2)
+    ax2.set_title('Final embeddings')
+    plt.show()
 
     # # create four subplots
     # fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
@@ -417,8 +411,6 @@ def main(argv) -> None:
     # ax4.plot(f1_macros)
     # ax4.set_title('Measures')
     # ax4.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
-
-    plt.show()
     
 if __name__ == "__main__":
     main(sys.argv[1:])

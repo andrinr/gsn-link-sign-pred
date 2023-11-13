@@ -42,5 +42,4 @@ def mlp_forces(
     x = jax.nn.softmax(x)
 
     return x
-
-   
+    

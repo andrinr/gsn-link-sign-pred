@@ -34,13 +34,11 @@ def simulate(
         nn_force_params=nn_force_params,
         graph = graph)
     
-    print(spring_state.force_decision.shape)
-
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         simulation_params = simulation_params, 
         spring_params = spring_params,
-        spring_state = spring_state,
+        spring_state = state,
         graph = graph)
 
     spring_state = jax.lax.fori_loop(

@@ -3,6 +3,7 @@ import jax
 import neural as nn
 import simulation as sim
 from helpers import SignedGraph
+from functools import partial
 
 EPSILON = 1e-6
 
@@ -56,14 +57,14 @@ def compute_acceleration(
     
     return acceleration * spring_vector_norm
 
-# @partial(jax.jit, static_argnames=["simulation_params"])
+#@partial(jax.jit, static_argnames=["simulation_params"])
 def update_spring_state(
     simulation_params : sim.SimulationParams,
     spring_params : sim.SpringParams,
     spring_state : sim.SpringState, 
     graph : SignedGraph) -> sim.SpringState:
     """
-    Update the spring state using the leapfrog method. 
+    Update the spring state using the kick drift kick integratoin scheme. 
     This is essentially a simple message passing network implementation. 
     """
     edge_acceleration = compute_acceleration(
@@ -71,29 +72,25 @@ def update_spring_state(
         spring_state,
         graph)
 
-    node_accererlations = jnp.zeros_like(spring_state.position)
-    node_accererlations = node_accererlations.at[graph.edge_index[0]].add(edge_acceleration)
+    node_accelerations = jnp.zeros_like(spring_state.position)
+    node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
 
-    velocity = spring_state.velocity + 0.5 * simulation_params.dt * node_accererlations
-    position = spring_state.position + simulation_params.dt * velocity
+    velocity_half = spring_state.velocity + 0.5 * simulation_params.dt * node_accelerations
+    position_full = spring_state.position + simulation_params.dt * velocity_half
 
-    spring_state = spring_state._replace(
-        position=position,
-        velocity=velocity)
+    spring_state = spring_state._replace(position=position_full)
 
     edge_acceleration = compute_acceleration(
         spring_params,
         spring_state,
         graph)
     
-    node_accererlations = jnp.zeros_like(spring_state.position)
-    node_accererlations = node_accererlations.at[graph.edge_index[0]].add(edge_acceleration)
+    node_accelerations = jnp.zeros_like(spring_state.position)
+    node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
 
-    velocity = velocity + 0.5 * simulation_params.dt * node_accererlations
-    velocity = velocity * (1.0 - simulation_params.damping)
+    velocity_full = velocity_half + 0.5 * simulation_params.dt * node_accelerations
+    # velocity = velocity * (1.0 - simulation_params.damping)
 
-    spring_state = spring_state._replace(
-        position=position,
-        velocity=velocity)
+    spring_state = spring_state._replace(velocity=velocity_full)
     
     return spring_state
