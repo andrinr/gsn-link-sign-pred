@@ -176,6 +176,8 @@ def main(argv) -> None:
     spring_hist = []    
 
     epoch_loss = 0
+    epoch_correct = 0
+    epoch_num_total = 0
 
     epochs = range(NUM_EPOCHS)
     
@@ -236,8 +238,8 @@ def main(argv) -> None:
                 
                 force_params = optax.apply_updates(force_params, nn_force_update)
 
-                print(f"nn_auxillary_grad: {nn_auxillary_grad}")
-                print(f"nn_force_grad: {nn_force_grad}")
+                # print(f"nn_auxillary_grad: {nn_auxillary_grad}")
+                # print(f"nn_force_grad: {nn_force_grad}")
 
             if OPTIMIZE_SPRING_PARAMS:
                 params_update, params_optimizier_state = params_multi_step.update(
@@ -246,6 +248,9 @@ def main(argv) -> None:
                 spring_params = optax.apply_updates(spring_params, params_update)
 
             epoch_loss += loss_value
+
+            epoch_correct += jnp.sum(jnp.equal(jnp.round(signs_pred), batch_graph.sign))
+            epoch_num_total += batch_graph.sign.shape[0]
 
         metrics = sim.evaluate(
             spring_state,
@@ -256,10 +261,10 @@ def main(argv) -> None:
         
         print(metrics)
         print(f"epoch: {epoch_index} batch: {batch_index}")
-        print(f"predictions: {signs_pred}")
+        # print(f"predictions: {signs_pred}")
         print(f"epoch loss: {epoch_loss}")
         sign_ = batch_graph.sign * 0.5 + 0.5
-        print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))} out of {batch_graph.sign.shape[0]}")
+        print(f"epoch correct percentage: {epoch_correct / epoch_num_total}")
 
         loss_hist.append(epoch_loss)
         epoch_loss = 0
