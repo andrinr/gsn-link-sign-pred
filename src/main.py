@@ -32,7 +32,7 @@ def main(argv) -> None:
     """
     # Simulation parameters
     NN_FORCE = True
-    OPTIMIZE_FORCE = True
+    OPTIMIZE_FORCE = False
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 32
     AUXILLARY_DIM = 32
@@ -47,7 +47,7 @@ def main(argv) -> None:
     PER_EPOCH_SIM_ITERATIONS = 200
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
     AUXILLARY_ITERATIONS = 4
-    GRAPH_PARTITIONING = True
+    GRAPH_PARTITIONING = False
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -57,7 +57,7 @@ def main(argv) -> None:
     assert not (not NN_FORCE and OPTIMIZE_FORCE), "Cannot optimize force without using NN force"
 
     if not OPTIMIZE_FORCE and not OPTIMIZE_SPRING_PARAMS:
-        NUM_EPOCHS = 1
+        NUM_EPOCHS = 0
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -154,11 +154,11 @@ def main(argv) -> None:
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adamaxw(learning_rate=1e-2)
+        auxillary_optimizer = optax.adamaxw(learning_rate=1e-3)
         auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-2)
+        force_optimizer = optax.adamaxw(learning_rate=1e-3)
         force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
@@ -180,7 +180,13 @@ def main(argv) -> None:
     epoch_num_total = 0
 
     epochs = range(NUM_EPOCHS)
-    
+
+    max_score_force_params = None
+    max_score_aux_params = None
+    max_score = 0
+
+    epoch_score = 0
+
     epochs_keys = random.split(key_training, NUM_EPOCHS)
     for epoch_index in epochs:
         for batch_index, batch_graph in enumerate(batches):
@@ -249,30 +255,42 @@ def main(argv) -> None:
 
             epoch_loss += loss_value
 
-            epoch_correct += jnp.sum(jnp.equal(jnp.round(signs_pred), batch_graph.sign))
+            sign_ = batch_graph.sign * 0.5 + 0.5
+            epoch_correct += jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))
             epoch_num_total += batch_graph.sign.shape[0]
 
-        metrics = sim.evaluate(
-            spring_state,
-            batch_graph.edge_index,
-            batch_graph.sign,
-            batch_graph.train_mask,
-            batch_graph.val_mask)
-        
-        print(metrics)
-        print(f"epoch: {epoch_index} batch: {batch_index}")
+            metrics = sim.evaluate(
+                spring_state,
+                batch_graph.edge_index,
+                batch_graph.sign,
+                batch_graph.train_mask,
+                batch_graph.val_mask)
+            
+            score = metrics.auc + metrics.f1_binary + metrics.f1_micro + metrics.f1_macro - loss_value
+            epoch_score += score
+
+        if epoch_score > max_score:
+            max_score = epoch_score
+            max_score_force_params = force_params.copy()
+            max_score_aux_params = auxillary_params.copy()
+
+            print(f"new max score: {max_score}")
+
+        print(f"epoch: {epoch_index}")
         # print(f"predictions: {signs_pred}")
+        print(f"epoch score: {epoch_score}")
         print(f"epoch loss: {epoch_loss}")
-        sign_ = batch_graph.sign * 0.5 + 0.5
         print(f"epoch correct percentage: {epoch_correct / epoch_num_total}")
 
         loss_hist.append(epoch_loss)
         epoch_loss = 0
+        epoch_score = 0
         metrics_hist.append(metrics)
 
         if OPTIMIZE_SPRING_PARAMS:
             spring_hist.append(spring_params)
 
+    
     # plot loss over time
     epochs = range(NUM_EPOCHS)
     plt.plot(epochs, loss_hist)
@@ -338,10 +356,10 @@ def main(argv) -> None:
         if answers['save'] == 'Yes':
                 
             with open(auxillary_checkpoint_path, 'w') as file:
-                yaml.dump(auxillary_params, file)
+                yaml.dump(max_score_aux_params, file)
 
             with open(force_params_name, 'w') as file:
-                yaml.dump(force_params, file)
+                yaml.dump(max_score_force_params, file)
 
     spring_state = sim.init_spring_state(
         rng=key_test,
@@ -378,6 +396,10 @@ def main(argv) -> None:
         graph.sign,
         graph.train_mask,
         graph.test_mask)
+    
+    print(graph)
+    
+    print(f"test metrics: {metrics}")
 
     # create new plot
     # fig, ax = plt.subplots(1, 1)
