@@ -32,7 +32,7 @@ def main(argv) -> None:
     """
     # Simulation parameters
     NN_FORCE = True
-    OPTIMIZE_FORCE = False
+    OPTIMIZE_FORCE = True
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 32
     AUXILLARY_DIM = 32
@@ -41,12 +41,12 @@ def main(argv) -> None:
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 100
-    GRADIENT_ACCUMULATION = 1
+    NUM_EPOCHS = 50
+    GRADIENT_ACCUMULATION = 2
     BATCH_SIZE = 8
-    PER_EPOCH_SIM_ITERATIONS = 200
+    PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
-    AUXILLARY_ITERATIONS = 4
+    AUXILLARY_ITERATIONS = 5
     GRAPH_PARTITIONING = False
 
     # Paths
@@ -64,7 +64,7 @@ def main(argv) -> None:
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".90"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    # jax.config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", True)
     
     dataset = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index):
@@ -131,7 +131,7 @@ def main(argv) -> None:
     else:
         auxillary_params = nn.init_gnn_params(
             key=key_auxillary,
-            factor=0.01,
+            factor=1,
             auxilliary_dimension=AUXILLARY_DIM)
         print("no auxillary params checkpoint found, using default params")
 
@@ -149,23 +149,23 @@ def main(argv) -> None:
         force_params = nn.init_force_params(
             key=key_force,
             auxillary_dim = AUXILLARY_DIM,
-            factor= 0.01)
+            factor=1)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adamaxw(learning_rate=1e-3)
+        auxillary_optimizer = optax.adamaxw(learning_rate=1e-1)
         auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-3)
+        force_optimizer = optax.adamaxw(learning_rate=1e-1)
         force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
         value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
 
     if OPTIMIZE_SPRING_PARAMS:
-        params_optimizer = optax.adamaxw(learning_rate=1e-2)
+        params_optimizer = optax.adamaxw(learning_rate=1e-3)
         params_multi_step = optax.MultiSteps(params_optimizer, GRADIENT_ACCUMULATION)
         params_optimizier_state = params_multi_step.init(spring_params)  
 
@@ -259,6 +259,8 @@ def main(argv) -> None:
             epoch_correct += jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))
             epoch_num_total += batch_graph.sign.shape[0]
 
+            print(f"loss: {loss_value}")
+            print(spring_state.force_decision)
             metrics = sim.evaluate(
                 spring_state,
                 batch_graph.edge_index,
@@ -268,6 +270,7 @@ def main(argv) -> None:
             
             score = metrics.auc + metrics.f1_binary + metrics.f1_micro + metrics.f1_macro - loss_value
             epoch_score += score
+
 
         if epoch_score > max_score:
             max_score = epoch_score
@@ -381,6 +384,10 @@ def main(argv) -> None:
 
     initial_embeddings = spring_state.position.copy()
 
+    training_signs = graph.sign.copy()
+    training_signs = jnp.where(graph.train_mask, training_signs, 0)
+    training_graph = graph._replace(sign=training_signs)
+
     spring_state = sim.simulate(
         simulation_params=simulation_params_test,
         spring_state=spring_state, 
@@ -388,7 +395,7 @@ def main(argv) -> None:
         nn_force=NN_FORCE,
         nn_auxillary_params=auxillary_params,
         nn_force_params=force_params,
-        graph=graph)
+        graph=training_graph)
 
     metrics = sim.evaluate(
         spring_state,
@@ -396,9 +403,7 @@ def main(argv) -> None:
         graph.sign,
         graph.train_mask,
         graph.test_mask)
-    
-    print(graph)
-    
+
     print(f"test metrics: {metrics}")
 
     # create new plot

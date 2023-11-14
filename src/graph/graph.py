@@ -20,7 +20,7 @@ class SignedGraph(NamedTuple):
 def to_SignedGraph(
     data : Data,
     reindexing : bool = True) -> SignedGraph:
-    data, train_mask, val_mask, test_mask = permute_split(data, 0.1, 0.8)
+    data, train_mask, val_mask, test_mask = permute_split(data, 0.05, 0.8)
 
     if reindexing:
         keep = torch.unique(data.edge_index)
