@@ -108,7 +108,7 @@ def simulate_and_loss(
     # apply weights to the loss
     incorrect_predictions = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
     # only consider the training / validation nodes
-    # incorrect_predictions = jnp.where(graph.test_mask, 0, incorrect_predictions)
+    #incorrect_predictions = jnp.where(graph.test_mask, 0, incorrect_predictions)
 
     # MSE loss
     loss = jnp.mean(incorrect_predictions)

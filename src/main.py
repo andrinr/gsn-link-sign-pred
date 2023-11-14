@@ -34,8 +34,8 @@ def main(argv) -> None:
     NN_FORCE = True
     OPTIMIZE_FORCE = True
     OPTIMIZE_SPRING_PARAMS = False
-    EMBEDDING_DIM = 64
-    AUXILLARY_DIM = 16
+    EMBEDDING_DIM = 32
+    AUXILLARY_DIM = 32
     INIT_POS_RANGE = 2.0
     DT = 0.03
     DAMPING = 0.1
@@ -64,7 +64,7 @@ def main(argv) -> None:
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".90"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    jax.config.update("jax_enable_x64", True)
+    # jax.config.update("jax_enable_x64", True)
     
     dataset = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index):
@@ -86,13 +86,15 @@ def main(argv) -> None:
         loader = ClusterLoader(cluster_data)
         for batch in loader:
             signedGraph = to_SignedGraph(batch)
-            batches.append(signedGraph)
+            if signedGraph.num_nodes > 32:
+                batches.append(signedGraph)
             
     else:
         signedGraph = to_SignedGraph(dataset)
         batches.append(signedGraph)
 
     graph = to_SignedGraph(dataset)
+    print(graph.sign)
         
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(params_path):
@@ -129,7 +131,7 @@ def main(argv) -> None:
     else:
         auxillary_params = nn.init_gnn_params(
             key=key_auxillary,
-            factor=0.3,
+            factor=0.01,
             auxilliary_dimension=AUXILLARY_DIM)
         print("no auxillary params checkpoint found, using default params")
 
@@ -147,7 +149,7 @@ def main(argv) -> None:
         force_params = nn.init_force_params(
             key=key_force,
             auxillary_dim = AUXILLARY_DIM,
-            factor= 0.3)
+            factor= 0.01)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
@@ -173,6 +175,8 @@ def main(argv) -> None:
     metrics_hist = []
     spring_hist = []    
 
+    epoch_loss = 0
+
     epochs = range(NUM_EPOCHS)
     
     epochs_keys = random.split(key_training, NUM_EPOCHS)
@@ -180,17 +184,14 @@ def main(argv) -> None:
         for batch_index, batch_graph in enumerate(batches):
 
             print(f"epoch: {epoch_index} batch: {batch_index}")
-            print(f"num_nodes: {num_nodes}")
-            print(f"num_edges: {batch_graph.sign.shape[0]}")
-            num_edges = batch_graph.sign.shape[0] // 2
 
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
             spring_state = sim.init_spring_state(
-                rng=epochs_keys[epoch_index],
+                rng=epochs_keys[0],
                 range=INIT_POS_RANGE,
-                n=num_nodes,
-                m=num_edges,
+                n=batch_graph.num_nodes,
+                m=batch_graph.num_edges,
                 embedding_dim=EMBEDDING_DIM,
                 auxillary_dim=AUXILLARY_DIM)
 
@@ -235,14 +236,16 @@ def main(argv) -> None:
                 
                 force_params = optax.apply_updates(force_params, nn_force_update)
 
-                # print(f"nn_auxillary_grad: {nn_auxillary_grad}")
-                # print(f"nn_force_grad: {nn_force_grad}")
+                print(f"nn_auxillary_grad: {nn_auxillary_grad}")
+                print(f"nn_force_grad: {nn_force_grad}")
 
             if OPTIMIZE_SPRING_PARAMS:
                 params_update, params_optimizier_state = params_multi_step.update(
                     params_grad, params_optimizier_state, spring_params)
                 
                 spring_params = optax.apply_updates(spring_params, params_update)
+
+            epoch_loss += loss_value
 
         metrics = sim.evaluate(
             spring_state,
@@ -254,11 +257,12 @@ def main(argv) -> None:
         print(metrics)
         print(f"epoch: {epoch_index} batch: {batch_index}")
         print(f"predictions: {signs_pred}")
-        print(f"loss: {loss_value}")
+        print(f"epoch loss: {epoch_loss}")
         sign_ = batch_graph.sign * 0.5 + 0.5
         print(f"correct predictions: {jnp.sum(jnp.equal(jnp.round(signs_pred), sign_))} out of {batch_graph.sign.shape[0]}")
 
-        loss_hist.append(loss_value)
+        loss_hist.append(epoch_loss)
+        epoch_loss = 0
         metrics_hist.append(metrics)
 
         if OPTIMIZE_SPRING_PARAMS:

@@ -32,9 +32,15 @@ def evaluate(
     logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
     y_pred = logreg.predict(spring_vec_norm.at[evaulation_mask].get())
 
-    auc = roc_auc_score(signs.at[evaulation_mask].get(), y_pred)
-    f1_binary = f1_score(signs.at[evaulation_mask].get(), y_pred, average='binary')
-    f1_micro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='micro')
-    f1_macro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='macro')
+    try:
+        auc = roc_auc_score(signs.at[evaulation_mask].get(), y_pred)
+        f1_binary = f1_score(signs.at[evaulation_mask].get(), y_pred, average='binary')
+        f1_micro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='micro')
+        f1_macro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='macro')
+    except ValueError:
+        auc = 0
+        f1_binary = 0
+        f1_micro = 0
+        f1_macro = 0
 
     return Metrics(auc, f1_binary, f1_micro, f1_macro)
