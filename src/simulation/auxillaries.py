@@ -18,11 +18,19 @@ def update_auxillary_state(
 
     auxillaries_i = spring_state.auxillary[graph.edge_index[0]]
     auxillaries_j = spring_state.auxillary[graph.edge_index[1]]
+    degs_i = jnp.expand_dims(graph.node_degrees[graph.edge_index[0]], axis=-1)
+    degs_j = jnp.expand_dims(graph.node_degrees[graph.edge_index[1]], axis=-1)
+
+    max_deg = jnp.maximum(degs_i, degs_j)
+
+    degs_i = degs_i / max_deg
+    degs_j = degs_j / max_deg
 
     sign_one_hot = jax.nn.one_hot(graph.sign, 3)
+    degs = jnp.expand_dims(graph.node_degrees, axis=-1)
 
     auxillaries_i = nn.gnn_psi(
-        jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot], axis=-1),
+        jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot, degs_i, degs_j], axis=-1),
         auxillaries_nn_params)
 
     # mean aggregation

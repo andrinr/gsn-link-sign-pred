@@ -23,9 +23,9 @@ def init_spring_state(
     range : float,
     embedding_dim : int,
     auxillary_dim : int) -> SpringState:
-    position = jax.random.uniform(rng, (n, embedding_dim), maxval=range, minval=-range)
+    position = jax.random.normal(rng, (n, embedding_dim))
     velocity = jnp.zeros((n, embedding_dim))
-    auxillary = jnp.zeros((n, auxillary_dim))
+    auxillary = jax.random.normal(rng, (n, auxillary_dim))
     force_decision = jnp.zeros((m, 3))
     return SpringState(position, velocity, auxillary, force_decision)
 

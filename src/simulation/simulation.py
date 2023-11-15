@@ -4,7 +4,7 @@ from functools import partial
 import simulation as sim
 from graph import SignedGraph
 
-# @partial(jax.jit, static_argnames=["simulation_params", "nn_force", "nn_auxillary"])
+@partial(jax.jit, static_argnames=["simulation_params", "nn_force"])
 def simulate(
     simulation_params : sim.SimulationParams,
     spring_state : sim.SpringState,

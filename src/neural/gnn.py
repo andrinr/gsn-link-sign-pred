@@ -11,7 +11,7 @@ def init_gnn_params(
     params = {}
     
     # psi
-    psi_input_dimension = auxilliary_dimension * 2 + 3
+    psi_input_dimension = auxilliary_dimension * 2 + 3 + 2
     params[f'W{0}_psi'] = jax.random.normal(
         key=keys[0], shape=(psi_input_dimension, psi_input_dimension), dtype=jnp.float32) * factor
     params[f'b{0}_psi'] = jnp.zeros(psi_input_dimension, dtype=jnp.float32)

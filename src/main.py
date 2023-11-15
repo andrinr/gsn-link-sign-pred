@@ -33,22 +33,22 @@ def main(argv) -> None:
     """
     # Simulation parameters
     NN_FORCE = True
-    OPTIMIZE_FORCE = False
+    OPTIMIZE_FORCE = True
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 64
-    AUXILLARY_DIM = 16
+    AUXILLARY_DIM = 32
     INIT_POS_RANGE = 2.0
     TRAIN_DT = 0.03
     TEST_DT = 0.01
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 1000
+    NUM_EPOCHS = 200
     GRADIENT_ACCUMULATION = 1
-    BATCH_SIZE = 8
+    BATCH_SIZE = 10
     PER_EPOCH_SIM_ITERATIONS = 40
-    FINAL_SIM_ITERATIONS = 300
-    AUXILLARY_ITERATIONS = 5
+    FINAL_SIM_ITERATIONS = 500
+    AUXILLARY_ITERATIONS = 3
     GRAPH_PARTITIONING = True
 
     # Paths
@@ -63,10 +63,10 @@ def main(argv) -> None:
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".90"
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".95"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    jax.config.update("jax_enable_x64", True)
+    #jax.config.update("jax_enable_x64", True)
     
     dataset = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index):
@@ -151,7 +151,7 @@ def main(argv) -> None:
         force_params = nn.init_force_params(
             key=key_force,
             auxillary_dim = AUXILLARY_DIM,
-            factor=0.2)
+            factor=0.1)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
@@ -183,13 +183,9 @@ def main(argv) -> None:
 
     epochs = range(NUM_EPOCHS)
 
-    max_score_force_params = None
-    max_score_aux_params = None
     max_score = 0
 
     epoch_score = 0
-
-    iteration_count = np.random.randint(5, 50, size=(NUM_EPOCHS, len(batches)))
 
     epochs_keys = random.split(key_training, NUM_EPOCHS)
     for epoch_index in epochs:
