@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import optax
 import os
 import torch_geometric.transforms as T
+import numpy as np
 
 # Local dependencies
 import simulation as sim
@@ -32,22 +33,23 @@ def main(argv) -> None:
     """
     # Simulation parameters
     NN_FORCE = True
-    OPTIMIZE_FORCE = True
+    OPTIMIZE_FORCE = False
     OPTIMIZE_SPRING_PARAMS = False
-    EMBEDDING_DIM = 32
-    AUXILLARY_DIM = 32
+    EMBEDDING_DIM = 64
+    AUXILLARY_DIM = 16
     INIT_POS_RANGE = 2.0
-    DT = 0.03
+    TRAIN_DT = 0.03
+    TEST_DT = 0.01
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 50
-    GRADIENT_ACCUMULATION = 2
+    NUM_EPOCHS = 1000
+    GRADIENT_ACCUMULATION = 1
     BATCH_SIZE = 8
-    PER_EPOCH_SIM_ITERATIONS = 300
-    FINAL_SIM_ITERATIONS = PER_EPOCH_SIM_ITERATIONS
+    PER_EPOCH_SIM_ITERATIONS = 40
+    FINAL_SIM_ITERATIONS = 300
     AUXILLARY_ITERATIONS = 5
-    GRAPH_PARTITIONING = False
+    GRAPH_PARTITIONING = True
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -115,7 +117,7 @@ def main(argv) -> None:
 
     simulation_params_train = sim.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS,
-        dt=DT,
+        dt=TRAIN_DT,
         damping=DAMPING,
         message_passing_iterations=AUXILLARY_ITERATIONS)
 
@@ -131,7 +133,7 @@ def main(argv) -> None:
     else:
         auxillary_params = nn.init_gnn_params(
             key=key_auxillary,
-            factor=1,
+            factor=0.2,
             auxilliary_dimension=AUXILLARY_DIM)
         print("no auxillary params checkpoint found, using default params")
 
@@ -149,16 +151,16 @@ def main(argv) -> None:
         force_params = nn.init_force_params(
             key=key_force,
             auxillary_dim = AUXILLARY_DIM,
-            factor=1)
+            factor=0.2)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adamaxw(learning_rate=1e-1)
+        auxillary_optimizer = optax.adamaxw(learning_rate=1e-3)
         auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-1)
+        force_optimizer = optax.adamaxw(learning_rate=1e-3)
         force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
@@ -187,9 +189,14 @@ def main(argv) -> None:
 
     epoch_score = 0
 
+    iteration_count = np.random.randint(5, 50, size=(NUM_EPOCHS, len(batches)))
+
     epochs_keys = random.split(key_training, NUM_EPOCHS)
     for epoch_index in epochs:
         for batch_index, batch_graph in enumerate(batches):
+            
+            # simulation_params_train = simulation_params_train._replace(iterations=iteration_count[epoch_index][batch_index])
+            # print(simulation_params_train)
 
             print(f"epoch: {epoch_index} batch: {batch_index}")
 
@@ -244,8 +251,10 @@ def main(argv) -> None:
                 
                 force_params = optax.apply_updates(force_params, nn_force_update)
 
-                # print(f"nn_auxillary_grad: {nn_auxillary_grad}")
-                # print(f"nn_force_grad: {nn_force_grad}")
+                print(f"force grad: {nn_force_grad}")
+                
+                print(f"auxillary grad: {nn_auxillary_grad}")
+
 
             if OPTIMIZE_SPRING_PARAMS:
                 params_update, params_optimizier_state = params_multi_step.update(
@@ -359,10 +368,10 @@ def main(argv) -> None:
         if answers['save'] == 'Yes':
                 
             with open(auxillary_checkpoint_path, 'w') as file:
-                yaml.dump(max_score_aux_params, file)
+                yaml.dump(auxillary_params, file)
 
             with open(force_params_name, 'w') as file:
-                yaml.dump(max_score_force_params, file)
+                yaml.dump(force_params, file)
 
     spring_state = sim.init_spring_state(
         rng=key_test,
@@ -378,7 +387,7 @@ def main(argv) -> None:
 
     simulation_params_test = sim.SimulationParams(
         iterations=FINAL_SIM_ITERATIONS,
-        dt=DT,
+        dt=TEST_DT,
         damping=DAMPING,
         message_passing_iterations=AUXILLARY_ITERATIONS)
 
