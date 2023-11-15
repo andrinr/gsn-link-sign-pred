@@ -22,8 +22,13 @@ def init_force_params(
 
     # layer 2
     params[f'W{2}'] = jax.random.normal(
+        key=keys[1], shape=(auxillary_dim, auxillary_dim), dtype=jnp.float32) * factor
+    params[f'b{2}'] = jnp.zeros(auxillary_dim, dtype=jnp.float32)
+
+    # layer 3
+    params[f'W{3}'] = jax.random.normal(
         key=keys[1], shape=(auxillary_dim, 3), dtype=jnp.float32) * factor
-    params[f'b{2}'] = jnp.zeros(3, dtype=jnp.float32)
+    params[f'b{3}'] = jnp.zeros(3, dtype=jnp.float32)
 
     return params
 
@@ -39,6 +44,9 @@ def mlp_forces(
     x = jax.nn.relu(x)
 
     x = jnp.dot(x, params[f'W{2}']) + params[f'b{2}']
+    x = jax.nn.relu(x)
+
+    x = jnp.dot(x, params[f'W{3}']) + params[f'b{3}']
     x = jax.nn.softmax(x)
 
     return x

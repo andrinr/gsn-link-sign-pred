@@ -33,22 +33,22 @@ def main(argv) -> None:
     """
     # Simulation parameters
     NN_FORCE = True
-    OPTIMIZE_FORCE = True
+    OPTIMIZE_FORCE = False
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 64
     AUXILLARY_DIM = 32
     INIT_POS_RANGE = 2.0
-    TRAIN_DT = 0.03
-    TEST_DT = 0.01
+    TEST_DT = 0.002
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 200
-    GRADIENT_ACCUMULATION = 1
-    BATCH_SIZE = 10
-    PER_EPOCH_SIM_ITERATIONS = 40
-    FINAL_SIM_ITERATIONS = 500
-    AUXILLARY_ITERATIONS = 3
+    NUM_EPOCHS = 20
+    GRADIENT_ACCUMULATION = 2
+    BATCH_SIZE = 6
+    TRAIN_DT = 0.03
+    PER_EPOCH_SIM_ITERATIONS = 60
+    FINAL_SIM_ITERATIONS = 2000
+    AUXILLARY_ITERATIONS = 4
     GRAPH_PARTITIONING = True
 
     # Paths
@@ -116,7 +116,7 @@ def main(argv) -> None:
         print("no spring params checkpoint found, using default params")
 
     simulation_params_train = sim.SimulationParams(
-        iterations=PER_EPOCH_SIM_ITERATIONS,
+        iterations=PER_EPOCH_SIM_ITERATIONS // GRADIENT_ACCUMULATION,
         dt=TRAIN_DT,
         damping=DAMPING,
         message_passing_iterations=AUXILLARY_ITERATIONS)
@@ -156,11 +156,11 @@ def main(argv) -> None:
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adamaxw(learning_rate=1e-3)
+        auxillary_optimizer = optax.adam(learning_rate=1e-3)
         auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
         auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
 
-        force_optimizer = optax.adamaxw(learning_rate=1e-3)
+        force_optimizer = optax.adam(learning_rate=1e-3)
         force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
@@ -190,11 +190,8 @@ def main(argv) -> None:
     epochs_keys = random.split(key_training, NUM_EPOCHS)
     for epoch_index in epochs:
         for batch_index, batch_graph in enumerate(batches):
-            
-            # simulation_params_train = simulation_params_train._replace(iterations=iteration_count[epoch_index][batch_index])
-            # print(simulation_params_train)
 
-            print(f"epoch: {epoch_index} batch: {batch_index}")
+            print(f"EPOCH: #{epoch_index} BATCH: #{batch_index}")
 
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
@@ -207,8 +204,8 @@ def main(argv) -> None:
                 auxillary_dim=AUXILLARY_DIM)
 
             # run simulation and compute loss, auxillaries and gradient
-            if OPTIMIZE_FORCE:
-                (loss_value, (spring_state, signs_pred)), (nn_auxillary_grad, nn_force_grad) = value_grad_fn(
+            for i in range(GRADIENT_ACCUMULATION):
+                (loss_value, (spring_state, signs_pred)), grad = value_grad_fn(
                     simulation_params_train, #0
                     spring_state, #1
                     spring_params, #2
@@ -216,47 +213,26 @@ def main(argv) -> None:
                     auxillary_params, #4
                     force_params, #5
                     batch_graph)
-                
-            if OPTIMIZE_SPRING_PARAMS:
-                (loss_value, (spring_state, signs_pred)), params_grad = value_grad_fn(
-                    simulation_params_train, #0
-                    spring_state, #1
-                    spring_params, #2
-                    NN_FORCE, #3
-                    auxillary_params, #4
-                    force_params, #5
-                    batch_graph)
-            else:
-                loss_value, (spring_state, signs_pred) = sim.simulate_and_loss(
-                    simulation_params_train, #0
-                    spring_state, #1
-                    spring_params, #2
-                    NN_FORCE, #3
-                    auxillary_params, #4
-                    force_params, #5
-                    batch_graph)
-                
-            if OPTIMIZE_FORCE:
-                nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
-                    nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
-            
-                auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
-            
-                nn_force_update, force_optimizier_state = force_multi_step.update(
-                    nn_force_grad, force_optimizier_state, force_params)
-                
-                force_params = optax.apply_updates(force_params, nn_force_update)
 
-                print(f"force grad: {nn_force_grad}")
-                
-                print(f"auxillary grad: {nn_auxillary_grad}")
+                if OPTIMIZE_FORCE:
+                    nn_auxillary_grad, nn_force_grad = grad
 
-
-            if OPTIMIZE_SPRING_PARAMS:
-                params_update, params_optimizier_state = params_multi_step.update(
-                    params_grad, params_optimizier_state, spring_params)
+                    nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
+                        nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
                 
-                spring_params = optax.apply_updates(spring_params, params_update)
+                    auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
+                
+                    nn_force_update, force_optimizier_state = force_multi_step.update(
+                        nn_force_grad, force_optimizier_state, force_params)
+                    
+                    force_params = optax.apply_updates(force_params, nn_force_update)
+
+                if OPTIMIZE_SPRING_PARAMS:
+                    params_grad = grad
+                    params_update, params_optimizier_state = params_multi_step.update(
+                        params_grad, params_optimizier_state, spring_params)
+                    
+                    spring_params = optax.apply_updates(spring_params, params_update)
 
             epoch_loss += loss_value
 
@@ -299,20 +275,21 @@ def main(argv) -> None:
             spring_hist.append(spring_params)
 
     
-    # plot loss over time
-    epochs = range(NUM_EPOCHS)
-    plt.plot(epochs, loss_hist)
-    plt.title('Loss')
-    plt.show()
+    if OPTIMIZE_SPRING_PARAMS or OPTIMIZE_FORCE:
+        # plot loss over time
+        epochs = range(NUM_EPOCHS)
+        plt.plot(epochs, loss_hist)
+        plt.title('Loss')
+        plt.show()
 
-    # plot metrics over time
-    plt.plot(epochs, [metrics.auc for metrics in metrics_hist])
-    plt.plot(epochs, [metrics.f1_binary for metrics in metrics_hist])
-    plt.plot(epochs, [metrics.f1_micro for metrics in metrics_hist])
-    plt.plot(epochs, [metrics.f1_macro for metrics in metrics_hist])
-    plt.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
-    plt.title('Measures')
-    plt.show()
+        # plot metrics over time
+        plt.plot(epochs, [metrics.auc for metrics in metrics_hist])
+        plt.plot(epochs, [metrics.f1_binary for metrics in metrics_hist])
+        plt.plot(epochs, [metrics.f1_micro for metrics in metrics_hist])
+        plt.plot(epochs, [metrics.f1_macro for metrics in metrics_hist])
+        plt.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
+        plt.title('Measures')
+        plt.show()
 
     # plot spring params over time
     if OPTIMIZE_SPRING_PARAMS:
