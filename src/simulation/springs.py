@@ -25,7 +25,7 @@ def force_decision(
     auxillaries_j = spring_state.auxillary[graph.edge_index[1]]
 
     decision = nn.mlp_forces(
-        jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot], axis=-1),
+        jnp.concatenate([auxillaries_i, auxillaries_j], axis=-1),
         nn_force_params)
 
     return spring_state._replace(

@@ -10,14 +10,15 @@ def init_force_params(
 
     params = {}
 
+    input_dim = auxillary_dim * 2
     # layer 0
     params[f'W{0}'] = jax.random.normal(
-        key=keys[0], shape=(auxillary_dim * 2 + 3, auxillary_dim * 2 + 3), dtype=jnp.float32) * factor
-    params[f'b{0}'] = jnp.zeros(auxillary_dim * 2 + 3, dtype=jnp.float32)
+        key=keys[0], shape=(input_dim, input_dim), dtype=jnp.float32) * factor
+    params[f'b{0}'] = jnp.zeros(input_dim, dtype=jnp.float32)
 
     # layer 1
     params[f'W{1}'] = jax.random.normal(
-        key=keys[1], shape=(auxillary_dim * 2 + 3, auxillary_dim), dtype=jnp.float32) * factor
+        key=keys[1], shape=(input_dim, auxillary_dim), dtype=jnp.float32) * factor
     params[f'b{1}'] = jnp.zeros(auxillary_dim, dtype=jnp.float32)
 
     # layer 2

@@ -27,8 +27,7 @@ def update_auxillary_state(
     degs_j = degs_j / max_deg
 
     sign_one_hot = jax.nn.one_hot(graph.sign, 3)
-    degs = jnp.expand_dims(graph.node_degrees, axis=-1)
-
+ 
     auxillaries_i = nn.gnn_psi(
         jnp.concatenate([auxillaries_i, auxillaries_j, sign_one_hot, degs_i, degs_j], axis=-1),
         auxillaries_nn_params)
@@ -37,7 +36,7 @@ def update_auxillary_state(
     auxillaries = jnp.zeros_like(spring_state.auxillary)
     auxillaries = auxillaries.at[graph.edge_index[0]].add(auxillaries_i)
     # avoid division by zero
-    auxillaries = auxillaries / jnp.expand_dims(graph.node_degrees + EPSILON , axis=-1)
+    # auxillaries = auxillaries / jnp.expand_dims(graph.node_degrees + EPSILON , axis=-1)
    
     auxillaries = nn.gnn_phi(
         jnp.concatenate([auxillaries, spring_state.auxillary], axis=-1),

@@ -33,21 +33,21 @@ def main(argv) -> None:
     """
     # Simulation parameters
     NN_FORCE = True
-    OPTIMIZE_FORCE = False
+    OPTIMIZE_FORCE = True
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 64
     AUXILLARY_DIM = 32
     INIT_POS_RANGE = 2.0
-    TEST_DT = 0.002
+    TEST_DT = 0.006
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 20
+    NUM_EPOCHS = 50
     GRADIENT_ACCUMULATION = 2
     BATCH_SIZE = 6
     TRAIN_DT = 0.03
     PER_EPOCH_SIM_ITERATIONS = 60
-    FINAL_SIM_ITERATIONS = 2000
+    FINAL_SIM_ITERATIONS = 1200
     AUXILLARY_ITERATIONS = 4
     GRAPH_PARTITIONING = True
 
@@ -133,7 +133,7 @@ def main(argv) -> None:
     else:
         auxillary_params = nn.init_gnn_params(
             key=key_auxillary,
-            factor=0.2,
+            factor=0.01,
             auxilliary_dimension=AUXILLARY_DIM)
         print("no auxillary params checkpoint found, using default params")
 

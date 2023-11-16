@@ -18,6 +18,9 @@ def init_gnn_params(
     params[f'W{1}_psi'] = jax.random.normal(
         key=keys[1], shape=(psi_input_dimension, auxilliary_dimension), dtype=jnp.float32) * factor
     params[f'b{1}_psi'] = jnp.zeros(auxilliary_dimension, dtype=jnp.float32)
+    params[f'W{2}_psi'] = jax.random.normal(
+        key=keys[1], shape=(auxilliary_dimension, auxilliary_dimension), dtype=jnp.float32) * factor
+    params[f'b{2}_psi'] = jnp.zeros(auxilliary_dimension, dtype=jnp.float32)
 
     # phi
     phi_input_dimension = auxilliary_dimension * 2
@@ -27,6 +30,10 @@ def init_gnn_params(
     params[f'W{1}_phi'] = jax.random.normal(
         key=keys[3], shape=(phi_input_dimension, auxilliary_dimension), dtype=jnp.float32) * factor
     params[f'b{1}_phi'] = jnp.zeros(auxilliary_dimension, dtype=jnp.float32)
+    params[f'W{2}_phi'] = jax.random.normal(
+        key=keys[3], shape=(auxilliary_dimension, auxilliary_dimension), dtype=jnp.float32) * factor
+    params[f'b{2}_phi'] = jnp.zeros(auxilliary_dimension, dtype=jnp.float32)
+
 
     return params
 
@@ -41,6 +48,9 @@ def gnn_psi(
     x = jnp.dot(x, params[f'W{1}_psi']) + params[f'b{1}_psi']
     x = jax.nn.relu(x)
 
+    x = jnp.dot(x, params[f'W{2}_psi']) + params[f'b{2}_psi']
+    x = jax.nn.relu(x)
+
     return x
 
 @jax.jit
@@ -52,6 +62,9 @@ def gnn_phi(
     x = jax.nn.relu(x)
 
     x = jnp.dot(x, params[f'W{1}_phi']) + params[f'b{1}_phi']
+    x = jax.nn.relu(x)
+
+    x = jnp.dot(x, params[f'W{2}_phi']) + params[f'b{2}_phi']
     x = jax.nn.relu(x)
 
     return x

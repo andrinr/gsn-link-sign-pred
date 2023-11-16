@@ -200,4 +200,8 @@ Generally a decrease in energy in the system correlates with a better performanc
 For aggregation methods and graph subsampling:
 @book{hamilton_ying_leskovec, title={Inductive Representation Learning on Large Graphs}, url={https://arxiv.org/pdf/1706.02216.pdf}, author={Hamilton, William and Ying, Rex and Leskovec, Jure} }
 
+Signed Network Node Embedding via Dual
+Attention Mechanism
+‌@misc{ieee xplore full-text pdf:_2023, url={https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9915410}, journal={Ieee.org}, year={2023} }
+
 ‌
