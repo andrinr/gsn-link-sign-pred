@@ -10,35 +10,16 @@ def simulate(
     spring_state : sim.SpringState,
     spring_params : sim.SpringParams,
     nn_force : bool,
-    nn_auxillary_params : dict,
     nn_force_params : dict,
     graph : SignedGraph) -> sim.SpringState:
-
-    if nn_force:
-        # capture the auxillaries_nn_params in the closure
-        auxillary_update = lambda i, state: sim.update_auxillary_state(
-            spring_state = state,
-            auxillaries_nn_params = nn_auxillary_params,
-            graph = graph)
-        
-        # jax.debug.print(f"message_passing_iterations: {simulation_params.message_passing_iterations}") 
-        spring_state = jax.lax.fori_loop(
-            0,
-            simulation_params.message_passing_iterations,
-            auxillary_update,
-            spring_state)
-        
-    spring_state = sim.force_decision(
-        spring_state=spring_state,
-        nn_force=nn_force,
-        nn_force_params=nn_force_params,
-        graph = graph)
     
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         simulation_params = simulation_params, 
         spring_params = spring_params,
         spring_state = state,
+        nn_force = nn_force,
+        nn_force_params = nn_force_params,
         graph = graph)
 
     spring_state = jax.lax.fori_loop(
@@ -70,7 +51,6 @@ def simulate_and_loss(
     spring_state : sim.SpringState,
     spring_params : sim.SpringParams,
     nn_force : bool,
-    nn_auxillary_params : dict,
     nn_force_params : dict,
     graph : SignedGraph) -> sim.SpringState:
 
@@ -83,7 +63,6 @@ def simulate_and_loss(
         spring_state = spring_state,
         spring_params = spring_params,
         nn_force = nn_force,
-        nn_auxillary_params = nn_auxillary_params,
         nn_force_params = nn_force_params,
         graph=training_graph)
 
@@ -108,7 +87,7 @@ def simulate_and_loss(
     # apply weights to the loss
     incorrect_predictions = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
     # only consider the training / validation nodes
-    incorrect_predictions = jnp.where(graph.test_mask, 0, incorrect_predictions)
+    #incorrect_predictions = jnp.where(graph.test_mask, 0, incorrect_predictions)
 
     # MSE loss
     loss = jnp.mean(incorrect_predictions)

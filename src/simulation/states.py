@@ -14,20 +14,15 @@ class SpringParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
-    auxillary: jnp.ndarray
-    force_decision: jnp.ndarray
     
 def init_spring_state(
     rng : jax.random.PRNGKey, 
     n : int, m : int,
     range : float,
-    embedding_dim : int,
-    auxillary_dim : int) -> SpringState:
+    embedding_dim : int) -> SpringState:
     position = jax.random.normal(rng, (n, embedding_dim)) * range
     velocity = jnp.zeros((n, embedding_dim))
-    auxillary = jax.random.normal(rng, (n, auxillary_dim))
-    force_decision = jnp.zeros((m, 3))
-    return SpringState(position, velocity, auxillary, force_decision)
+    return SpringState(position, velocity)
 
 class SimulationState(NamedTuple):
     iteration : int

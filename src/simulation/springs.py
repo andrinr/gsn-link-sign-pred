@@ -7,31 +7,28 @@ from functools import partial
 
 EPSILON = 1e-6
 
-# @partial(jax.jit, static_argnames=["nn_force"])
-def force_decision(
+def nn_based_force(
     spring_state : sim.SpringState,
-    nn_force : bool,
     nn_force_params : dict,
     graph : SignedGraph) -> jnp.ndarray:
-    
+
+    position_i = spring_state.position[graph.edge_index[0]]
+    position_j = spring_state.position[graph.edge_index[1]]
+
+    spring_vector = position_j - position_i
+    distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
+    spring_vector_norm = spring_vector / (distance + EPSILON)
+
     sign_one_hot = jax.nn.one_hot(graph.sign + 1, 3)
+    degree = jnp.expand_dims(graph.node_degrees[graph.edge_index[0]], axis=-1)
 
-    if not nn_force:
-        return spring_state._replace(
-            force_decision = sign_one_hot
-        )
-
-    auxillaries_i = spring_state.auxillary[graph.edge_index[0]]
-    auxillaries_j = spring_state.auxillary[graph.edge_index[1]]
-
-    decision = nn.mlp_forces(
-        jnp.concatenate([auxillaries_i, auxillaries_j], axis=-1),
+    forces = nn.mlp_forces(
+        jnp.concatenate([distance, degree, sign_one_hot], axis=-1),
         nn_force_params)
-
-    return spring_state._replace(
-        force_decision = decision
-    )
-
+        
+    
+    return forces * spring_vector_norm
+    
 # @partial(jax.jit, static_argnames=[])
 def force(
     params : sim.SpringParams,
@@ -65,14 +62,16 @@ def update_spring_state(
     simulation_params : sim.SimulationParams,
     spring_params : sim.SpringParams,
     spring_state : sim.SpringState, 
+    nn_force : bool,
+    nn_force_params : dict,
     graph : SignedGraph) -> sim.SpringState:
     """
     Update the spring state using the kick drift kick integratoin scheme. 
     This is essentially a simple message passing network implementation. 
     """
-    edge_acceleration = force(
-        spring_params,
+    edge_acceleration = nn_based_force(
         spring_state,
+        nn_force_params,
         graph)
 
     node_accelerations = jnp.zeros_like(spring_state.position)
@@ -84,9 +83,9 @@ def update_spring_state(
 
     spring_state = spring_state._replace(position=position_full)
 
-    edge_acceleration = force(
-        spring_params,
+    edge_acceleration = nn_based_force(
         spring_state,
+        nn_force_params,
         graph)
     
     node_accelerations = jnp.zeros_like(spring_state.position)

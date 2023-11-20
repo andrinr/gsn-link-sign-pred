@@ -36,18 +36,17 @@ def main(argv) -> None:
     OPTIMIZE_FORCE = True
     OPTIMIZE_SPRING_PARAMS = False
     EMBEDDING_DIM = 64
-    AUXILLARY_DIM = 32
     INIT_POS_RANGE = 2.0
-    TEST_DT = 0.006
+    TEST_DT = 0.03
     DAMPING = 0.1
 
     # Training parameters
-    NUM_EPOCHS = 50
-    GRADIENT_ACCUMULATION = 2
-    BATCH_SIZE = 6
+    NUM_EPOCHS = 30
+    GRADIENT_ACCUMULATION = 4
+    BATCH_SIZE = 10
     TRAIN_DT = 0.03
-    PER_EPOCH_SIM_ITERATIONS = 60
-    FINAL_SIM_ITERATIONS = 1200
+    PER_EPOCH_SIM_ITERATIONS = 300
+    FINAL_SIM_ITERATIONS = 600
     AUXILLARY_ITERATIONS = 4
     GRAPH_PARTITIONING = True
 
@@ -80,7 +79,7 @@ def main(argv) -> None:
     print(f"num_edges: {num_edges}")
 
     batches = []
-    if GRAPH_PARTITIONING:
+    if GRAPH_PARTITIONING and (OPTIMIZE_FORCE or OPTIMIZE_SPRING_PARAMS):
         cluster_data = ClusterData(
             dataset, 
             num_parts=BATCH_SIZE)
@@ -122,27 +121,11 @@ def main(argv) -> None:
         message_passing_iterations=AUXILLARY_ITERATIONS)
 
     # Create initial values for neural network parameters
-    key_auxillary, key_force, key_training, key_test = random.split(random.PRNGKey(2), 4)
-    
-    auxillary_checkpoint_path = f"{CECKPOINT_PATH}auxillary_params_{AUXILLARY_DIM}.yaml"
-    if os.path.exists(auxillary_checkpoint_path):
-        stream = open(auxillary_checkpoint_path, 'r')
-        auxillary_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
-        print("loaded auxillary params checkpoint")
+    key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
-    else:
-        auxillary_params = nn.init_gnn_params(
-            key=key_auxillary,
-            factor=0.01,
-            auxilliary_dimension=AUXILLARY_DIM)
-        print("no auxillary params checkpoint found, using default params")
-
-    # auxillaries, sign (one hot), difference
-    layer_0_size = (AUXILLARY_DIM * 2) + 3
     
-    print(f"layer_0_size: {layer_0_size}")
     # params including embdding size
-    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}x{AUXILLARY_DIM}.yaml"
+    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(force_params_name):
         stream = open(force_params_name, 'r')
         force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
@@ -150,21 +133,16 @@ def main(argv) -> None:
     else:
         force_params = nn.init_force_params(
             key=key_force,
-            auxillary_dim = AUXILLARY_DIM,
             factor=0.1)
         print("no force params checkpoint found, using default params")
     
     # setup optax optimizers
     if OPTIMIZE_FORCE:
-        auxillary_optimizer = optax.adam(learning_rate=1e-3)
-        auxillary_multi_step = optax.MultiSteps(auxillary_optimizer, GRADIENT_ACCUMULATION)
-        auxillary_optimizier_state = auxillary_multi_step.init(auxillary_params)
-
         force_optimizer = optax.adam(learning_rate=1e-3)
         force_multi_step = optax.MultiSteps(force_optimizer, GRADIENT_ACCUMULATION)
         force_optimizier_state = force_multi_step.init(force_params)
 
-        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=[4, 5], has_aux=True)
+        value_grad_fn = value_and_grad(sim.simulate_and_loss, argnums=4, has_aux=True)
 
     if OPTIMIZE_SPRING_PARAMS:
         params_optimizer = optax.adamaxw(learning_rate=1e-3)
@@ -200,8 +178,7 @@ def main(argv) -> None:
                 range=INIT_POS_RANGE,
                 n=batch_graph.num_nodes,
                 m=batch_graph.num_edges,
-                embedding_dim=EMBEDDING_DIM,
-                auxillary_dim=AUXILLARY_DIM)
+                embedding_dim=EMBEDDING_DIM)
 
             # run simulation and compute loss, auxillaries and gradient
             for i in range(GRADIENT_ACCUMULATION):
@@ -210,20 +187,12 @@ def main(argv) -> None:
                     spring_state, #1
                     spring_params, #2
                     NN_FORCE, #3
-                    auxillary_params, #4
-                    force_params, #5
+                    force_params, #4
                     batch_graph)
 
                 if OPTIMIZE_FORCE:
-                    nn_auxillary_grad, nn_force_grad = grad
-
-                    nn_auxillary_update, auxillary_optimizier_state = auxillary_multi_step.update(
-                        nn_auxillary_grad, auxillary_optimizier_state, auxillary_params)
-                
-                    auxillary_params = optax.apply_updates(auxillary_params, nn_auxillary_update)
-                
                     nn_force_update, force_optimizier_state = force_multi_step.update(
-                        nn_force_grad, force_optimizier_state, force_params)
+                        grad, force_optimizier_state, force_params)
                     
                     force_params = optax.apply_updates(force_params, nn_force_update)
 
@@ -241,9 +210,9 @@ def main(argv) -> None:
             epoch_num_total += batch_graph.sign.shape[0]
 
             print(f"loss: {loss_value}")
-            print(spring_state.force_decision)
             metrics = sim.evaluate(
                 spring_state,
+
                 batch_graph.edge_index,
                 batch_graph.sign,
                 batch_graph.train_mask,
@@ -251,14 +220,6 @@ def main(argv) -> None:
             
             score = metrics.auc + metrics.f1_binary + metrics.f1_micro + metrics.f1_macro - loss_value
             epoch_score += score
-
-
-        if epoch_score > max_score:
-            max_score = epoch_score
-            max_score_force_params = force_params.copy()
-            max_score_aux_params = auxillary_params.copy()
-
-            print(f"new max score: {max_score}")
 
         print(f"epoch: {epoch_index}")
         # print(f"predictions: {signs_pred}")
@@ -339,9 +300,6 @@ def main(argv) -> None:
         ]
         answers = inquirer.prompt(questions)
         if answers['save'] == 'Yes':
-                
-            with open(auxillary_checkpoint_path, 'w') as file:
-                yaml.dump(auxillary_params, file)
 
             with open(force_params_name, 'w') as file:
                 yaml.dump(force_params, file)
@@ -351,8 +309,7 @@ def main(argv) -> None:
         n=graph.num_nodes,
         m=graph.num_edges,
         range=INIT_POS_RANGE,
-        embedding_dim=EMBEDDING_DIM,
-        auxillary_dim=AUXILLARY_DIM
+        embedding_dim=EMBEDDING_DIM
     )
 
     # training_signs = graphsigns.copy()
@@ -375,7 +332,6 @@ def main(argv) -> None:
         spring_state=spring_state, 
         spring_params=spring_params,
         nn_force=NN_FORCE,
-        nn_auxillary_params=auxillary_params,
         nn_force_params=force_params,
         graph=training_graph)
 
