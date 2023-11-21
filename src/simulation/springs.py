@@ -26,7 +26,6 @@ def nn_based_force(
         jnp.concatenate([distance, degree, sign_one_hot], axis=-1),
         nn_force_params)
         
-    
     return forces * spring_vector_norm
     
 # @partial(jax.jit, static_argnames=[])
@@ -46,16 +45,14 @@ def force(
     neutral = (distance - params.neutral_distance) * params.neutral_stiffness
     retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
 
-    acceleration = jnp.squeeze(attraction) * state.force_decision[:,2]
-    acceleration += jnp.squeeze(neutral) * state.force_decision[:,1]
-    acceleration += jnp.squeeze(retraction) * state.force_decision[:,0]
+    sign = jnp.expand_dims(graph.sign, axis=1)
 
-    acceleration = jnp.expand_dims(acceleration, axis=-1)
-    
+    acceleration = jnp.where(sign == 1, attraction, neutral)
+    acceleration = jnp.where(sign == -1, retraction, acceleration)
+
+    acceleration -= params.center_attraction * (position_i - jnp.mean(position_i, axis=0, keepdims=True))
+
     return acceleration * spring_vector_norm
-
-def damping(spring_state : sim.SpringState, simulation_params : sim.SimulationParams) -> jnp.ndarray:
-    return -spring_state.velocity * (1.0 - simulation_params.damping)
 
 #@partial(jax.jit, static_argnames=["simulation_params"])
 def update_spring_state(
@@ -64,36 +61,31 @@ def update_spring_state(
     spring_state : sim.SpringState, 
     nn_force : bool,
     nn_force_params : dict,
-    graph : SignedGraph) -> sim.SpringState:
+    graph : SignedGraph
+    ) -> sim.SpringState:
     """
     Update the spring state using the kick drift kick integratoin scheme. 
     This is essentially a simple message passing network implementation. 
     """
-    edge_acceleration = nn_based_force(
-        spring_state,
-        nn_force_params,
-        graph)
 
-    node_accelerations = jnp.zeros_like(spring_state.position)
-    node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
-    node_damping = damping(spring_state, simulation_params)
-
-    velocity_half = spring_state.velocity + 0.5 * simulation_params.dt * (node_accelerations + node_damping)
-    position_full = spring_state.position + simulation_params.dt * velocity_half
-
-    spring_state = spring_state._replace(position=position_full)
-
-    edge_acceleration = nn_based_force(
-        spring_state,
-        nn_force_params,
-        graph)
-    
+    if nn_force:
+        edge_acceleration = nn_based_force(
+            spring_state,
+            nn_force_params,
+            graph)
+    else:
+        edge_acceleration = force(
+            spring_params,
+            spring_state,
+            graph)
+        
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
 
-    velocity_full = velocity_half + 0.5 * simulation_params.dt * (node_accelerations + node_damping)
-    # velocity = velocity * (1.0 - simulation_params.damping)
+    velocity = spring_state.velocity * (1 - simulation_params.damping) + simulation_params.dt * node_accelerations
 
-    spring_state = spring_state._replace(velocity=velocity_full)
+    position = spring_state.position + simulation_params.dt * velocity
+
+    spring_state = spring_state._replace(velocity=velocity, position=position, acceleration=node_accelerations)
     
     return spring_state

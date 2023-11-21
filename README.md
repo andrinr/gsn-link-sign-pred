@@ -133,6 +133,52 @@ The main reason why the loss and the measures are so 'jagged' is that the initia
 
 ![Results](img/spring_params_16.png)
 
+## Training
+
+The training process of the neural networks is challenging as a single simulation run takes up to a minute on my machine on all of the datasets. Therefore we use the Tribes dataset as a pretraining and then finetune the network on the other datasets. This saves a lot of time as the Tribes dataset is very small and can be simulated very quickly.
+
+## Results
+
+Impact of dimensionality on the performance of the method:
+
+![Results](img/dimensions.png)
+
+Impact of simulation iterations on the performance of the method:
+
+![Results](img/iterations.png)
+
+Impact of damping factor on the performance of the method:
+
+![Results](img/damping.png)
+
+### Comparison to other previous best method
+
+![Results](results.png)
+
+### Energy minima and score correlations
+
+Generally a decrease in energy in the system correlates with a better performance of the method. However the effect is much more pronounced in the beginning of the method.
+
+![Results](energy_score_corr.png)
+
+
+### Correlation between energy 
+![Results](ratio_energy.png)
+
+
+## Sources:
+
+For aggregation methods and graph subsampling:
+@book{hamilton_ying_leskovec, title={Inductive Representation Learning on Large Graphs}, url={https://arxiv.org/pdf/1706.02216.pdf}, author={Hamilton, William and Ying, Rex and Leskovec, Jure} }
+
+Signed Network Node Embedding via Dual
+Attention Mechanism
+‌@misc{ieee xplore full-text pdf:_2023, url={https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9915410}, journal={Ieee.org}, year={2023} }
+
+‌
+## Things I tried but did not work
+
+
 ### Message Passing Neural Network for local pattern recognition
 
 As of now we have hardcoded the forces acting on a node as:
@@ -173,35 +219,3 @@ A trainig step of the entire process then looks as follows:
 5. Predict the sign of an edge $(u, v)$ using the distance between $x_u$ and $x_v$.
 6. Compute the loss and update the parameters of the message passing neural network $A$ and the force decision network $B$ using gradient descent.
 7. Repeat from step 1.
-
-## Training
-
-The training process of the neural networks is challenging as a single simulation run takes up to a minute on my machine on all of the datasets. Therefore we use the Tribes dataset as a pretraining and then finetune the network on the other datasets. This saves a lot of time as the Tribes dataset is very small and can be simulated very quickly.
-
-## Results
-
-### Comparison to other previous best method
-
-![Results](results.png)
-
-### Energy minima and score correlations
-
-Generally a decrease in energy in the system correlates with a better performance of the method. However the effect is much more pronounced in the beginning of the method.
-
-![Results](energy_score_corr.png)
-
-
-### Correlation between energy 
-![Results](ratio_energy.png)
-
-
-## Sources:
-
-For aggregation methods and graph subsampling:
-@book{hamilton_ying_leskovec, title={Inductive Representation Learning on Large Graphs}, url={https://arxiv.org/pdf/1706.02216.pdf}, author={Hamilton, William and Ying, Rex and Leskovec, Jure} }
-
-Signed Network Node Embedding via Dual
-Attention Mechanism
-‌@misc{ieee xplore full-text pdf:_2023, url={https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9915410}, journal={Ieee.org}, year={2023} }
-
-‌

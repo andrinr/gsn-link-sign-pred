@@ -43,4 +43,4 @@ def evaluate(
         f1_micro = 0
         f1_macro = 0
 
-    return Metrics(auc, f1_binary, f1_micro, f1_macro)
+    return Metrics(auc, f1_binary, f1_micro, f1_macro), y_pred

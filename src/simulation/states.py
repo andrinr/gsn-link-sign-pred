@@ -10,19 +10,22 @@ class SpringParams(NamedTuple):
     enemy_distance: float
     enemy_stiffness: float
     distance_threshold: float
+    center_attraction: float
 
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
+    acceleration: jnp.ndarray
     
 def init_spring_state(
     rng : jax.random.PRNGKey, 
     n : int, m : int,
     range : float,
     embedding_dim : int) -> SpringState:
-    position = jax.random.normal(rng, (n, embedding_dim)) * range
+    position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
     velocity = jnp.zeros((n, embedding_dim))
-    return SpringState(position, velocity)
+    acceleration = jnp.zeros((n, embedding_dim))
+    return SpringState(position, velocity, acceleration)
 
 class SimulationState(NamedTuple):
     iteration : int

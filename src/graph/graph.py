@@ -7,6 +7,9 @@ from graph import permute_split
 import torch
 
 class SignedGraph(NamedTuple):
+    """
+    A signed directed graph.
+    """
     edge_index : jnp.ndarray
     sign : jnp.ndarray
     node_degrees : jnp.ndarray
@@ -16,11 +19,19 @@ class SignedGraph(NamedTuple):
     test_mask : jnp.ndarray
     val_mask : jnp.ndarray
 
+    def get_nodes(self, edge_index : int) -> (int, int):
+        a = self.edge_index.at[0, edge_index].get()
+        b = self.edge_index.at[1, edge_index].get()
+
+        return a, b
     
+    def get_neighbors(self, node_index : int) -> jnp.ndarray:
+        self.edge_index.at[0, self.edge_index.at[0, :] == node_index].get()
+
 def to_SignedGraph(
     data : Data,
     reindexing : bool = True) -> SignedGraph:
-    data, train_mask, val_mask, test_mask = permute_split(data, 0.05, 0.8)
+    data, train_mask, val_mask, test_mask = permute_split(data, 0, 0.9)
 
     if reindexing:
         keep = torch.unique(data.edge_index)

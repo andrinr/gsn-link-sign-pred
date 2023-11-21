@@ -1,7 +1,7 @@
-distance_threshold: 14.500882148742676
-enemy_distance: 20.955026626586914
-enemy_stiffness: 14.814151763916016
-friend_distance: 9.825674057006836
-friend_stiffness: 7.730888366699219
-neutral_distance: 16.779491424560547
-neutral_stiffness: 1.191374659538269
+distance_threshold: 14.923707008361816
+enemy_distance: 21.50422477722168
+enemy_stiffness: 15.322776794433594
+friend_distance: 10.382364273071289
+friend_stiffness: 7.157981872558594
+neutral_distance: 16.314287185668945
+neutral_stiffness: 1.1408945322036743

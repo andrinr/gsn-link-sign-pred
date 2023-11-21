@@ -3,6 +3,7 @@ import jax
 from functools import partial
 import simulation as sim
 from graph import SignedGraph
+from optax import softmax_cross_entropy_with_integer_labels
 
 @partial(jax.jit, static_argnames=["simulation_params", "nn_force"])
 def simulate(
@@ -41,7 +42,7 @@ def predict(
     distance = jnp.linalg.norm(position_j - position_i, axis=1) - spring_params.distance_threshold
 
     # apply sigmoid function to get sign (0 for negative, 1 for positive)
-    predicted_sign = 1 / (1 + jnp.exp(distance))
+    predicted_sign = 1 / (1 + jnp.exp(1 * distance))
 
     return predicted_sign
 
@@ -52,7 +53,8 @@ def simulate_and_loss(
     spring_params : sim.SpringParams,
     nn_force : bool,
     nn_force_params : dict,
-    graph : SignedGraph) -> sim.SpringState:
+    graph : SignedGraph,
+    ) -> sim.SpringState:
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -70,11 +72,10 @@ def simulate_and_loss(
         spring_state = spring_state,
         spring_params = spring_params,
         graph = graph)
-
-    # apply same transformation to the actual signs
+    
     sign = graph.sign * 0.5 + 0.5
 
-    incorrect_predictions = (sign - predicted_sign) ** 2
+    incorrect_predictions = jnp.square(sign - predicted_sign)
 
     fraction_negatives = jnp.sum(sign == 0) / sign.shape[0]
     fraction_positives =  1 - fraction_negatives
@@ -85,11 +86,11 @@ def simulate_and_loss(
     # score = (sign * predicted_sign) *  1 / fraction_positives + ((1 - sign) * (1 - predicted_sign)) * 1 / fraction_negatives
     
     # apply weights to the loss
-    incorrect_predictions = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
-    # only consider the training / validation nodes
-    #incorrect_predictions = jnp.where(graph.test_mask, 0, incorrect_predictions)
+    incorrect_predictions_weighted = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
+    # we weigh the test data twice as much
+    # incorrect_predictions_weighted = jnp.where(graph.test_mask, incorrect_predictions_weighted , 0)
 
     # MSE loss
-    loss = jnp.mean(incorrect_predictions)
+    loss = jnp.mean(incorrect_predictions_weighted)
     
     return loss, (spring_state, predicted_sign)
