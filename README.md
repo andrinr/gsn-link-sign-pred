@@ -151,6 +151,12 @@ Impact of damping factor on the performance of the method:
 
 ![Results](img/damping.png)
 
+### Local graph structures
+
+![Results](img/false_negatives_structure.png)
+
+![Results](img/false_positives_structure.png)
+
 ### Comparison to other previous best method
 
 ![Results](results.png)

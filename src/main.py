@@ -52,7 +52,7 @@ def main(argv) -> None:
     AUXILLARY_ITERATIONS = 4
     GRAPH_PARTITIONING = True
 
-    TEST_SHOTS = 10
+    TEST_SHOTS = 32
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -667,19 +667,22 @@ def main(argv) -> None:
 
     # transform position to numpy array
     embeddings = np.array(spring_state.position)
+    edge_index = np.array(graph.edge_index)
+    signs = np.array(graph.sign)
     
-
     fig, axes = plt.subplots(2, 5)
-    depth = 3
+    depth = 1
     for i in range(10):
         edge = false_negatives[i]
-        print(f"edge_index: {edge}")
-        print(dataset.edge_index.shape)
 
-        nodes = dataset.edge_index[:, edge]
+        nodes = edge_index[:, edge]
+        nodes = np.unique(nodes)
+
+        edge_node_a = nodes[0]
+        edge_node_b = nodes[1]
 
         for d in range(depth):
-            nodes = np.unique(np.concatenate((nodes, dataset.edge_index[:, dataset.edge_index[1] == nodes[-1]])))
+            nodes = np.unique(np.concatenate((nodes, edge_index[0, edge_index[1] == nodes[-1]])))
 
         # get embeddings of nodes
         node_embeddings = embeddings[nodes]
@@ -692,12 +695,108 @@ def main(argv) -> None:
         axes[i // 5, i % 5].scatter(node_embeddings[:, 0], node_embeddings[:, 1])
 
         # plot edges
-        for j in range(node_embeddings.shape[0]):
-            for k in range(node_embeddings.shape[0]):
-                if dataset.edge_index[0, edge] == nodes[j] and dataset.edge_index[1, edge] == nodes[k]:
-                    axes[i // 5, i % 5].plot([node_embeddings[j, 0], node_embeddings[k, 0]], [node_embeddings[j, 1], node_embeddings[k, 1]], color='red')
-                else:
-                    axes[i // 5, i % 5].plot([node_embeddings[j, 0], node_embeddings[k, 0]], [node_embeddings[j, 1], node_embeddings[k, 1]], color='black')
+        for k in range(len(nodes)):
+            node_a = nodes[k]
+            neigbours = edge_index[0, edge_index[1] == node_a]
+
+            for j in range(k + 1, len(nodes)):
+                node_b = nodes[j]
+                
+                # check if neighbours array contains node_b
+                exists = False
+                for l in range(len(neigbours)):
+                    if neigbours[l] == node_b:
+                        exists = True
+                        break
+
+                if not exists:
+                    continue
+
+                # get id of edge between node_a and node_b
+                edge_index_a = edge_index[0] == node_a
+                edge_index_b = edge_index[1] == node_b
+                edge_index_ab = np.logical_and(edge_index_a, edge_index_b)
+                edge_index_ab = np.where(edge_index_ab)[0]
+
+                axes[i // 5, i % 5].plot(
+                    [node_embeddings[k, 0], node_embeddings[j, 0]],
+                    [node_embeddings[k, 1], node_embeddings[j, 1]],
+                    color='green' if signs[edge_index_ab] == 1 else 'red',
+                    linestyle='dashed' if node_a == edge_node_a and node_b == edge_node_b else 'solid',
+                    linewidth=3 if node_a == edge_node_a and node_b == edge_node_b else 1.0,
+                    alpha=1.0 if node_a == edge_node_a and node_b == edge_node_b else 0.3)
+
+    # set title for all plots
+    fig.suptitle('Top 10 false negatives and their local graph structure')
+
+    # look at top 10 false positive edges and their surrounding local graph structure
+    false_negatives = jnp.argsort(count_false_positives)[::-1]
+    print(false_negatives)
+
+    # transform position to numpy array
+    embeddings = np.array(spring_state.position)
+    edge_index = np.array(graph.edge_index)
+    signs = np.array(graph.sign)
+    
+    fig, axes = plt.subplots(2, 5)
+    depth = 1
+    for i in range(10):
+        edge = false_negatives[i]
+
+        nodes = edge_index[:, edge]
+        nodes = np.unique(nodes)
+
+        edge_node_a = nodes[0]
+        edge_node_b = nodes[1]
+
+        for d in range(depth):
+            nodes = np.unique(np.concatenate((nodes, edge_index[0, edge_index[1] == nodes[-1]])))
+
+        # get embeddings of nodes
+        node_embeddings = embeddings[nodes]
+
+        # reduce dimensionality of embeddings
+        pca = PCA(n_components=2)
+        node_embeddings = pca.fit_transform(node_embeddings)
+
+        # plot embeddings
+        axes[i // 5, i % 5].scatter(node_embeddings[:, 0], node_embeddings[:, 1])
+
+        # plot edges
+        for k in range(len(nodes)):
+            node_a = nodes[k]
+            neigbours = edge_index[0, edge_index[1] == node_a]
+
+            for j in range(k + 1, len(nodes)):
+                node_b = nodes[j]
+                
+                # check if neighbours array contains node_b
+                exists = False
+                for l in range(len(neigbours)):
+                    if neigbours[l] == node_b:
+                        exists = True
+                        break
+
+                if not exists:
+                    continue
+
+                # get id of edge between node_a and node_b
+                edge_index_a = edge_index[0] == node_a
+                edge_index_b = edge_index[1] == node_b
+                edge_index_ab = np.logical_and(edge_index_a, edge_index_b)
+                edge_index_ab = np.where(edge_index_ab)[0]
+
+                axes[i // 5, i % 5].plot(
+                    [node_embeddings[k, 0], node_embeddings[j, 0]],
+                    [node_embeddings[k, 1], node_embeddings[j, 1]],
+                    color='green' if signs[edge_index_ab] == 1 else 'red',
+                    linestyle='dashed' if node_a == edge_node_a and node_b == edge_node_b else 'solid',
+                    linewidth=3 if node_a == edge_node_a and node_b == edge_node_b else 1.0,
+                    alpha=1.0 if node_a == edge_node_a and node_b == edge_node_b else 0.3)
+
+    # set title for all plots
+    fig.suptitle('Top 10 false positives and their local graph structure')
+
 
     plt.show()
 
