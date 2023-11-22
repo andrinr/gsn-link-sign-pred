@@ -85,8 +85,14 @@ def simulate_and_loss(
 
     # score = (sign * predicted_sign) *  1 / fraction_positives + ((1 - sign) * (1 - predicted_sign)) * 1 / fraction_negatives
     
-    # apply weights to the loss
-    incorrect_predictions_weighted = jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
+    # false negatives
+    jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
+    
+    incorrect_predictions_weighted = jnp.where(
+        sign == 1, 
+        incorrect_predictions * weight_positives, 
+        incorrect_predictions * weight_negatives)
+    
     # we weigh the test data twice as much
     # incorrect_predictions_weighted = jnp.where(graph.test_mask, incorrect_predictions_weighted , 0)
 

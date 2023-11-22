@@ -18,7 +18,7 @@ from sklearn.decomposition import PCA
 import simulation as sim
 import neural as nn
 from io_helpers import get_dataset
-from plot_helpers import plot_embedding
+from plot_helpers import plot_embedding, selected_wrong_classification
 from graph import to_SignedGraph
 
 def main(argv) -> None:
@@ -52,7 +52,7 @@ def main(argv) -> None:
     AUXILLARY_ITERATIONS = 4
     GRAPH_PARTITIONING = True
 
-    TEST_SHOTS = 32
+    TEST_SHOTS = 10
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -309,308 +309,13 @@ def main(argv) -> None:
             with open(force_params_name, 'w') as file:
                 yaml.dump(force_params, file)
 
-    auc_avgs = []
-    f1_binary_avgs = []
-    f1_micro_avgs = []
-    f1_macro_avgs = []
 
-    auc_vars = []
-    f1_binary_vars = []
-    f1_micro_vars = []
-    f1_macro_vars = []
-
-    # dims = [2, 4, 8, 16, 32, 64, 128]
-    # for dim in dims:
-    #     shot_metrics = []
-    #     key_shots = random.split(key_test, TEST_SHOTS)
-    #     for shot in range(TEST_SHOTS):
-
-    #         graph = to_SignedGraph(dataset)
-    #         print(graph.sign)
-
-    #         print(f"shot: {shot}")
-
-    #         # initialize spring state
-    #         spring_state = sim.init_spring_state(
-    #             rng=key_shots[shot],
-    #             n=graph.num_nodes,
-    #             m=graph.num_edges,
-    #             range=INIT_POS_RANGE,
-    #             embedding_dim=dim
-    #         )
-
-    #         # training_signs = graphsigns.copy()
-    #         # training_signs = training_signs.at[train_mask].set(0)
-
-    #         simulation_params_test = sim.SimulationParams(
-    #             iterations=FINAL_SIM_ITERATIONS,
-    #             dt=TEST_DT,
-    #             damping=DAMPING,
-    #             message_passing_iterations=AUXILLARY_ITERATIONS)
-
-    #         training_signs = graph.sign.copy()
-    #         training_signs = jnp.where(graph.train_mask, training_signs, 0)
-    #         training_graph = graph._replace(sign=training_signs)
-
-    #         spring_state = sim.simulate(
-    #             simulation_params=simulation_params_test,
-    #             spring_state=spring_state, 
-    #             spring_params=spring_params,
-    #             nn_force=NN_FORCE,
-    #             nn_force_params=force_params,
-    #             graph=training_graph)
-
-    #         metrics = sim.evaluate(
-    #             spring_state,
-    #             graph.edge_index,
-    #             graph.sign,
-    #             graph.train_mask,
-    #             graph.test_mask)
-            
-    #         shot_metrics.append(metrics)
-
-    #     auc_avgs.append(np.mean([metrics.auc for metrics in shot_metrics]))
-    #     f1_binary_avgs.append(np.mean([metrics.f1_binary for metrics in shot_metrics]))
-    #     f1_micro_avgs.append(np.mean([metrics.f1_micro for metrics in shot_metrics]))
-    #     f1_macro_avgs.append(np.mean([metrics.f1_macro for metrics in shot_metrics]))
-
-    #     auc_vars.append(np.var([metrics.auc for metrics in shot_metrics]))
-    #     f1_binary_vars.append(np.var([metrics.f1_binary for metrics in shot_metrics]))
-    #     f1_micro_vars.append(np.var([metrics.f1_micro for metrics in shot_metrics]))
-    #     f1_macro_vars.append(np.var([metrics.f1_macro for metrics in shot_metrics]))
-
-    # # new plot
-    # fig, ax = plt.subplots(1, 1)
-    
-    # ax.plot(dims, auc_avgs)
-    # ax.plot(dims, f1_binary_avgs)
-    # ax.plot(dims, f1_micro_avgs)
-    # ax.plot(dims, f1_macro_avgs)
-    # ax.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
-    # ax.set_title('Measures')
-    # ax.set_xlabel('Embedding dimension')
-    # ax.set_xscale('log')
-
-    # ax.set_ylabel('Average measure over all shots')
-    # plt.show()
-
-    # dampings = [0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128]
-    # for damping in dampings:
-    #     shot_metrics = []
-    #     key_shots = random.split(key_test, TEST_SHOTS)
-    #     for shot in range(TEST_SHOTS):
-
-    #         graph = to_SignedGraph(dataset)
-    #         print(graph.sign)
-
-    #         print(f"shot: {shot}")
-
-    #         # initialize spring state
-    #         spring_state = sim.init_spring_state(
-    #             rng=key_shots[shot],
-    #             n=graph.num_nodes,
-    #             m=graph.num_edges,
-    #             range=INIT_POS_RANGE,
-    #             embedding_dim=64
-    #         )
-
-    #         # training_signs = graphsigns.copy()
-    #         # training_signs = training_signs.at[train_mask].set(0)
-
-    #         simulation_params_test = sim.SimulationParams(
-    #             iterations=FINAL_SIM_ITERATIONS,
-    #             dt=TEST_DT,
-    #             damping=damping,
-    #             message_passing_iterations=AUXILLARY_ITERATIONS)
-
-    #         training_signs = graph.sign.copy()
-    #         training_signs = jnp.where(graph.train_mask, training_signs, 0)
-    #         training_graph = graph._replace(sign=training_signs)
-
-    #         spring_state = sim.simulate(
-    #             simulation_params=simulation_params_test,
-    #             spring_state=spring_state, 
-    #             spring_params=spring_params,
-    #             nn_force=NN_FORCE,
-    #             nn_force_params=force_params,
-    #             graph=training_graph)
-
-    #         metrics = sim.evaluate(
-    #             spring_state,
-    #             graph.edge_index,
-    #             graph.sign,
-    #             graph.train_mask,
-    #             graph.test_mask)
-            
-    #         shot_metrics.append(metrics)
-
-    #     auc_avgs.append(np.mean([metrics.auc for metrics in shot_metrics]))
-    #     f1_binary_avgs.append(np.mean([metrics.f1_binary for metrics in shot_metrics]))
-    #     f1_micro_avgs.append(np.mean([metrics.f1_micro for metrics in shot_metrics]))
-    #     f1_macro_avgs.append(np.mean([metrics.f1_macro for metrics in shot_metrics]))
-
-    #     auc_vars.append(np.var([metrics.auc for metrics in shot_metrics]))
-    #     f1_binary_vars.append(np.var([metrics.f1_binary for metrics in shot_metrics]))
-    #     f1_micro_vars.append(np.var([metrics.f1_micro for metrics in shot_metrics]))
-    #     f1_macro_vars.append(np.var([metrics.f1_macro for metrics in shot_metrics]))
-
-    # # new plot
-    # fig, ax = plt.subplots(1, 1)
-    # ax.plot(dampings, auc_avgs)
-    # ax.plot(dampings, f1_binary_avgs)
-    # ax.plot(dampings, f1_micro_avgs)
-    # ax.plot(dampings, f1_macro_avgs)
-    # ax.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
-    # ax.set_title('Measures')
-    # ax.set_xlabel('Damping')
-    # ax.set_xscale('log')
-    # ax.set_ylabel('Average measure over all shots')
-    # plt.show()
-
-    
-    # iterations = [32, 64, 128, 256, 512, 1024, 2048]
-    # for iteration in iterations:
-    #     shot_metrics = []
-    #     key_shots = random.split(key_test, TEST_SHOTS)
-    #     for shot in range(TEST_SHOTS):
-
-    #         graph = to_SignedGraph(dataset)
-    #         print(graph.sign)
-
-    #         print(f"shot: {shot}")
-
-    #         # initialize spring state
-    #         spring_state = sim.init_spring_state(
-    #             rng=key_shots[shot],
-    #             n=graph.num_nodes,
-    #             m=graph.num_edges,
-    #             range=INIT_POS_RANGE,
-    #             embedding_dim=64
-    #         )
-
-    #         # training_signs = graphsigns.copy()
-    #         # training_signs = training_signs.at[train_mask].set(0)
-
-    #         simulation_params_test = sim.SimulationParams(
-    #             iterations=iteration,
-    #             dt=TEST_DT,
-    #             damping=DAMPING,
-    #             message_passing_iterations=AUXILLARY_ITERATIONS)
-
-    #         training_signs = graph.sign.copy()
-    #         training_signs = jnp.where(graph.train_mask, training_signs, 0)
-    #         training_graph = graph._replace(sign=training_signs)
-
-    #         spring_state = sim.simulate(
-    #             simulation_params=simulation_params_test,
-    #             spring_state=spring_state, 
-    #             spring_params=spring_params,
-    #             nn_force=NN_FORCE,
-    #             nn_force_params=force_params,
-    #             graph=training_graph)
-
-    #         metrics = sim.evaluate(
-    #             spring_state,
-    #             graph.edge_index,
-    #             graph.sign,
-    #             graph.train_mask,
-    #             graph.test_mask)
-            
-    #         shot_metrics.append(metrics)
-
-    #     auc_avgs.append(np.mean([metrics.auc for metrics in shot_metrics]))
-    #     f1_binary_avgs.append(np.mean([metrics.f1_binary for metrics in shot_metrics]))
-    #     f1_micro_avgs.append(np.mean([metrics.f1_micro for metrics in shot_metrics]))
-    #     f1_macro_avgs.append(np.mean([metrics.f1_macro for metrics in shot_metrics]))
-        
-    # # new plot
-    # fig, ax = plt.subplots(1, 1)
-    
-    # ax.plot(iterations, auc_avgs)
-    # ax.plot(iterations, f1_binary_avgs)
-    # ax.plot(iterations, f1_micro_avgs)
-    # ax.plot(iterations, f1_macro_avgs)
-
-    # ax.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
-    # ax.set_title('Measures')
-    # ax.set_xlabel('Iterations')
-    # # set x axis to 2^x
-    # ax.set_xscale('log')
-    # ax.set_ylabel('Average measure over all shots')
-    # plt.show()
-
-    # shot_metrics = []
-    # key_shots = random.split(key_test, TEST_SHOTS)      
-    # for shot in range(TEST_SHOTS):
-
-    #     graph = to_SignedGraph(dataset)
-    #     print(graph.sign)
-
-    #     print(f"shot: {shot}")
-
-    #     # initialize spring state
-    #     spring_state = sim.init_spring_state(
-    #         rng=key_shots[shot],
-    #         n=graph.num_nodes,
-    #         m=graph.num_edges,
-    #         range=INIT_POS_RANGE,
-    #         embedding_dim=EMBEDDING_DIM
-    #     )
-
-    #     # training_signs = graphsigns.copy()
-    #     # training_signs = training_signs.at[train_mask].set(0)
-
-    #     simulation_params_test = sim.SimulationParams(
-    #         iterations=FINAL_SIM_ITERATIONS,
-    #         dt=TEST_DT,
-    #         damping=DAMPING,
-    #         message_passing_iterations=AUXILLARY_ITERATIONS)
-
-    #     training_signs = graph.sign.copy()
-    #     training_signs = jnp.where(graph.train_mask, training_signs, 0)
-    #     training_graph = graph._replace(sign=training_signs)
-
-    #     spring_state = sim.simulate(
-    #         simulation_params=simulation_params_test,
-    #         spring_state=spring_state, 
-    #         spring_params=spring_params,
-    #         nn_force=NN_FORCE,
-    #         nn_force_params=force_params,
-    #         graph=training_graph)
-
-    #     metrics = sim.evaluate(
-    #         spring_state,
-    #         graph.edge_index,
-    #         graph.sign,
-    #         graph.train_mask,
-    #         graph.test_mask)
-        
-    #     shot_metrics.append(metrics)
-
-    # # print average metrics over all shots
-    # print(f"average metrics over {TEST_SHOTS} shots:")
-    # print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
-    # print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
-    # print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
-    # print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
-
-    # # print extreme metrics over all shots
-    # print(f"extreme metrics over {TEST_SHOTS} shots:")
-    # print(f"auc: {np.max([metrics.auc for metrics in shot_metrics])}")
-    # print(f"f1_binary: {np.max([metrics.f1_binary for metrics in shot_metrics])}")
-    # print(f"f1_micro: {np.max([metrics.f1_micro for metrics in shot_metrics])}")
-    # print(f"f1_macro: {np.max([metrics.f1_macro for metrics in shot_metrics])}")
-
-    graph = to_SignedGraph(dataset)
     shot_metrics = []
-    key_shots = random.split(key_test, TEST_SHOTS)    
-    count_false_positives = jnp.zeros(graph.num_edges)
-    count_false_negatives = jnp.zeros(graph.num_edges)
-
+    key_shots = random.split(key_test, TEST_SHOTS)      
     for shot in range(TEST_SHOTS):
 
-        # graph = to_SignedGraph(dataset)
-        # print(graph.sign)
+        graph = to_SignedGraph(dataset)
+        print(graph.sign)
 
         print(f"shot: {shot}")
 
@@ -644,161 +349,41 @@ def main(argv) -> None:
             nn_force_params=force_params,
             graph=training_graph)
 
-        metrics, y_pred = sim.evaluate(
+        metrics, _ = sim.evaluate(
             spring_state,
             graph.edge_index,
             graph.sign,
             graph.train_mask,
             graph.test_mask)
-
-        false_negatives = jnp.logical_and(y_pred == -1, graph.sign.at[graph.test_mask].get() == 1)
-        false_positives = jnp.logical_and(y_pred == 1, graph.sign.at[graph.test_mask].get() == -1)
-
-        count_false_negatives = count_false_negatives.at[graph.test_mask].add(false_negatives)
-        count_false_positives = count_false_positives.at[graph.test_mask].add(false_positives)
         
         shot_metrics.append(metrics)
 
-    print(count_false_negatives)
+    # print average metrics over all shots
+    print(f"average metrics over {TEST_SHOTS} shots:")
+    print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
+    print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
+    print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
+    print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
 
-    # look at top 10 false negatives edges and their surrounding local graph structure
-    false_negatives = jnp.argsort(count_false_negatives)[::-1]
-    print(false_negatives)
+    # print extreme metrics over all shots
+    print(f"extreme metrics over {TEST_SHOTS} shots:")
+    print(f"auc: {np.max([metrics.auc for metrics in shot_metrics])}")
+    print(f"f1_binary: {np.max([metrics.f1_binary for metrics in shot_metrics])}")
+    print(f"f1_micro: {np.max([metrics.f1_micro for metrics in shot_metrics])}")
+    print(f"f1_macro: {np.max([metrics.f1_macro for metrics in shot_metrics])}")
 
-    # transform position to numpy array
-    embeddings = np.array(spring_state.position)
-    edge_index = np.array(graph.edge_index)
-    signs = np.array(graph.sign)
+    # selected_wrong_classification(
+    #     dataset=dataset,
+    #     key=key_test,
+    #     spring_params=spring_params,
+    #     init_range=INIT_POS_RANGE,
+    #     dim=EMBEDDING_DIM,
+    #     iterations=FINAL_SIM_ITERATIONS,
+    #     dt=TEST_DT,
+    #     damping=DAMPING,
+    # )
+
     
-    fig, axes = plt.subplots(2, 5)
-    depth = 1
-    for i in range(10):
-        edge = false_negatives[i]
-
-        nodes = edge_index[:, edge]
-        nodes = np.unique(nodes)
-
-        edge_node_a = nodes[0]
-        edge_node_b = nodes[1]
-
-        for d in range(depth):
-            nodes = np.unique(np.concatenate((nodes, edge_index[0, edge_index[1] == nodes[-1]])))
-
-        # get embeddings of nodes
-        node_embeddings = embeddings[nodes]
-
-        # reduce dimensionality of embeddings
-        pca = PCA(n_components=2)
-        node_embeddings = pca.fit_transform(node_embeddings)
-
-        # plot embeddings
-        axes[i // 5, i % 5].scatter(node_embeddings[:, 0], node_embeddings[:, 1])
-
-        # plot edges
-        for k in range(len(nodes)):
-            node_a = nodes[k]
-            neigbours = edge_index[0, edge_index[1] == node_a]
-
-            for j in range(k + 1, len(nodes)):
-                node_b = nodes[j]
-                
-                # check if neighbours array contains node_b
-                exists = False
-                for l in range(len(neigbours)):
-                    if neigbours[l] == node_b:
-                        exists = True
-                        break
-
-                if not exists:
-                    continue
-
-                # get id of edge between node_a and node_b
-                edge_index_a = edge_index[0] == node_a
-                edge_index_b = edge_index[1] == node_b
-                edge_index_ab = np.logical_and(edge_index_a, edge_index_b)
-                edge_index_ab = np.where(edge_index_ab)[0]
-
-                axes[i // 5, i % 5].plot(
-                    [node_embeddings[k, 0], node_embeddings[j, 0]],
-                    [node_embeddings[k, 1], node_embeddings[j, 1]],
-                    color='green' if signs[edge_index_ab] == 1 else 'red',
-                    linestyle='dashed' if node_a == edge_node_a and node_b == edge_node_b else 'solid',
-                    linewidth=3 if node_a == edge_node_a and node_b == edge_node_b else 1.0,
-                    alpha=1.0 if node_a == edge_node_a and node_b == edge_node_b else 0.3)
-
-    # set title for all plots
-    fig.suptitle('Top 10 false negatives and their local graph structure')
-
-    # look at top 10 false positive edges and their surrounding local graph structure
-    false_negatives = jnp.argsort(count_false_positives)[::-1]
-    print(false_negatives)
-
-    # transform position to numpy array
-    embeddings = np.array(spring_state.position)
-    edge_index = np.array(graph.edge_index)
-    signs = np.array(graph.sign)
-    
-    fig, axes = plt.subplots(2, 5)
-    depth = 1
-    for i in range(10):
-        edge = false_negatives[i]
-
-        nodes = edge_index[:, edge]
-        nodes = np.unique(nodes)
-
-        edge_node_a = nodes[0]
-        edge_node_b = nodes[1]
-
-        for d in range(depth):
-            nodes = np.unique(np.concatenate((nodes, edge_index[0, edge_index[1] == nodes[-1]])))
-
-        # get embeddings of nodes
-        node_embeddings = embeddings[nodes]
-
-        # reduce dimensionality of embeddings
-        pca = PCA(n_components=2)
-        node_embeddings = pca.fit_transform(node_embeddings)
-
-        # plot embeddings
-        axes[i // 5, i % 5].scatter(node_embeddings[:, 0], node_embeddings[:, 1])
-
-        # plot edges
-        for k in range(len(nodes)):
-            node_a = nodes[k]
-            neigbours = edge_index[0, edge_index[1] == node_a]
-
-            for j in range(k + 1, len(nodes)):
-                node_b = nodes[j]
-                
-                # check if neighbours array contains node_b
-                exists = False
-                for l in range(len(neigbours)):
-                    if neigbours[l] == node_b:
-                        exists = True
-                        break
-
-                if not exists:
-                    continue
-
-                # get id of edge between node_a and node_b
-                edge_index_a = edge_index[0] == node_a
-                edge_index_b = edge_index[1] == node_b
-                edge_index_ab = np.logical_and(edge_index_a, edge_index_b)
-                edge_index_ab = np.where(edge_index_ab)[0]
-
-                axes[i // 5, i % 5].plot(
-                    [node_embeddings[k, 0], node_embeddings[j, 0]],
-                    [node_embeddings[k, 1], node_embeddings[j, 1]],
-                    color='green' if signs[edge_index_ab] == 1 else 'red',
-                    linestyle='dashed' if node_a == edge_node_a and node_b == edge_node_b else 'solid',
-                    linewidth=3 if node_a == edge_node_a and node_b == edge_node_b else 1.0,
-                    alpha=1.0 if node_a == edge_node_a and node_b == edge_node_b else 0.3)
-
-    # set title for all plots
-    fig.suptitle('Top 10 false positives and their local graph structure')
-
-
-    plt.show()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

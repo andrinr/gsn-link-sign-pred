@@ -181,6 +181,10 @@ Signed Network Node Embedding via Dual
 Attention Mechanism
 ‌@misc{ieee xplore full-text pdf:_2023, url={https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=9915410}, journal={Ieee.org}, year={2023} }
 
+Differentiable AUC scores
+@article{eban_schain_mackey_gordon_saurous_elidan, title={Scalable Learning of Non-Decomposable Objectives}, volume={54}, url={https://arxiv.org/pdf/1608.04802.pdf}, author={Eban, Elad and Schain, Mariano and Mackey, Alan and Gordon, Ariel and Saurous, Rif and Elidan, Gal} }
+
+‌
 ‌
 ## Things I tried but did not work
 
@@ -225,3 +229,4 @@ A trainig step of the entire process then looks as follows:
 5. Predict the sign of an edge $(u, v)$ using the distance between $x_u$ and $x_v$.
 6. Compute the loss and update the parameters of the message passing neural network $A$ and the force decision network $B$ using gradient descent.
 7. Repeat from step 1.
+
