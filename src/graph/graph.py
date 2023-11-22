@@ -17,7 +17,8 @@ class SignedGraph(NamedTuple):
     num_edges : int
     train_mask : jnp.ndarray
     test_mask : jnp.ndarray
-    val_mask : jnp.ndarray
+    subsample_pos_mask : jnp.ndarray
+    subsample_neg_mask : jnp.ndarray
 
     def get_nodes(self, edge_index : int) -> (int, int):
         a = self.edge_index.at[0, edge_index].get()
@@ -31,7 +32,7 @@ class SignedGraph(NamedTuple):
 def to_SignedGraph(
     data : Data,
     reindexing : bool = True) -> SignedGraph:
-    data, train_mask, val_mask, test_mask = permute_split(data, 0, 0.9)
+    data, train_mask, val_mask, test_mask, num_train, num_val, num_test = permute_split(data, 0, 0.9)
 
     if reindexing:
         keep = torch.unique(data.edge_index)
@@ -45,8 +46,27 @@ def to_SignedGraph(
         data.edge_attr = edge_attr
 
     train_mask = jnp.array(train_mask)
-    val_mask = jnp.array(val_mask)
     test_mask = jnp.array(test_mask)
+
+    # mark first 1000 nodes in test mask as subsample mask
+    number_of_negative_edges = jnp.sum(data.edge_attr == -1)
+    subsample_size = min(1000, number_of_negative_edges)
+
+    # find indices of negative edges
+    negative_edge_indices = jnp.where(data.edge_attr == -1)[0]
+    positive_edge_indices = jnp.where(data.edge_attr == 1)[0]
+
+    # randomly select subsample_size indices
+    subsample_pos_indices = jnp.random.choice(negative_edge_indices, subsample_size, replace=False)
+    subsample_neg_indices = jnp.random.choice(positive_edge_indices, subsample_size, replace=False)
+
+    # create subsample mask
+    subsample_pos_mask = jnp.zeros(data.edge_attr.shape[0], dtype=bool)
+    subsample_pos_mask = subsample_pos_mask.at[subsample_pos_indices].set(True)
+
+    subsample_neg_mask = jnp.zeros(data.edge_attr.shape[0], dtype=bool)
+    subsample_neg_mask = subsample_neg_mask.at[subsample_neg_indices].set(True)
+
 
     # convert to jnp arrays from torch tensors
     edge_index = jnp.array(data.edge_index)
@@ -64,4 +84,5 @@ def to_SignedGraph(
         num_edges, 
         train_mask,
         test_mask, 
-        val_mask)
+        subsample_pos_mask,
+        subsample_neg_mask)

@@ -52,4 +52,4 @@ def permute_split(
     test_mask[num_train + num_val:num_total] = True
     test_mask[num_total + num_train + num_val:] = True
     
-    return data, train_mask, val_mask, test_mask
+    return data, train_mask, val_mask, test_mask, num_train, num_val, num_test

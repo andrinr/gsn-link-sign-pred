@@ -92,11 +92,19 @@ def simulate_and_loss(
         sign == 1, 
         incorrect_predictions * weight_positives, 
         incorrect_predictions * weight_negatives)
-    
-    # we weigh the test data twice as much
-    # incorrect_predictions_weighted = jnp.where(graph.test_mask, incorrect_predictions_weighted , 0)
 
-    # MSE loss
-    loss = jnp.mean(incorrect_predictions_weighted)
+    subsample_pos = predicted_sign.at[graph.subsample_pos_mask].get()
+    subsample_neg = predicted_sign.at[graph.subsample_neg_mask].get()
+
+    # compute difference between each pair in subsample_pos and subsample_neg
+    subsample_pos = subsample_pos[:, None]
+    subsample_neg = subsample_neg[None, :]
+    subsample_difference = subsample_pos - subsample_neg
+
+    
+
+
+    
+
     
     return loss, (spring_state, predicted_sign)

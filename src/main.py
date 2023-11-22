@@ -35,7 +35,7 @@ def main(argv) -> None:
     # Simulation parameters
     NN_FORCE = False
     OPTIMIZE_FORCE = False
-    OPTIMIZE_SPRING_PARAMS = False
+    OPTIMIZE_SPRING_PARAMS = True
     EMBEDDING_DIM = 64
     INIT_POS_RANGE = 3.0
     TEST_DT = 0.0025
@@ -212,7 +212,7 @@ def main(argv) -> None:
             epoch_num_total += batch_graph.sign.shape[0]
 
             print(f"loss: {loss_value}")
-            metrics = sim.evaluate(
+            metrics, _= sim.evaluate(
                 spring_state,
 
                 batch_graph.edge_index,
