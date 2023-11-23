@@ -1,39 +1,17 @@
 import jax.numpy as jnp
-import jax
-import neural as nn
 import simulation as sim
 from graph import SignedGraph
-from functools import partial
+from neural import NeuralForceParams, mlp_forces
 
 EPSILON = 1e-6
-
-def nn_based_force(
-    spring_state : sim.SpringState,
-    nn_force_params : dict,
-    graph : SignedGraph) -> jnp.ndarray:
-
-    position_i = spring_state.position[graph.edge_index[0]]
-    position_j = spring_state.position[graph.edge_index[1]]
-
-    spring_vector = position_j - position_i
-    distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
-    spring_vector_norm = spring_vector / (distance + EPSILON)
-
-    sign_one_hot = jax.nn.one_hot(graph.sign + 1, 3)
-    degree = jnp.expand_dims(graph.node_degrees[graph.edge_index[0]], axis=-1)
-
-    forces = nn.mlp_forces(
-        jnp.concatenate([distance, degree, sign_one_hot], axis=-1),
-        nn_force_params)
-        
-    return forces * spring_vector_norm
     
 # @partial(jax.jit, static_argnames=[])
-def force(
-    params : sim.SpringParams,
+def heuristic_force(
+    params : sim.HeuristicForceParams,
     state : sim.SpringState,
-    graph : SignedGraph) -> jnp.ndarray:
-
+    graph : SignedGraph
+) -> jnp.ndarray:
+    
     position_i = state.position[graph.edge_index[0]]
     position_j = state.position[graph.edge_index[1]]
 
@@ -54,28 +32,46 @@ def force(
 
     return acceleration * spring_vector_norm
 
-#@partial(jax.jit, static_argnames=["simulation_params"])
+def neural_force(
+    params : NeuralForceParams,
+    state : sim.SpringState,
+    graph : SignedGraph
+) -> jnp.ndarray:
+    
+    position_i = state.position[graph.edge_index[0]]
+    position_j = state.position[graph.edge_index[1]]
+    degs_i = graph.node_degrees[graph.edge_index[0]]
+    degs_j = graph.node_degrees[graph.edge_index[1]]
+
+    spring_vector = position_j - position_i
+    distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
+    spring_vector_norm = spring_vector / (distance + EPSILON)
+
+    degs_i = jnp.expand_dims(degs_i, axis=1)
+    degs_j = jnp.expand_dims(degs_j, axis=1)
+    
+    x = jnp.concatenate([graph.sign_one_hot, distance, degs_i, degs_j], axis=1)
+
+    x = mlp_forces(x, params)
+
+    return x * 10 * spring_vector_norm
+
 def update_spring_state(
     simulation_params : sim.SimulationParams,
-    spring_params : sim.SpringParams,
+    force_params : sim.HeuristicForceParams | NeuralForceParams,
+    use_neural_force : bool,
     spring_state : sim.SpringState, 
-    nn_force : bool,
-    nn_force_params : dict,
-    graph : SignedGraph
-    ) -> sim.SpringState:
-    """
-    Update the spring state using the kick drift kick integratoin scheme. 
-    This is essentially a simple message passing network implementation. 
-    """
+    graph : SignedGraph,
+) -> sim.SpringState:
 
-    if nn_force:
-        edge_acceleration = nn_based_force(
+    if use_neural_force:
+        edge_acceleration = neural_force(
+            force_params,
             spring_state,
-            nn_force_params,
             graph)
     else:
-        edge_acceleration = force(
-            spring_params,
+        edge_acceleration = heuristic_force(
+            force_params,
             spring_state,
             graph)
         

@@ -2,14 +2,13 @@ from typing import NamedTuple
 import jax.numpy as jnp
 import jax
 
-class SpringParams(NamedTuple):
+class HeuristicForceParams(NamedTuple):
     friend_distance: float
     friend_stiffness: float
     neutral_distance: float
     neutral_stiffness: float
     enemy_distance: float
     enemy_stiffness: float
-    distance_threshold: float
     center_attraction: float
 
 class SpringState(NamedTuple):

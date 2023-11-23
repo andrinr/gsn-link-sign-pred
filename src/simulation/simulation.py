@@ -3,24 +3,23 @@ import jax
 from functools import partial
 import simulation as sim
 from graph import SignedGraph
-from optax import softmax_cross_entropy_with_integer_labels
+from neural import NeuralForceParams
 
-@partial(jax.jit, static_argnames=["simulation_params", "nn_force"])
+@partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate(
     simulation_params : sim.SimulationParams,
     spring_state : sim.SpringState,
-    spring_params : sim.SpringParams,
-    nn_force : bool,
-    nn_force_params : dict,
-    graph : SignedGraph) -> sim.SpringState:
+    force_params : sim.HeuristicForceParams | NeuralForceParams,
+    use_neural_force : bool,
+    graph : SignedGraph
+) -> sim.SpringState:
     
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sim.update_spring_state(
         simulation_params = simulation_params, 
-        spring_params = spring_params,
+        force_params = force_params,
+        use_neural_force = use_neural_force,
         spring_state = state,
-        nn_force = nn_force,
-        nn_force_params = nn_force_params,
         graph = graph)
 
     spring_state = jax.lax.fori_loop(
@@ -31,30 +30,14 @@ def simulate(
     
     return spring_state
 
-def predict(
-    spring_state : sim.SpringState,
-    spring_params : sim.SpringParams,
-    graph : SignedGraph
-):
-    position_i = spring_state.position[graph.edge_index[0]]
-    position_j = spring_state.position[graph.edge_index[1]]
-
-    distance = jnp.linalg.norm(position_j - position_i, axis=1) - spring_params.distance_threshold
-
-    # apply sigmoid function to get sign (0 for negative, 1 for positive)
-    predicted_sign = 1 / (1 + jnp.exp(1 * distance))
-
-    return predicted_sign
-
-@partial(jax.jit, static_argnames=["simulation_params", "nn_force"])
+@partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate_and_loss(
     simulation_params : sim.SimulationParams,
     spring_state : sim.SpringState,
-    spring_params : sim.SpringParams,
-    nn_force : bool,
-    nn_force_params : dict,
+    force_params : sim.HeuristicForceParams | NeuralForceParams,
+    use_neural_force : bool,
     graph : SignedGraph,
-    ) -> sim.SpringState:
+) -> sim.SpringState:
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -63,16 +46,48 @@ def simulate_and_loss(
     spring_state = simulate(
         simulation_params = simulation_params,
         spring_state = spring_state,
-        spring_params = spring_params,
-        nn_force = nn_force,
-        nn_force_params = nn_force_params,
+        force_params = force_params,
+        use_neural_force = use_neural_force,
         graph=training_graph)
+
+    # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
+    x_0s = jnp.linspace(-2, 2, 10)
+    losses = jnp.array([loss(spring_state, graph, x_0) for x_0 in x_0s])
+
+    loss_value = jnp.mean(losses)
 
     predicted_sign = predict(
         spring_state = spring_state,
-        spring_params = spring_params,
-        graph = graph)
-    
+        graph = graph,
+        x_0 = 0)
+
+    return loss_value, (spring_state, predicted_sign)
+
+def predict(
+    spring_state : sim.SpringState,
+    graph : SignedGraph,
+    x_0 : float
+):
+    position_i = spring_state.position[graph.edge_index[0]]
+    position_j = spring_state.position[graph.edge_index[1]]
+
+    distance = jnp.linalg.norm(position_j - position_i, axis=1) - 10
+
+    # apply sigmoid function to get sign (0 for negative, 1 for positive)
+    predicted_sign = 1 / (1 + jnp.exp(1 * (distance-x_0)))
+
+    return predicted_sign
+
+def loss(
+    spring_state : sim.SpringState,
+    graph : SignedGraph,
+    x_0 : float
+):
+    predicted_sign = predict(
+        spring_state = spring_state,
+        graph = graph,
+        x_0 = x_0)
+
     sign = graph.sign * 0.5 + 0.5
 
     incorrect_predictions = jnp.square(sign - predicted_sign)
@@ -93,18 +108,6 @@ def simulate_and_loss(
         incorrect_predictions * weight_positives, 
         incorrect_predictions * weight_negatives)
 
-    subsample_pos = predicted_sign.at[graph.subsample_pos_mask].get()
-    subsample_neg = predicted_sign.at[graph.subsample_neg_mask].get()
+    loss = jnp.mean(incorrect_predictions_weighted)
 
-    # compute difference between each pair in subsample_pos and subsample_neg
-    subsample_pos = subsample_pos[:, None]
-    subsample_neg = subsample_neg[None, :]
-    subsample_difference = subsample_pos - subsample_neg
-
-    
-
-
-    
-
-    
-    return loss, (spring_state, predicted_sign)
+    return loss

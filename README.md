@@ -185,7 +185,6 @@ Differentiable AUC scores
 @article{eban_schain_mackey_gordon_saurous_elidan, title={Scalable Learning of Non-Decomposable Objectives}, volume={54}, url={https://arxiv.org/pdf/1608.04802.pdf}, author={Eban, Elad and Schain, Mariano and Mackey, Alan and Gordon, Ariel and Saurous, Rif and Elidan, Gal} }
 
 ‌
-‌
 ## Things I tried but did not work
 
 

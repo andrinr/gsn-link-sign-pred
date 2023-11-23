@@ -1,6 +1,6 @@
 import torch_geometric.transforms as T
 import matplotlib.pyplot as plt
-from simulation import SpringState, predict, SpringParams
+from simulation import SpringState, predict, HeuristicForceParams
 from graph import SignedGraph
 import simulation as sim
 from graph import to_SignedGraph
@@ -11,7 +11,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from torch_geometric.data import Data
     
-def plot_embedding(spring_state : SpringState, spring_params : SpringParams, graph : SignedGraph, axis : plt.Axes):
+def plot_embedding(spring_state : SpringState, spring_params : HeuristicForceParams, graph : SignedGraph, axis : plt.Axes):
         # plot the embeddings
     embeddings = spring_state.position
     predicted_sign = predict(spring_state, spring_params, graph)
@@ -47,7 +47,7 @@ def plot_embedding(spring_state : SpringState, spring_params : SpringParams, gra
 def params_plot(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : SpringParams, 
+        spring_params : HeuristicForceParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -102,7 +102,7 @@ def params_plot(
             spring_state = sim.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                spring_params=spring_params,
+                force_params=spring_params,
                 nn_force=False,
                 nn_force_params={},
                 graph=training_graph)
@@ -178,7 +178,7 @@ def params_plot(
             spring_state = sim.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                spring_params=spring_params,
+                force_params=spring_params,
                 nn_force=False,
                 nn_force_params={},
                 graph=training_graph)
@@ -261,7 +261,7 @@ def params_plot(
             spring_state = sim.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                spring_params=spring_params,
+                force_params=spring_params,
                 nn_force=Falses,
                 nn_force_params={},
                 graph=training_graph)
@@ -302,7 +302,7 @@ def params_plot(
 def selected_wrong_classification(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : SpringParams, 
+        spring_params : HeuristicForceParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -346,7 +346,7 @@ def selected_wrong_classification(
         spring_state = sim.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
-            spring_params=spring_params,
+            force_params=spring_params,
             nn_force=False,
             nn_force_params={},
             graph=training_graph)

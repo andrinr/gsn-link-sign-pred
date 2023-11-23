@@ -1,6 +1,5 @@
 from .states import * 
 from .springs import *
-from .evaluate import evaluate
+from .evaluate import *
 from .helpers import *
-from .auxillaries import *
 from .simulation import *
