@@ -4,17 +4,16 @@ from tqdm import tqdm
 import optax
 
 # local imports
-import simulation as sim
-import neural as nn
-from graph import SignedGraph
+import graph as g
+import simulation as sm
 
 def pre_train(
     key : jax.random.PRNGKey,
     learning_rate : float,
     num_epochs : int,
-    heuristic_force_params : nn.NeuralForceParams,
-    neural_force_params : nn.NeuralForceParams,
-) -> nn.NeuralForceParams:
+    heuristic_force_params : sm.NeuralForceParams,
+    neural_force_params : sm.NeuralForceParams,
+) -> sm.NeuralForceParams:
     
     # generate random SignedGraph
     num_edges = 10000
@@ -22,27 +21,27 @@ def pre_train(
 
     signs = jax.random.randint(
         key, 
-        low=0, 
-        high=2, 
+        minval=0, 
+        maxval=2, 
         shape=(num_edges,))
     
     edge_index = jax.random.randint(
         key, 
-        low=0, 
-        high=num_nodes, 
+        minval=0, 
+        maxval=num_nodes, 
         shape=(2, num_edges))
 
-    signed_graph = SignedGraph(
+    signed_graph = g.SignedGraph(
         edge_index=edge_index,
         sign=signs,
         sign_one_hot=jax.nn.one_hot(signs, 3),
-        node_degrees=jax.zeros((num_nodes,)),
+        node_degrees=jnp.zeros((num_nodes,)),
         num_nodes=num_nodes,
         num_edges=num_edges,
         train_mask=jnp.zeros((num_nodes,), dtype=bool),
         test_mask=jnp.zeros((num_nodes,), dtype=bool))
     
-    spring_state = sim.init_spring_state(
+    spring_state = sm.init_spring_state(
         key,
         range=40,
         n=num_nodes,
@@ -81,18 +80,18 @@ def pre_train(
     return neural_force_params
 
 def pre_train_loss(
-    heuristic_force_params : sim.HeuristicForceParams,
-    neural_force_params : nn.NeuralForceParams,
-    spring_state : sim.SpringState,
-    graph : SignedGraph
+    heuristic_force_params : sm.HeuristicForceParams,
+    neural_force_params : sm.NeuralForceParams,
+    spring_state : sm.SpringState,
+    graph : g.SignedGraph
 ) -> jnp.ndarray:
     
-    heuristic_force = sim.heuristic_force(
+    heuristic_force = sm.heuristic_force(
         heuristic_force_params,
         spring_state,
         graph)
     
-    neural_force = nn.neural_force(
+    neural_force = sm.neural_force(
         neural_force_params,
         spring_state,
         graph)

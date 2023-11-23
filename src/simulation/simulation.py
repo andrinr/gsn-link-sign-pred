@@ -1,21 +1,21 @@
 import jax.numpy as jnp
 import jax
 from functools import partial
-import simulation as sim
-from graph import SignedGraph
-from neural import NeuralForceParams
+
+import graph as g
+import simulation as sm
 
 @partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate(
-    simulation_params : sim.SimulationParams,
-    spring_state : sim.SpringState,
-    force_params : sim.HeuristicForceParams | NeuralForceParams,
+    simulation_params : sm.SimulationParams,
+    spring_state : sm.SpringState,
+    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
     use_neural_force : bool,
-    graph : SignedGraph
-) -> sim.SpringState:
+    graph : g.SignedGraph
+) -> sm.SpringState:
     
     # capture the spring_params and signs in the closure
-    simulation_update = lambda i, state: sim.update_spring_state(
+    simulation_update = lambda i, state: sm.update_spring_state(
         simulation_params = simulation_params, 
         force_params = force_params,
         use_neural_force = use_neural_force,
@@ -32,12 +32,12 @@ def simulate(
 
 @partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate_and_loss(
-    simulation_params : sim.SimulationParams,
-    spring_state : sim.SpringState,
-    force_params : sim.HeuristicForceParams | NeuralForceParams,
+    simulation_params : sm.SimulationParams,
+    spring_state : sm.SpringState,
+    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
     use_neural_force : bool,
-    graph : SignedGraph,
-) -> sim.SpringState:
+    graph : g.SignedGraph,
+) -> sm.SpringState:
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -64,8 +64,8 @@ def simulate_and_loss(
     return loss_value, (spring_state, predicted_sign)
 
 def predict(
-    spring_state : sim.SpringState,
-    graph : SignedGraph,
+    spring_state : sm.SpringState,
+    graph : g.SignedGraph,
     x_0 : float
 ):
     position_i = spring_state.position[graph.edge_index[0]]
@@ -79,8 +79,8 @@ def predict(
     return predicted_sign
 
 def loss(
-    spring_state : sim.SpringState,
-    graph : SignedGraph,
+    spring_state : sm.SpringState,
+    graph : g.SignedGraph,
     x_0 : float
 ):
     predicted_sign = predict(

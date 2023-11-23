@@ -14,11 +14,9 @@ import torch_geometric.transforms as T
 import numpy as np
 
 # Local dependencies
-import simulation as sim
-import neural as nn
+import simulation as sm
+import graph as g
 from io_helpers import get_dataset
-from graph import to_SignedGraph
-import neural as nn
 
 def main(argv) -> None:
     """
@@ -88,22 +86,22 @@ def main(argv) -> None:
         
         loader = ClusterLoader(cluster_data)
         for batch in loader:
-            signedGraph = to_SignedGraph(batch)
+            signedGraph = g.to_SignedGraph(batch)
             if signedGraph.num_nodes > 300:
                 batches.append(signedGraph)
             
     else:
-        signedGraph = to_SignedGraph(dataset)
+        signedGraph = g.to_SignedGraph(dataset)
         batches.append(signedGraph)
         
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(params_path):
         stream = open(params_path, 'r')
         spring_params = yaml.load(stream, Loader=yaml.FullLoader)
-        spring_params = sim.HeuristicForceParams(**spring_params)
+        spring_params = sm.HeuristicForceParams(**spring_params)
         print("loaded spring params checkpoint")
     else:
-        spring_params = sim.HeuristicForceParams(
+        spring_params = sm.HeuristicForceParams(
             friend_distance=5.0,
             friend_stiffness=0.3,
             neutral_distance=10.0,
@@ -114,7 +112,7 @@ def main(argv) -> None:
             center_attraction=0.0)
         print("no spring params checkpoint found, using default params")
 
-    simulation_params_train = sim.SimulationParams(
+    simulation_params_train = sm.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS // MULTISTPES_GRADIENT,
         dt=TRAIN_DT,
         damping=DAMPING,
@@ -130,13 +128,13 @@ def main(argv) -> None:
         force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
         print("loaded force params checkpoint")
     else:
-        force_params = nn.init_neural_force_params(
+        force_params = sm.init_neural_force_params(
             key=key_force,
             factor=0.1)
         print("no force params checkpoint found, using default params")
     
     if OPTIMIZE_NEURAL_FORCE and PRE_TRAIN_NEURAL_FORCE:
-        force_params = nn.pre_train(
+        force_params = sm.pre_train(
             key=key_training,
             learning_rate=1e-3,
             num_epochs=NUM_EPOCHS,
@@ -144,11 +142,11 @@ def main(argv) -> None:
             neural_force_params=force_params)
         
     if OPTIMIZE_HEURISTIC_FORCE or OPTIMIZE_NEURAL_FORCE:
-        force_params, loss_hist, metrics_hist = nn.train(
+        force_params, loss_hist, metrics_hist = sm.train(
             random_key=key_training,
             batches=batches,
             force_params=force_params,
-            training_params=nn.TrainingParams(
+            training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
                 learning_rate=1e-3,
                 use_neural_force=NEURAL_FORCE,
@@ -217,13 +215,13 @@ def main(argv) -> None:
     key_shots = random.split(key_test, TEST_SHOTS)      
     for shot in range(TEST_SHOTS):
 
-        graph = to_SignedGraph(dataset)
+        graph = g.to_SignedGraph(dataset)
         print(graph.sign)
 
         print(f"shot: {shot}")
 
         # initialize spring state
-        spring_state = sim.init_spring_state(
+        spring_state = sm.init_spring_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -234,7 +232,7 @@ def main(argv) -> None:
         # training_signs = graphsigns.copy()
         # training_signs = training_signs.at[train_mask].set(0)
 
-        simulation_params_test = sim.SimulationParams(
+        simulation_params_test = sm.SimulationParams(
             iterations=FINAL_SIM_ITERATIONS,
             dt=TEST_DT,
             damping=DAMPING,
@@ -244,13 +242,13 @@ def main(argv) -> None:
         training_signs = jnp.where(graph.train_mask, training_signs, 0)
         training_graph = graph._replace(sign=training_signs)
 
-        spring_state = sim.simulate(
+        spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
             force_params=spring_params,
             graph=training_graph)
 
-        metrics, _ = sim.evaluate(
+        metrics, _ = sm.evaluate(
             spring_state,
             graph.edge_index,
             graph.sign,

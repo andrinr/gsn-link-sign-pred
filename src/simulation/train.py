@@ -4,11 +4,8 @@ import jax.numpy as jnp
 from tqdm import tqdm
 import optax
 
-# local imports
-from simulation import SimulationParams, HeuristicForceParams, Metrics, init_spring_state, SpringState, evaluate
-from neural import NeuralForceParams
-from graph import SignedGraph
-from simulation import simulate_and_loss
+import graph as g
+import simulation as sm
 
 class TrainingParams(NamedTuple):
     num_epochs : int
@@ -21,11 +18,11 @@ class TrainingParams(NamedTuple):
 
 def train(
     random_key : jax.random.PRNGKey,
-    batches : list[SignedGraph],
-    force_params : HeuristicForceParams | NeuralForceParams,
+    batches : list[g.SignedGraph],
+    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
     training_params : TrainingParams,
-    simulation_params : SimulationParams,
-) -> (HeuristicForceParams | NeuralForceParams, list[float], list[Metrics]):
+    simulation_params : sm.SimulationParams,
+) -> (sm.HeuristicForceParams | sm.NeuralForceParams, list[float], list[sm.Metrics]):
     
     optimizer = optax.adam(training_params.learning_rate)
     force_optimizer_multi_step = optax.MultiSteps(
@@ -33,7 +30,7 @@ def train(
     force_optimizier_state = force_optimizer_multi_step.init(
         force_params)
     
-    value_and_grad_fn = jax.value_and_grad(simulate_and_loss, argnums=2, has_aux=True)
+    value_and_grad_fn = jax.value_and_grad(sm.simulate_and_loss, argnums=2, has_aux=True)
     
     # init progress bar, add total number of epochs, add loss and metrics
     epochs = tqdm(range(training_params.num_epochs))
@@ -48,7 +45,7 @@ def train(
         for batch_index, batch_graph in enumerate(batches):
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
-            spring_state = init_spring_state(
+            spring_state = sm.init_spring_state(
                 rng=random_keys[epoch_index],
                 range=training_params.init_pos_range,
                 n=batch_graph.num_nodes,
@@ -71,7 +68,7 @@ def train(
 
             epoch_loss += loss_value
 
-            metrics, _= evaluate(
+            metrics, _= sm.evaluate(
                 spring_state,
 
                 batch_graph.edge_index,

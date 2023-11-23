@@ -1,15 +1,14 @@
 import jax.numpy as jnp
-import simulation as sim
-from graph import SignedGraph
-from neural import NeuralForceParams, mlp_forces
 
+import graph as g
+import simulation as sm
 EPSILON = 1e-6
     
 # @partial(jax.jit, static_argnames=[])
 def heuristic_force(
-    params : sim.HeuristicForceParams,
-    state : sim.SpringState,
-    graph : SignedGraph
+    params : sm.HeuristicForceParams,
+    state : sm.SpringState,
+    graph : g.SignedGraph
 ) -> jnp.ndarray:
     
     position_i = state.position[graph.edge_index[0]]
@@ -33,9 +32,9 @@ def heuristic_force(
     return acceleration * spring_vector_norm
 
 def neural_force(
-    params : NeuralForceParams,
-    state : sim.SpringState,
-    graph : SignedGraph
+    params : sm.NeuralForceParams,
+    state : sm.SpringState,
+    graph : g.SignedGraph
 ) -> jnp.ndarray:
     
     position_i = state.position[graph.edge_index[0]]
@@ -52,17 +51,17 @@ def neural_force(
     
     x = jnp.concatenate([graph.sign_one_hot, distance, degs_i, degs_j], axis=1)
 
-    x = mlp_forces(x, params)
+    x = sm.mlp_forces(x, params)
 
     return x * 10 * spring_vector_norm
 
 def update_spring_state(
-    simulation_params : sim.SimulationParams,
-    force_params : sim.HeuristicForceParams | NeuralForceParams,
+    simulation_params : sm.SimulationParams,
+    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
     use_neural_force : bool,
-    spring_state : sim.SpringState, 
-    graph : SignedGraph,
-) -> sim.SpringState:
+    spring_state : sm.SpringState, 
+    graph : g.SignedGraph,
+) -> sm.SpringState:
 
     if use_neural_force:
         edge_acceleration = neural_force(
