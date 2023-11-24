@@ -20,7 +20,7 @@ def init_neural_force_params(
 
     keys = jax.random.split(key, num=5)
     
-    sizes = [6, 32, 32, 32, 16, 1]
+    sizes = [4, 32, 32, 32, 16, 1]
 
     params = {}
 

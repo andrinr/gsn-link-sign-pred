@@ -1,14 +1,12 @@
 # External dependencies
 import sys
 import inquirer
-from torch_geometric.utils import is_undirected, subgraph
+from torch_geometric.utils import is_undirected
 from torch_geometric.loader import ClusterData, ClusterLoader
 import yaml
 from jax import random
 import jax.numpy as jnp
-import jax
 import matplotlib.pyplot as plt
-import optax
 import os
 import torch_geometric.transforms as T
 import numpy as np
@@ -43,7 +41,7 @@ def main(argv) -> None:
     NUM_EPOCHS = 30
     MULTISTPES_GRADIENT = 3
     GRAPH_PARTITIONING = True
-    BATCH_SIZE = 6
+    BATCH_SIZE = 12
     TRAIN_DT = 0.005
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 2048
@@ -136,8 +134,8 @@ def main(argv) -> None:
     if OPTIMIZE_NEURAL_FORCE and PRE_TRAIN_NEURAL_FORCE:
         force_params = sm.pre_train(
             key=key_training,
-            learning_rate=1e-3,
-            num_epochs=NUM_EPOCHS,
+            learning_rate=1e-2,
+            num_epochs=200,
             heuristic_force_params=spring_params,
             neural_force_params=force_params)
         
@@ -246,6 +244,7 @@ def main(argv) -> None:
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
             force_params=spring_params,
+            use_neural_force=NEURAL_FORCE,
             graph=training_graph)
 
         metrics, _ = sm.evaluate(

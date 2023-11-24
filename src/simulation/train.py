@@ -23,7 +23,9 @@ def train(
     training_params : TrainingParams,
     simulation_params : sm.SimulationParams,
 ) -> (sm.HeuristicForceParams | sm.NeuralForceParams, list[float], list[sm.Metrics]):
-    
+
+    print("Training neural force... \n")
+
     optimizer = optax.adam(training_params.learning_rate)
     force_optimizer_multi_step = optax.MultiSteps(
         optimizer, training_params.multi_step)

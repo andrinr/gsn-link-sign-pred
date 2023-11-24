@@ -15,38 +15,29 @@ def pre_train(
     neural_force_params : sm.NeuralForceParams,
 ) -> sm.NeuralForceParams:
     
-    # generate random SignedGraph
-    num_edges = 10000
-    num_nodes = 1000
+    print("Pre-training neural force... \n")
 
-    signs = jax.random.randint(
+    # generate random SignedGraph
+    num_edges = 100000
+
+    sign = jax.random.randint(
         key, 
-        minval=0, 
+        minval=-1, 
         maxval=2, 
         shape=(num_edges,))
     
-    edge_index = jax.random.randint(
-        key, 
-        minval=0, 
-        maxval=num_nodes, 
-        shape=(2, num_edges))
-
-    signed_graph = g.SignedGraph(
-        edge_index=edge_index,
-        sign=signs,
-        sign_one_hot=jax.nn.one_hot(signs, 3),
-        node_degrees=jnp.zeros((num_nodes,)),
-        num_nodes=num_nodes,
-        num_edges=num_edges,
-        train_mask=jnp.zeros((num_nodes,), dtype=bool),
-        test_mask=jnp.zeros((num_nodes,), dtype=bool))
+    sign_one_hot = jax.nn.one_hot(sign + 1, 3)
     
-    spring_state = sm.init_spring_state(
+    distances = jax.random.uniform(
         key,
-        range=40,
-        n=num_nodes,
-        m=num_edges,
-        embedding_dim=16)
+        minval=-50,
+        maxval=50,
+        shape=(num_edges,1))
+    
+    true_force = sm.heuristic_force(
+        heuristic_force_params,
+        distances,
+        sign)
 
     # create optimizer
     optimizer = optax.adam(learning_rate)
@@ -56,20 +47,25 @@ def pre_train(
     epochs = tqdm(range(num_epochs))
 
     # create value and grad function
-    value_and_grad_fn = jax.value_and_grad(pre_train_loss, argnums=1, has_aux=False)
+    value_and_grad_fn = jax.value_and_grad(pre_train_loss, argnums=0, has_aux=True)
 
     # pre train
     for epoch_index in epochs:
-        loss_value, grad = value_and_grad_fn(
-            heuristic_force_params,
+        (loss_value, neural_force), grad = value_and_grad_fn(
             neural_force_params,
-            spring_state,
-            signed_graph)
+            true_force,
+            sign_one_hot,
+            distances)
 
+        updates, optimizer_state = optimizer.update(grad, optimizer_state, neural_force_params)
+
+        # print(loss_value)
+        # print(neural_force)
+        # print(true_force)
         # update neural force params
         neural_force_params = optax.apply_updates(
             neural_force_params,
-            optimizer(grad, optimizer_state))
+            updates)
 
         # update progress bar
         epochs.set_postfix({
@@ -80,26 +76,17 @@ def pre_train(
     return neural_force_params
 
 def pre_train_loss(
-    heuristic_force_params : sm.HeuristicForceParams,
     neural_force_params : sm.NeuralForceParams,
-    spring_state : sm.SpringState,
-    graph : g.SignedGraph
+    true_force : jnp.ndarray,
+    sign_one_hot : jnp.ndarray,
+    distance : jnp.ndarray,
 ) -> jnp.ndarray:
-    
-    heuristic_force = sm.heuristic_force(
-        heuristic_force_params,
-        spring_state,
-        graph)
     
     neural_force = sm.neural_force(
         neural_force_params,
-        spring_state,
-        graph)
-    
-    loss = jnp.mean(jnp.square(heuristic_force - neural_force))
+        distance,
+        sign_one_hot)
 
-    return loss
+    loss = jnp.mean(jnp.square(true_force - neural_force))
 
-
-
-
+    return loss, neural_force

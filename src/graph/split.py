@@ -4,7 +4,6 @@ import torch
 
 def permute_split(
         data : Data, 
-        val_percentage : float,
         train_percentage : float) -> tuple[Data, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Sets the edge_attr of the test edges to 0. 
@@ -21,7 +20,6 @@ def permute_split(
 
     assert data.is_undirected()
     assert data.edge_attr is not None
-    assert val_percentage + train_percentage <= 1.0
 
     mask = data.edge_index[0] < data.edge_index[1]
     data.edge_index = data.edge_index[:, mask]
@@ -29,8 +27,7 @@ def permute_split(
 
     num_total = data.edge_attr.shape[0]
     num_train = int(train_percentage * num_total)
-    num_val = int(val_percentage * num_total)
-    num_test = num_total - num_train - num_val
+    num_test = num_total - num_train
 
     perm = torch.randperm(num_total, device=data.edge_index.device)
 
@@ -44,12 +41,8 @@ def permute_split(
     train_mask[:num_train] = True
     train_mask[num_total:num_total + num_train] = True
 
-    val_mask = torch.zeros(num_total * 2, dtype=torch.bool)
-    val_mask[num_train:num_train + num_val] = True
-    val_mask[num_total + num_train:num_total + num_train + num_val] = True
-
     test_mask = torch.zeros(num_total * 2, dtype=torch.bool)
-    test_mask[num_train + num_val:num_total] = True
-    test_mask[num_total + num_train + num_val:] = True
+    test_mask[num_train:num_total] = True
+    test_mask[num_total + num_train:] = True
     
-    return data, train_mask, val_mask, test_mask, num_train, num_val, num_test
+    return data, train_mask, test_mask

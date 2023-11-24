@@ -43,6 +43,9 @@ def simulate_and_loss(
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
     training_graph = graph._replace(sign=training_signs)
 
+    training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+    training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+
     spring_state = simulate(
         simulation_params = simulation_params,
         spring_state = spring_state,
@@ -88,11 +91,11 @@ def loss(
         graph = graph,
         x_0 = x_0)
 
-    sign = graph.sign * 0.5 + 0.5
+    sign_binary = graph.sign * 0.5 + 0.5
 
-    incorrect_predictions = jnp.square(sign - predicted_sign)
+    incorrect_predictions = jnp.square(sign_binary - predicted_sign)
 
-    fraction_negatives = jnp.sum(sign == 0) / sign.shape[0]
+    fraction_negatives = jnp.sum(sign_binary == 0) / sign_binary.shape[0]
     fraction_positives =  1 - fraction_negatives
 
     weight_positives = 1 / fraction_positives
@@ -101,10 +104,10 @@ def loss(
     # score = (sign * predicted_sign) *  1 / fraction_positives + ((1 - sign) * (1 - predicted_sign)) * 1 / fraction_negatives
     
     # false negatives
-    jnp.where(sign == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
+    jnp.where(sign_binary == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
     
     incorrect_predictions_weighted = jnp.where(
-        sign == 1, 
+        sign_binary == 1, 
         incorrect_predictions * weight_positives, 
         incorrect_predictions * weight_negatives)
 
