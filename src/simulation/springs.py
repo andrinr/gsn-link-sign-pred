@@ -18,10 +18,11 @@ def update_spring_state(
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
 
     velocity = spring_state.velocity * (1 - simulation_params.damping) + simulation_params.dt * node_accelerations
+    velocity += simulation_params.centering * -spring_state.position * simulation_params.dt
 
     position = spring_state.position + simulation_params.dt * velocity
 
-    spring_state = spring_state._replace(velocity=velocity, position=position, acceleration=node_accelerations)
+    spring_state = spring_state._replace(velocity=velocity, position=position)
     
     return spring_state
   
@@ -34,13 +35,15 @@ def acceleration(
     
     position_i = state.position[graph.edge_index[0]]
     position_j = state.position[graph.edge_index[1]]
+    degs_i = graph.node_degrees[graph.edge_index[0]]
+    degs_j = graph.node_degrees[graph.edge_index[1]]
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
     if use_neural_force:
-        force = neural_force(params, distance, graph.sign_one_hot)
+        force = neural_force(params, distance, degs_i, degs_j, graph.sign_one_hot)
     else:
         force = heuristic_force(params, distance, graph.sign)
 
@@ -66,11 +69,13 @@ def heuristic_force(
 def neural_force(
     params : sm.NeuralForceParams,
     distance : jnp.ndarray,
+    degs_i : jnp.ndarray,
+    degs_j : jnp.ndarray,
     sign_one_hot : jnp.ndarray,
 ) -> jnp.ndarray:
 
-    x = jnp.concatenate([sign_one_hot, distance], axis=1)
+    x = jnp.concatenate([sign_one_hot, degs_i, degs_j, distance], axis=1)
 
     force = sm.mlp_forces(x, params)
 
-    return force * 300
+    return force * 1000

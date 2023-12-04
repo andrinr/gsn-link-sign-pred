@@ -229,3 +229,22 @@ A trainig step of the entire process then looks as follows:
 6. Compute the loss and update the parameters of the message passing neural network $A$ and the force decision network $B$ using gradient descent.
 7. Repeat from step 1.
 
+Even though I was able to train the network to a low loss, the performance of the network was not better than the original method. Furthermore there is a reasoning mistake in the above method. Above all the message passing network $A$ and $B$ together are most of all trained to predict the sign of each edge. Naturally they are able to also predict a probability for each possibility (-1, 0, 1) which gives it a somewhat improved capaility from the original method. However the overhead and the imprecision which comes from the uncertain training signal is not worth the small improvement in performance. Furthermore if $A$ and $B$ are trained to predict the sign of an edge successfully, there is no real reason to apply the spring network simulation, as the network $A$ and $B$ already capture the local graph structure.
+
+### Learning the force functions
+
+As denoted above the force acting on a node $v_i$ from the edge $(v_i, v_j)$ is the partial derivative of the energy with respect to the node position $\frac{\partial E(x_i, x_j) }{\partial x_i} $. We denote the force coming from negative, neutral and positive nodes as $f^{-}_{i,j}$, $f^{0}_{i,j}$ and $f^{-}_{i,j}$. The partial differential equations evaluate to equations:
+
+$$f^{-}_{i,j} = \alpha^{-} \cdot min(l^{-} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+
+$$f^{0}_{i,j} = \alpha^{0} \cdot (l^{0} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+
+$$f^{+}_{i,j} = \alpha^{+} \cdot max(l^{+} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - X_i}{\|{ X_j - X_i}\|_2}$$
+
+The idea is to learn a function $F$, which given the distance between two nodes $d = \|{ X_j - X_i}\|_2$ and the edge type $\sigma(i, j)$, computes the force $f_{i, j}$. To do so I pretrained the network on the heuristic force functions and then finetuned the network on the Bitcoin Alpha dataset. The results are shown below:
+
+![Results](img/loss_spring_params_16.png)
+
+![Results](img/measures_spring_params_16.png)
+
+The results did however not outperform the heuristic forces.

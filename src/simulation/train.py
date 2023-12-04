@@ -55,7 +55,6 @@ def train(
                 embedding_dim=training_params.embedding_dim)
 
             # run simulation and compute loss, auxillaries and gradient
- 
             (loss_value, (spring_state, signs_pred)), grad = value_and_grad_fn(
                 simulation_params, #0
                 spring_state, #1

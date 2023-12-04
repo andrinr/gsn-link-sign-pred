@@ -4,7 +4,7 @@ from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
 from torch_geometric.data import Data 
 import torch_geometric.transforms as T
     
-def get_dataset(data_path : str, argv : list) -> Data:
+def get_dataset(data_path : str, argv : list) -> (Data, str):
     dataset_names = ['Tribes', 'Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
     questions = [
         inquirer.List('dataset',
@@ -44,4 +44,4 @@ def get_dataset(data_path : str, argv : list) -> Data:
 
     data = dataset[0]
 
-    return data
+    return data, dataset_name

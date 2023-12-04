@@ -14,7 +14,6 @@ class HeuristicForceParams(NamedTuple):
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
-    acceleration: jnp.ndarray
     
 def init_spring_state(
     rng : jax.random.PRNGKey, 
@@ -23,8 +22,7 @@ def init_spring_state(
     embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
     velocity = jnp.zeros((n, embedding_dim))
-    acceleration = jnp.zeros((n, embedding_dim))
-    return SpringState(position, velocity, acceleration)
+    return SpringState(position, velocity)
 
 class SimulationState(NamedTuple):
     iteration : int
@@ -34,4 +32,4 @@ class SimulationParams(NamedTuple):
     iterations : int
     dt : float
     damping : float
-    message_passing_iterations : int
+    centering : float

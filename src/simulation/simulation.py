@@ -74,10 +74,10 @@ def predict(
     position_i = spring_state.position[graph.edge_index[0]]
     position_j = spring_state.position[graph.edge_index[1]]
 
-    distance = jnp.linalg.norm(position_j - position_i, axis=1) - 10
+    distance = jnp.linalg.norm(position_j - position_i, axis=1) - 16
 
     # apply sigmoid function to get sign (0 for negative, 1 for positive)
-    predicted_sign = 1 / (1 + jnp.exp(1 * (distance-x_0)))
+    predicted_sign = 1 / (1 + jnp.exp(5 * (distance-x_0)))
 
     return predicted_sign
 

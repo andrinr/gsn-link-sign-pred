@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import os
 import torch_geometric.transforms as T
 import numpy as np
+import jax
 
 # Local dependencies
 import simulation as sm
@@ -28,25 +29,25 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     # Simulation parameters
-    NEURAL_FORCE = True
-    PRE_TRAIN_NEURAL_FORCE = True      
-    OPTIMIZE_NEURAL_FORCE = True
+    NEURAL_FORCE = False
+    PRE_TRAIN_NEURAL_FORCE = False      
+    OPTIMIZE_NEURAL_FORCE = False
     OPTIMIZE_HEURISTIC_FORCE = False
-    EMBEDDING_DIM = 16
+    EMBEDDING_DIM = 64
     INIT_POS_RANGE = 3.0
     TEST_DT = 0.0025
     DAMPING = 0.032
+    CENTERING = -0.005
 
     # Training parameters
-    NUM_EPOCHS = 30
-    MULTISTPES_GRADIENT = 3
+    NUM_EPOCHS = 60
+    MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = True
-    BATCH_SIZE = 12
+    BATCH_SIZE = 4
     TRAIN_DT = 0.005
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 2048
-    AUXILLARY_ITERATIONS = 4
-    TEST_SHOTS = 10
+    TEST_SHOTS = 1
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -65,7 +66,7 @@ def main(argv) -> None:
 
     #jax.config.update("jax_enable_x64", True)
     
-    dataset = get_dataset(DATA_PATH, argv) 
+    dataset, dataset_name = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index):
         transform = T.ToUndirected(reduce="min")
         dataset = transform(dataset)
@@ -106,7 +107,7 @@ def main(argv) -> None:
             neutral_stiffness=0.3,
             enemy_distance=20.0,
             enemy_stiffness=0.3,
-            distance_threshold=4.0,
+            # distance_threshold=4.0,
             center_attraction=0.0)
         print("no spring params checkpoint found, using default params")
 
@@ -114,13 +115,13 @@ def main(argv) -> None:
         iterations=PER_EPOCH_SIM_ITERATIONS // MULTISTPES_GRADIENT,
         dt=TRAIN_DT,
         damping=DAMPING,
-        message_passing_iterations=AUXILLARY_ITERATIONS)
+        centering=CENTERING)
 
     # Create initial values for neural network parameters
     key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
     # params including embdding size
-    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}.yaml"
+    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}_{dataset_name}.yaml"
     if os.path.exists(force_params_name):
         stream = open(force_params_name, 'r')
         force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
@@ -135,7 +136,7 @@ def main(argv) -> None:
         force_params = sm.pre_train(
             key=key_training,
             learning_rate=1e-2,
-            num_epochs=200,
+            num_epochs=400,
             heuristic_force_params=spring_params,
             neural_force_params=force_params)
         
@@ -146,7 +147,7 @@ def main(argv) -> None:
             force_params=force_params,
             training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
-                learning_rate=1e-3,
+                learning_rate=1e-5,
                 use_neural_force=NEURAL_FORCE,
                 batch_size=BATCH_SIZE,
                 init_pos_range=INIT_POS_RANGE,
@@ -210,14 +211,13 @@ def main(argv) -> None:
                 yaml.dump(force_params, file)
 
     shot_metrics = []
-    key_shots = random.split(key_test, TEST_SHOTS)      
+    key_shots = random.split(key_test, TEST_SHOTS)     
+    graph = {}
+
     for shot in range(TEST_SHOTS):
 
         graph = g.to_SignedGraph(dataset)
-        print(graph.sign)
-
-        print(f"shot: {shot}")
-
+   
         # initialize spring state
         spring_state = sm.init_spring_state(
             rng=key_shots[shot],
@@ -230,22 +230,33 @@ def main(argv) -> None:
         # training_signs = graphsigns.copy()
         # training_signs = training_signs.at[train_mask].set(0)
 
+
         simulation_params_test = sm.SimulationParams(
             iterations=FINAL_SIM_ITERATIONS,
             dt=TEST_DT,
             damping=DAMPING,
-            message_passing_iterations=AUXILLARY_ITERATIONS)
+            centering=CENTERING)
 
         training_signs = graph.sign.copy()
         training_signs = jnp.where(graph.train_mask, training_signs, 0)
         training_graph = graph._replace(sign=training_signs)
+        training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+        training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-        spring_state = sm.simulate(
-            simulation_params=simulation_params_test,
-            spring_state=spring_state, 
-            force_params=spring_params,
-            use_neural_force=NEURAL_FORCE,
-            graph=training_graph)
+        if NEURAL_FORCE:
+            spring_state = sm.simulate(
+                simulation_params=simulation_params_test,
+                spring_state=spring_state, 
+                force_params=force_params,
+                use_neural_force=NEURAL_FORCE,
+                graph=training_graph)
+        else:
+            spring_state = sm.simulate(
+                simulation_params=simulation_params_test,
+                spring_state=spring_state, 
+                force_params=spring_params,
+                use_neural_force=NEURAL_FORCE,
+                graph=training_graph)
 
         metrics, _ = sm.evaluate(
             spring_state,
@@ -262,6 +273,10 @@ def main(argv) -> None:
     print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
+    print(f"true_positives: {np.mean([metrics.true_positives for metrics in shot_metrics])}")
+    print(f"false_positives: {np.mean([metrics.false_positives for metrics in shot_metrics])}")
+    print(f"true_negatives: {np.mean([metrics.true_negatives for metrics in shot_metrics])}")
+    print(f"false_negatives: {np.mean([metrics.false_negatives for metrics in shot_metrics])}")
 
     # print extreme metrics over all shots
     print(f"extreme metrics over {TEST_SHOTS} shots:")
@@ -269,6 +284,10 @@ def main(argv) -> None:
     print(f"f1_binary: {np.max([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"f1_micro: {np.max([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"f1_macro: {np.max([metrics.f1_macro for metrics in shot_metrics])}")
+    print(f"true_positives: {np.max([metrics.true_positives for metrics in shot_metrics])}")
+    print(f"false_positives: {np.max([metrics.false_positives for metrics in shot_metrics])}")
+    print(f"true_negatives: {np.max([metrics.true_negatives for metrics in shot_metrics])}")
+    print(f"false_negatives: {np.max([metrics.false_negatives for metrics in shot_metrics])}")
 
     # selected_wrong_classification(
     #     dataset=dataset,
@@ -280,6 +299,151 @@ def main(argv) -> None:
     #     dt=TEST_DT,
     #     damping=DAMPING,
     # )
+
+    graph = g.to_SignedGraph(dataset)
+   
+    # initialize spring state
+    spring_state = sm.init_spring_state(
+        rng=key_shots[shot],
+        n=graph.num_nodes,
+        m=graph.num_edges,
+        range=INIT_POS_RANGE,
+        embedding_dim=EMBEDDING_DIM
+    )
+
+    # training_signs = graphsigns.copy()
+    # training_signs = training_signs.at[train_mask].set(0)
+
+
+    simulation_params_test = sm.SimulationParams(
+        iterations=FINAL_SIM_ITERATIONS,
+        dt=TEST_DT,
+        damping=DAMPING,
+        centering=CENTERING)
+
+    training_signs = graph.sign.copy()
+    training_signs = jnp.where(graph.train_mask, training_signs, 0)
+    training_graph = graph._replace(sign=training_signs)
+    training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+    training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+
+    if NEURAL_FORCE:
+        spring_state = sm.simulate(
+            simulation_params=simulation_params_test,
+            spring_state=spring_state, 
+            force_params=force_params,
+            use_neural_force=NEURAL_FORCE,
+            graph=training_graph)
+    else:
+        tree_depth = int(np.log2(EMBEDDING_DIM))
+        # initialize spring state
+        spring_state = sm.init_spring_state(
+            rng=key_shots[shot],
+            n=graph.num_nodes,
+            m=graph.num_edges,
+            range=INIT_POS_RANGE,
+            embedding_dim=48
+    	)
+    
+        for i in range(8):
+            simulation_params_test = sm.SimulationParams(
+                iterations=500,
+                dt=TEST_DT,
+                damping=DAMPING,
+                centering=CENTERING)
+                
+            spring_state = sm.simulate(
+                simulation_params=simulation_params_test,
+                spring_state=spring_state, 
+                force_params=spring_params,
+                use_neural_force=NEURAL_FORCE,
+                graph=training_graph)
+            dim = 2 ** (i + 1)
+
+            metrics = sm.evaluate(
+                spring_state,
+                graph.edge_index,
+                graph.sign,
+                graph.train_mask,
+                graph.test_mask)
+            
+            print(metrics)
+
+            print(f"dim: {dim}")
+            if i < tree_depth - 1:
+                spring_state = spring_state._replace(
+                    position=jnp.concatenate(
+                        [spring_state.position, jax.random.uniform(key_shots[shot], (graph.num_nodes, 2), minval=-INIT_POS_RANGE, maxval=INIT_POS_RANGE)], axis=1),
+                    velocity=jnp.concatenate(
+                        [spring_state.velocity, jnp.zeros((graph.num_nodes, 2))], axis=1))
+    
+    metrics = sm.evaluate(
+        spring_state,
+        graph.edge_index,
+        graph.sign,
+        graph.train_mask,
+        graph.test_mask)
+    
+    print(metrics)
+
+    # plot error per edge against avg node distance to center
+    embedding_i = spring_state.position[graph.edge_index[0]]
+    embedding_j = spring_state.position[graph.edge_index[1]]
+    distance_i = jnp.linalg.norm(embedding_i, axis=1, keepdims=True)
+    distance_j = jnp.linalg.norm(embedding_j, axis=1, keepdims=True)
+
+    avg_distance = (distance_i + distance_j) / 2
+    distance = jnp.linalg.norm(embedding_j - embedding_i, axis=1, keepdims=True)
+
+    predicted_sign = sm.predict(
+        spring_state = spring_state,
+        graph = graph,
+        x_0 = 0)
+    print(graph.sign)
+    print(predicted_sign)
+
+    sign = jnp.where(graph.sign == 1, 1, 0)
+    print(sign)
+    sign_pred = jnp.where(predicted_sign > 0.01, 1, 0)
+    print(sign_pred)
+
+    true_positives = jnp.logical_and(sign == 1, sign_pred == 1)
+    false_positives = jnp.logical_and(sign == 0, sign_pred == 1)
+    true_negatives = jnp.logical_and(sign == 0, sign_pred == 0)
+    false_negatives = jnp.logical_and(sign == 1, sign_pred == 0)
+
+    print(f"true_positives: {jnp.sum(true_positives)}")
+    print(f"false_positives: {jnp.sum(false_positives)}")
+    print(f"true_negatives: {jnp.sum(true_negatives)}")
+    print(f"false_negatives: {jnp.sum(false_negatives)}")
+
+    print(f"sign: {sign}")
+    print(f"sign_pred: {sign_pred}")
+
+    error = jnp.square(sign - predicted_sign)
+
+    plt.scatter(avg_distance, error, c=predicted_sign, cmap='viridis')
+    plt.colorbar()
+    plt.xlabel('avg distance to center')
+    plt.ylabel('error')
+    plt.title('error per edge')
+    plt.show()
+
+    error_per_node = jnp.zeros(graph.num_nodes)
+    error_per_node = error_per_node.at[graph.edge_index[0]].add(error)
+    error_per_node = jnp.expand_dims(error_per_node, axis=1)
+    # normalize error by node degree, elementwise division
+    error_per_node = error_per_node / graph.node_degrees
+
+    print(f"error_per_node: {error_per_node.shape}")
+
+    plt.scatter(graph.node_degrees, error_per_node)
+    plt.colorbar()
+    plt.xlabel('node degree')
+    plt.ylabel('predicted sign')
+    plt.title('predicted sign per node degree')
+    plt.show()
+    
 
     
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 from tqdm import tqdm
 import optax
+import matplotlib.pyplot as plt
 
 # local imports
 import graph as g
@@ -18,20 +19,32 @@ def pre_train(
     print("Pre-training neural force... \n")
 
     # generate random SignedGraph
-    num_edges = 100000
+    num_edges = 50000
 
     sign = jax.random.randint(
         key, 
         minval=-1, 
         maxval=2, 
-        shape=(num_edges,))
+        shape=(num_edges, ))
+    
+    degs_i = jax.random.randint(
+        key,
+        minval=0,
+        maxval=100,
+        shape=(num_edges, 1))
+    
+    degs_j = jax.random.randint(
+        key,
+        minval=0,
+        maxval=100,
+        shape=(num_edges, 1))
     
     sign_one_hot = jax.nn.one_hot(sign + 1, 3)
     
     distances = jax.random.uniform(
         key,
-        minval=-50,
-        maxval=50,
+        minval=0,
+        maxval=40,
         shape=(num_edges,1))
     
     true_force = sm.heuristic_force(
@@ -55,7 +68,10 @@ def pre_train(
             neural_force_params,
             true_force,
             sign_one_hot,
-            distances)
+            distances,
+            degs_i,
+            degs_j)
+            
 
         updates, optimizer_state = optimizer.update(grad, optimizer_state, neural_force_params)
 
@@ -73,6 +89,13 @@ def pre_train(
             "loss": loss_value,
         })
 
+    # plot the two functions to compare
+    plt.scatter(distances, true_force, label="true force")
+    plt.scatter(distances, neural_force, label="neural force")
+    plt.legend()
+    plt.show()
+
+
     return neural_force_params
 
 def pre_train_loss(
@@ -80,11 +103,15 @@ def pre_train_loss(
     true_force : jnp.ndarray,
     sign_one_hot : jnp.ndarray,
     distance : jnp.ndarray,
+    degs_i : jnp.ndarray,
+    degs_j : jnp.ndarray,
 ) -> jnp.ndarray:
     
     neural_force = sm.neural_force(
         neural_force_params,
         distance,
+        degs_i,
+        degs_j,
         sign_one_hot)
 
     loss = jnp.mean(jnp.square(true_force - neural_force))

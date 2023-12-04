@@ -1,6 +1,6 @@
 from simulation import SpringState
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score, f1_score
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
 import jax.numpy as jnp
 from typing import NamedTuple
 
@@ -9,9 +9,20 @@ class Metrics(NamedTuple):
     f1_binary : float
     f1_micro : float
     f1_macro : float
+    true_positives : float
+    false_positives : float
+    true_negatives : float
+    false_negatives : float
 
     def __str__(self):
-        return f"auc: {self.auc}, f1_binary: {self.f1_binary}, f1_micro: {self.f1_micro}, f1_macro: {self.f1_macro}"
+        return "auc: {self.auc}," + \
+        "f1_binary: {self.f1_binary}, " + \
+        "f1_micro: {self.f1_micro}, " + \
+        "f1_macro: {self.f1_macro}, " + \
+        "true_positives: {self.true_positives}, " + \
+        "false_positives: {self.false_positives}, " + \
+        "true_negatives: {self.true_negatives}, " + \
+        "false_negatives: {self.false_negatives}"
 
 def evaluate(
     spring_state : SpringState, 
@@ -37,10 +48,13 @@ def evaluate(
         f1_binary = f1_score(signs.at[evaulation_mask].get(), y_pred, average='binary')
         f1_micro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='micro')
         f1_macro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='macro')
+        tn, fp, fn, tp = confusion_matrix(signs.at[evaulation_mask].get(), y_pred).ravel()
+
     except ValueError:
         auc = 0
         f1_binary = 0
         f1_micro = 0
         f1_macro = 0
+        tn, fp, fn, tp = 0, 0, 0, 0
 
-    return Metrics(auc, f1_binary, f1_micro, f1_macro), y_pred
+    return Metrics(auc, f1_binary, f1_micro, f1_macro, tp, fp, tn, fn), y_pred

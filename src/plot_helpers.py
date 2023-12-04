@@ -262,7 +262,7 @@ def params_plot(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
                 force_params=spring_params,
-                nn_force=Falses,
+                nn_force=False,
                 nn_force_params={},
                 graph=training_graph)
 
