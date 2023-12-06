@@ -32,9 +32,9 @@ def main(argv) -> None:
     NEURAL_FORCE = False
     PRE_TRAIN_NEURAL_FORCE = False      
     OPTIMIZE_NEURAL_FORCE = False
-    OPTIMIZE_HEURISTIC_FORCE = False
+    OPTIMIZE_HEURISTIC_FORCE = True
     EMBEDDING_DIM = 64
-    INIT_POS_RANGE = 3.0
+    INIT_POS_RANGE = 1.0
     TEST_DT = 0.0025
     DAMPING = 0.032
     CENTERING = -0.005
@@ -42,12 +42,12 @@ def main(argv) -> None:
     # Training parameters
     NUM_EPOCHS = 60
     MULTISTPES_GRADIENT = 1
-    GRAPH_PARTITIONING = True
-    BATCH_SIZE = 4
+    GRAPH_PARTITIONING = False
+    BATCH_SIZE = 12
     TRAIN_DT = 0.005
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 2048
-    TEST_SHOTS = 1
+    TEST_SHOTS = 10
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -96,20 +96,53 @@ def main(argv) -> None:
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(params_path):
         stream = open(params_path, 'r')
-        spring_params = yaml.load(stream, Loader=yaml.FullLoader)
-        spring_params = sm.HeuristicForceParams(**spring_params)
+        heuristic_force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
+        print(heuristic_force_params)
         print("loaded spring params checkpoint")
     else:
-        spring_params = sm.HeuristicForceParams(
-            friend_distance=5.0,
-            friend_stiffness=0.3,
-            neutral_distance=10.0,
-            neutral_stiffness=0.3,
-            enemy_distance=20.0,
-            enemy_stiffness=0.3,
-            # distance_threshold=4.0,
-            center_attraction=0.0)
+        heuristic_force_params = sm.HeuristicForceParams(
+            friend_intercept=0.0,
+            friend_slope=jnp.array([0.3, 1.0, 0.2]),
+            friend_segment=jnp.array([0.5, 3.0]),
+            enemy_intercept=-4.0,
+            enemy_slope=jnp.array([0.5, 0.1, 1.0]),
+            enemy_segment=jnp.array([2.0, 6.0]),
+            neutral_intercept=0.0,
+            neutral_slope=jnp.array([0.2, 0.2, 0.2]),
+            neutral_segment=jnp.array([0.5, 1.3]))
         print("no spring params checkpoint found, using default params")
+
+        # plot piecewise linear functions
+        n = 300
+        x = jnp.linspace(-0.1, 10, n)
+        x = jnp.expand_dims(x, axis=1)
+        y_friend = sm.heuristic_force(
+            params=heuristic_force_params,
+            distance=x,
+            sign=jnp.ones(n))
+        y_friend = y_friend.squeeze()
+
+        y_enemy = sm.heuristic_force(
+            params=heuristic_force_params,
+            distance=x,
+            sign=jnp.ones(n) * -1)
+        y_enemy = y_enemy.squeeze()
+
+        y_neutral = sm.heuristic_force(
+            params=heuristic_force_params,
+            distance=x,
+            sign=jnp.zeros(n))
+        y_neutral = y_neutral.squeeze()
+
+        print(x.shape)
+        print(y_friend.shape)
+
+        plt.plot(x, y_friend, label='friend')
+        plt.plot(x, y_enemy, label='enemy')
+        plt.plot(x, y_neutral, label='neutral')
+        plt.legend()
+        plt.title('Piecewise linear functions')
+        plt.show()
 
     simulation_params_train = sm.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS // MULTISTPES_GRADIENT,
@@ -121,33 +154,35 @@ def main(argv) -> None:
     key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
     # params including embdding size
-    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}_{dataset_name}.yaml"
+    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(force_params_name):
         stream = open(force_params_name, 'r')
-        force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
+        neural_force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
         print("loaded force params checkpoint")
     else:
-        force_params = sm.init_neural_force_params(
+        neural_force_params = sm.init_neural_force_params(
             key=key_force,
             factor=0.1)
         print("no force params checkpoint found, using default params")
     
-    if OPTIMIZE_NEURAL_FORCE and PRE_TRAIN_NEURAL_FORCE:
-        force_params = sm.pre_train(
+    if OPTIMIZE_NEURAL_FORCE and PRE_TRAIN_NEURAL_FORCE and NEURAL_FORCE:
+        neural_force_params = sm.pre_train(
             key=key_training,
             learning_rate=1e-2,
             num_epochs=400,
-            heuristic_force_params=spring_params,
-            neural_force_params=force_params)
+            heuristic_force_params=heuristic_force_params,
+            neural_force_params=neural_force_params)
+        
+    force_params = neural_force_params if NEURAL_FORCE else heuristic_force_params
         
     if OPTIMIZE_HEURISTIC_FORCE or OPTIMIZE_NEURAL_FORCE:
-        force_params, loss_hist, metrics_hist = sm.train(
+        force_params, loss_hist, metrics_hist, force_params_hist = sm.train(
             random_key=key_training,
             batches=batches,
             force_params=force_params,
             training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
-                learning_rate=1e-5,
+                learning_rate=0.09,
                 use_neural_force=NEURAL_FORCE,
                 batch_size=BATCH_SIZE,
                 init_pos_range=INIT_POS_RANGE,
@@ -170,6 +205,39 @@ def main(argv) -> None:
         plt.title('Measures')
         plt.show()
 
+        if not NEURAL_FORCE:
+            # plot piecewise linear functions
+            n = 300
+            x = jnp.linspace(-3, 10, n)
+            x = jnp.expand_dims(x, axis=1)
+            y_friend = sm.heuristic_force(
+                params=force_params,
+                distance=x,
+                sign=jnp.ones(n))
+            y_friend = y_friend.squeeze()
+
+            y_enemy = sm.heuristic_force(
+                params=force_params,
+                distance=x,
+                sign=jnp.ones(n) * -1)
+            y_enemy = y_enemy.squeeze()
+
+            y_neutral = sm.heuristic_force(
+                params=force_params,
+                distance=x,
+                sign=jnp.zeros(n))
+            y_neutral = y_neutral.squeeze()
+
+            print(x.shape)
+            print(y_friend.shape)
+
+            plt.plot(x, y_friend, label='friend')
+            plt.plot(x, y_enemy, label='enemy')
+            plt.plot(x, y_neutral, label='neutral')
+            plt.legend()
+            plt.title('Piecewise linear functions')
+            plt.show()
+            
     # write spring params to file, the file is still a traced jax object
     if OPTIMIZE_HEURISTIC_FORCE:
         # ask user if they want to save the parameters
@@ -182,18 +250,7 @@ def main(argv) -> None:
         answers = inquirer.prompt(questions)
         if answers['save'] == 'Yes':
             with open(params_path, 'w') as file:
-                params_dict = {}
-                # get value from jax traced array
-                params_dict['friend_distance'] = spring_params.friend_distance.item()
-                params_dict['friend_stiffness'] = spring_params.friend_stiffness.item()
-                params_dict['neutral_distance'] = spring_params.neutral_distance.item()
-                params_dict['neutral_stiffness'] = spring_params.neutral_stiffness.item()
-                params_dict['enemy_distance'] = spring_params.enemy_distance.item()
-                params_dict['enemy_stiffness'] = spring_params.enemy_stiffness.item()
-                params_dict['distance_threshold'] = spring_params.distance_threshold.item()
-                params_dict['center_attraction'] = spring_params.center_attraction.item()
-
-                yaml.dump(params_dict, file)
+                yaml.dump(force_params, file, default_flow_style=False)
 
     # Store the trained parameters in a file
     if OPTIMIZE_NEURAL_FORCE:
@@ -254,7 +311,7 @@ def main(argv) -> None:
             spring_state = sm.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                force_params=spring_params,
+                force_params=force_params,
                 use_neural_force=NEURAL_FORCE,
                 graph=training_graph)
 
@@ -355,7 +412,7 @@ def main(argv) -> None:
             spring_state = sm.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                force_params=spring_params,
+                force_params=force_params,
                 use_neural_force=NEURAL_FORCE,
                 graph=training_graph)
             dim = 2 ** (i + 1)

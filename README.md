@@ -41,11 +41,13 @@ run ```pytest``` in the ```src``` folder.
 
 ### Task Definition
 
-We are given a signed network $G = (V, E, \sigma)$, where $V$ is the set of nodes and $E$ is the set of edges. Finally for each edge $(i, j)$ there is a sign which denotes a positive or a negative relationship between the two nodes. Formally we introduce a sign function $\sigma: V \times V \rightarrow \{-1, 0, 1\}$, which maps an edge $(i, j) \in E$ to a sign $\sigma(i, j) \in \{-1, 0, 1\}$.
+We are given a signed undirected network $G = (V, E, \sigma)$, where $V$ is the set of nodes, $E$ is the set of edges and the function $\sigma: V \times V \rightarrow \{-1, 1\}$, which maps an edge $(i, j) \in E$ to a sign $\sigma(i, j) \in \{-1, 1\}$. 
 
-The task is to predict the sign of an edge $(u, v) \in E_{test}$, where $E_{test} \subset E$ is a set of edges which are not known to the algorithm.
+Given the raw network, we sample a set of test edges $E_{test} \subset E$ and map its sign to a neutral value 0. Therefore the function $\sigma$ is now defined as $\sigma: V \times V \rightarrow \{-1, 0, 1\}$. Analogously we define the sets $E_{train}$ which is defined as $E_{train} = E \setminus E_{test}$. As in previous work, we do not use a validation set. 
 
-To do so we randomly sample a set of edges $E_{test} \subset E$ and set the sign to a neutral value 0. We want to find a function $f: V \times V \rightarrow \mathbb{R}$, which maps an edge $(u, v) \in E_{test}$ to a sign $\sigma(u, v) \in \{-1, 1\}$.
+( add some remarks about why dont use a validation set and how the test and train datasets are conceptually different from the classical case)
+
+The task is to predict the sign of an edge $(u, v) \in E_{test}$, where $E_{test} \subset E$, where the prediction method can only rely on the structural information of the network and the signs of the edges in $E_{train}$.
 
 ### Node Embedding
 
@@ -135,7 +137,7 @@ The main reason why the loss and the measures are so 'jagged' is that the initia
 
 ## Training
 
-The training process of the neural networks is challenging as a single simulation run takes up to a minute on my machine on all of the datasets. Therefore we use the Tribes dataset as a pretraining and then finetune the network on the other datasets. This saves a lot of time as the Tribes dataset is very small and can be simulated very quickly.
+The training process for the datasets can be challenging. As the loss needs to differentiated over a large number of simulation iterations, this requires large amounts of GPU memory. Therefore training on the entire graph is not possible. To overcome this problem we use a graph subsampling method. We sample a fixed number of nodes from the graph and only compute the loss for the sampled nodes. This allows us to train on large graphs. However the subsampling method introduces a bias, as the loss is only computed for a subset of the graph. To overcome this problem we use a batched subsampling method. We sample a fixed number of nodes for each batch and compute the loss for each batch. This allows us to train on the entire graph, while still being able to train on large graphs. The batched subsampling method is described in the paper [Inductive Representation Learning on Large Graphs](https://arxiv.org/pdf/1706.02216.pdf) by William L. Hamilton, Rex Ying and Jure Leskovec.
 
 ## Results
 
@@ -231,7 +233,7 @@ A trainig step of the entire process then looks as follows:
 
 Even though I was able to train the network to a low loss, the performance of the network was not better than the original method. Furthermore there is a reasoning mistake in the above method. Above all the message passing network $A$ and $B$ together are most of all trained to predict the sign of each edge. Naturally they are able to also predict a probability for each possibility (-1, 0, 1) which gives it a somewhat improved capaility from the original method. However the overhead and the imprecision which comes from the uncertain training signal is not worth the small improvement in performance. Furthermore if $A$ and $B$ are trained to predict the sign of an edge successfully, there is no real reason to apply the spring network simulation, as the network $A$ and $B$ already capture the local graph structure.
 
-### Learning the force functions
+### Learning the force functions using a neural network
 
 As denoted above the force acting on a node $v_i$ from the edge $(v_i, v_j)$ is the partial derivative of the energy with respect to the node position $\frac{\partial E(x_i, x_j) }{\partial x_i} $. We denote the force coming from negative, neutral and positive nodes as $f^{-}_{i,j}$, $f^{0}_{i,j}$ and $f^{-}_{i,j}$. The partial differential equations evaluate to equations:
 
@@ -243,8 +245,17 @@ $$f^{+}_{i,j} = \alpha^{+} \cdot max(l^{+} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - 
 
 The idea is to learn a function $F$, which given the distance between two nodes $d = \|{ X_j - X_i}\|_2$ and the edge type $\sigma(i, j)$, computes the force $f_{i, j}$. To do so I pretrained the network on the heuristic force functions and then finetuned the network on the Bitcoin Alpha dataset. The results are shown below:
 
-![Results](img/loss_spring_params_16.png)
+The training process in the framework is extremely fragile and the network is able to improve its force function, however the initial heuristic method did by far outperform this strategy.
 
-![Results](img/measures_spring_params_16.png)
+### Learning the force functions using a piecewise linear function
 
-The results did however not outperform the heuristic forces.
+Since th
+
+
+### The fundamental problems in the training process
+
+- If we want to successfully optimize the loss function for the state achieved after say 300 iterations, its also necessary to train it for 300 iterations. Its possible to increase the delta time and decrease the number of iterations, however this only works up to a certain factor of around 3. If we increase the delta time too much, the simulation diverges due to numerical instability. If we decrease the number of iterations too much, the simulation does not converge to a stable state.
+
+- Therefore each training step is very expensive and the loss surface we are trying to optimize is very uneven. Even very small changes in the parameters can lead to a very large change in the loss.
+
+- Training on smaller graphs does not translate well to larger graphs, as in larger graphs the nodes have more larger degrees. The more edges are connected to a single node, the more forces are acting on the node. Therefore the same force function do not translate from small to big networks. Furthermore as the graph structure becomes large, there might be additional forces pulling the entire network to the center of the graph. I was however not able to verify this claim.

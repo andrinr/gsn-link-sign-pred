@@ -24,7 +24,7 @@ def train(
     simulation_params : sm.SimulationParams,
 ) -> (sm.HeuristicForceParams | sm.NeuralForceParams, list[float], list[sm.Metrics]):
 
-    print("Training neural force... \n")
+    print("\n Training...")
 
     optimizer = optax.adam(training_params.learning_rate)
     force_optimizer_multi_step = optax.MultiSteps(
@@ -39,6 +39,7 @@ def train(
 
     loss_history = []
     metrics_history = []
+    force_params_history = []
     epoch_loss = 0
 
     random_keys = jax.random.split(random_key, training_params.num_epochs)
@@ -48,7 +49,7 @@ def train(
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
             spring_state = sm.init_spring_state(
-                rng=random_keys[epoch_index],
+                rng=random_keys[0],
                 range=training_params.init_pos_range,
                 n=batch_graph.num_nodes,
                 m=batch_graph.num_edges,
@@ -61,6 +62,7 @@ def train(
                 force_params, #2
                 training_params.use_neural_force, #3
                 batch_graph)
+        
 
             nn_force_update, force_optimizier_state = force_optimizer_multi_step.update(
                 grad, force_optimizier_state, force_params)
@@ -91,5 +93,6 @@ def train(
         loss_history.append(epoch_loss)
         epoch_loss = 0
         metrics_history.append(metrics)
+        force_params_history.append(force_params)
 
-    return force_params, loss_history, metrics_history
+    return force_params, loss_history, metrics_history, force_params_history

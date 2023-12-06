@@ -3,13 +3,15 @@ import jax.numpy as jnp
 import jax
 
 class HeuristicForceParams(NamedTuple):
-    friend_distance: float
-    friend_stiffness: float
-    neutral_distance: float
-    neutral_stiffness: float
-    enemy_distance: float
-    enemy_stiffness: float
-    center_attraction: float
+    friend_intercept : jnp.ndarray
+    enemy_intercept : jnp.ndarray
+    neutral_intercept : jnp.ndarray
+    friend_slope : jnp.ndarray
+    enemy_slope : jnp.ndarray
+    neutral_slope : jnp.ndarray
+    friend_segment : jnp.ndarray
+    enemy_segment : jnp.ndarray
+    neutral_segment : jnp.ndarray
 
 class SpringState(NamedTuple):
     position: jnp.ndarray

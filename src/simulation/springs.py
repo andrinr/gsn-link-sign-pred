@@ -17,8 +17,15 @@ def update_spring_state(
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
 
+    # if not use_neural_force:
+    #     # mass degree correction
+    #     node_accelerations = node_accelerations / ( 1 + force_params.mass_degree_correction * graph.node_degrees)
+
     velocity = spring_state.velocity * (1 - simulation_params.damping) + simulation_params.dt * node_accelerations
-    velocity += simulation_params.centering * -spring_state.position * simulation_params.dt
+    
+    # if not use_neural_force:
+    #     # center attractor
+    #     velocity += spring_state.position * force_params.center_attraction * simulation_params.dt * 0.1
 
     position = spring_state.position + simulation_params.dt * velocity
 
@@ -55,14 +62,53 @@ def heuristic_force(
     sign : jnp.ndarray
 ) -> jnp.ndarray:
     
-    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness
-    neutral = (distance - params.neutral_distance) * params.neutral_stiffness
-    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness
+    friend_force = jnp.where(distance < params.friend_segment[0],
+                            (distance - params.friend_segment[0]) * params.friend_slope[0] +\
+                            params.friend_intercept, 
+                            0)
 
+    friend_force = jnp.where((distance >= params.friend_segment[0]) & (distance < params.friend_segment[1]),
+                            (distance - params.friend_segment[0]) * params.friend_slope[1] +\
+                            params.friend_intercept, friend_force)
+    
+    friend_force = jnp.where(distance >= params.friend_segment[1],
+                            (distance - params.friend_segment[1]) * params.friend_slope[2] +\
+                            params.friend_intercept + (params.friend_segment[1] - params.friend_segment[0]) * params.friend_slope[1],
+                            friend_force)
+    
+    enemy_force = jnp.where(distance < params.enemy_segment[0],
+                            (distance - params.enemy_segment[0]) * params.enemy_slope[0] +\
+                            params.enemy_intercept, 
+                            0)
+    
+    enemy_force = jnp.where((distance >= params.enemy_segment[0]) & (distance < params.enemy_segment[1]),
+                            (distance - params.enemy_segment[0]) * params.enemy_slope[1] +\
+                            params.enemy_intercept, enemy_force)
+    
+    enemy_force = jnp.where(distance >= params.enemy_segment[1],
+                            (distance - params.enemy_segment[1]) * params.enemy_slope[2] +\
+                            params.enemy_intercept + (params.enemy_segment[1] - params.enemy_segment[0]) * params.enemy_slope[1],
+                            enemy_force)
+    
+    neutral_force = jnp.where(distance < params.neutral_segment[0],
+                            (distance - params.neutral_segment[0]) * params.neutral_slope[0] +\
+                            params.neutral_intercept, 
+                            0)
+    
+    neutral_force = jnp.where((distance >= params.neutral_segment[0]) & (distance < params.neutral_segment[1]),
+                            (distance - params.neutral_segment[0]) * params.neutral_slope[1] +\
+                            params.neutral_intercept, neutral_force)
+    
+    neutral_force = jnp.where(distance >= params.neutral_segment[1],
+                            (distance - params.neutral_segment[1]) * params.neutral_slope[2] +\
+                            params.neutral_intercept + (params.neutral_segment[1] - params.neutral_segment[0]) * params.neutral_slope[1],
+                            neutral_force)
+    
+  
     sign = jnp.expand_dims(sign, axis=1)
 
-    force = jnp.where(sign == 1, attraction, neutral)
-    force = jnp.where(sign == -1, retraction, force)
+    force = jnp.where(sign == 1, friend_force, enemy_force)
+    force = jnp.where(sign == 0, neutral_force, force)
 
     return force
 
@@ -78,4 +124,4 @@ def neural_force(
 
     force = sm.mlp_forces(x, params)
 
-    return force * 1000
+    return force * 50

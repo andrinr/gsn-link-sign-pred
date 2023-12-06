@@ -11,8 +11,6 @@ class NeuralForceParams(NamedTuple):
     b2 : jnp.ndarray
     W3 : jnp.ndarray
     b3 : jnp.ndarray
-    W4 : jnp.ndarray
-    b4 : jnp.ndarray
 
 def init_neural_force_params(
     key : jax.random.PRNGKey,
@@ -20,7 +18,7 @@ def init_neural_force_params(
 
     keys = jax.random.split(key, num=5)
     
-    sizes = [6, 32, 32, 32, 16, 1]
+    sizes = [6, 12, 6, 3, 1]
 
     params = {}
 
@@ -45,9 +43,6 @@ def mlp_forces(
     x = jax.nn.relu(x)
 
     x = jnp.dot(x, params.W3) + params.b3
-    x = jax.nn.relu(x)
-
-    x = jnp.dot(x, params.W4) + params.b4
     x = jax.nn.tanh(x)
 
     return x

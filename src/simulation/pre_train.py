@@ -44,7 +44,7 @@ def pre_train(
     distances = jax.random.uniform(
         key,
         minval=0,
-        maxval=40,
+        maxval=10,
         shape=(num_edges,1))
     
     true_force = sm.heuristic_force(
@@ -90,8 +90,8 @@ def pre_train(
         })
 
     # plot the two functions to compare
-    plt.scatter(distances, true_force, label="true force")
-    plt.scatter(distances, neural_force, label="neural force")
+    plt.scatter(distances, true_force, label="true force", s=0.5)
+    plt.scatter(distances, neural_force, label="neural force", s=0.5)
     plt.legend()
     plt.show()
 

@@ -1,7 +1,173 @@
-center_attraction: -0.11407578736543655
-enemy_distance: 22.873247146606445
-enemy_stiffness: 16.6799373626709
-friend_distance: 11.047764778137207
-friend_stiffness: 6.9460930824279785
-neutral_distance: 15.488149642944336
-neutral_stiffness: 2.1481637954711914
+!!python/object/new:simulation.states.HeuristicForceParams
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - &id001 !!python/name:numpy.core.multiarray._reconstruct ''
+  - !!python/tuple
+    - &id002 !!python/name:numpy.ndarray ''
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple []
+    - &id003 !!python/object/apply:numpy.dtype
+      args:
+      - f4
+      - false
+      - true
+      state: !!python/tuple
+      - 3
+      - <
+      - null
+      - null
+      - null
+      - -1
+      - -1
+      - 0
+    - false
+    - !!binary |
+      CL6APw==
+  - named_shape: &id004 {}
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple []
+    - *id003
+    - false
+    - !!binary |
+      OsvKwA==
+  - named_shape: *id004
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple []
+    - *id003
+    - false
+    - !!binary |
+      GMUdQA==
+  - named_shape: *id004
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple
+      - 3
+    - *id003
+    - false
+    - !!binary |
+      qo2WvQYJJ0FQMjFA
+  - named_shape: &id005 {}
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple
+      - 3
+    - *id003
+    - false
+    - !!binary |
+      mN2PQQQ/AMBEOy1A
+  - named_shape: *id005
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple
+      - 3
+    - *id003
+    - false
+    - !!binary |
+      02nMwM6jBkFnALtA
+  - named_shape: *id005
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple
+      - 2
+    - *id003
+    - false
+    - !!binary |
+      jTEOvwbX+UA=
+  - named_shape: &id006 {}
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple
+      - 2
+    - *id003
+    - false
+    - !!binary |
+      CDKxQKU7pEA=
+  - named_shape: *id006
+    weak_type: false
+- !!python/object/apply:jax._src.array._reconstruct_array
+  - *id001
+  - !!python/tuple
+    - *id002
+    - !!python/tuple
+      - 0
+    - !!binary |
+      Yg==
+  - !!python/tuple
+    - 1
+    - !!python/tuple
+      - 2
+    - *id003
+    - false
+    - !!binary |
+      66UHPyplAkE=
+  - named_shape: *id006
+    weak_type: false
