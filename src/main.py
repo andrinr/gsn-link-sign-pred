@@ -473,11 +473,11 @@ def main(argv) -> None:
     error_per_node = error_per_node.at[graph.edge_index[0]].add(error)
     error_per_node = jnp.expand_dims(error_per_node, axis=1)
     # normalize error by node degree, elementwise division
-    error_per_node = error_per_node / graph.node_degrees
+    error_per_node = error_per_node / graph.degree.values
 
     print(f"error_per_node: {error_per_node.shape}")
 
-    plt.scatter(graph.node_degrees, error_per_node)
+    plt.scatter(graph.degree.values, error_per_node)
     plt.colorbar()
     plt.xlabel('node degree')
     plt.ylabel('predicted sign')

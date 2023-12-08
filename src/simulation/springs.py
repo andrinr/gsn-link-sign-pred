@@ -16,7 +16,7 @@ def update_spring_state(
 
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
-    factor = (force_params.degree_multiplier * jnp.minimum(graph.node_degrees, graph.percentile_degree) / graph.percentile_degree + 1)
+    factor = (force_params.degree_multiplier * jnp.minimum(graph.centrality.values, graph.centrality.percentile) / graph.centrality.percentile + 1)
     node_accelerations = node_accelerations * factor
 
     velocity = spring_state.velocity * (1 - simulation_params.damping)
@@ -24,7 +24,7 @@ def update_spring_state(
 
     velocity_magnitude = jnp.linalg.norm(velocity, axis=1, keepdims=True)
     # limit the velocity to a maximum value
-    velocity = velocity * jnp.minimum(velocity_magnitude, 30) / (velocity_magnitude + 1.0)
+    velocity = velocity * jnp.minimum(velocity_magnitude, 20) / (velocity_magnitude + 1.0)
     
     position = spring_state.position + simulation_params.dt * velocity
 
@@ -41,25 +41,23 @@ def acceleration(
     
     position_i = state.position[graph.edge_index[0]]
     position_j = state.position[graph.edge_index[1]]
-    degs_i = graph.node_degrees[graph.edge_index[0]]
-    degs_j = graph.node_degrees[graph.edge_index[1]]
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
-    if use_neural_force:
-        force = neural_force(params, 
-                             distance, 
-                             position_i,
-                             position_j,
-                             state.velocity[graph.edge_index[0]],
-                             state.velocity[graph.edge_index[1]],
-                             degs_i, 
-                             degs_j, 
-                             graph)
-    else:
-        force = heuristic_force(params, distance, graph.sign)
+    # if use_neural_force:
+    #     # force = neural_force(params, 
+    #     #                      distance, 
+    #     #                      position_i,
+    #     #                      position_j,
+    #     #                      state.velocity[graph.edge_index[0]],
+    #     #                      state.velocity[graph.edge_index[1]],
+    #     #                      degs_i, 
+    #     #                      degs_j, 
+    #     #                      graph)
+    # else:
+    force = heuristic_force(params, distance, graph.sign)
 
     return force * spring_vector_norm
 

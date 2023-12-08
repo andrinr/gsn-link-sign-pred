@@ -13,12 +13,12 @@ class Measures(NamedTuple):
     percentile : int
     values : jnp.ndarray
 
-    def init(self, values : jnp.ndarray):
-        self.max = jnp.max(values)
-        self.avg = jnp.mean(values)
-        self.percentile = jnp.percentile(values, 90)
-        self.values = values
-        return self
+def init_measures(values : jnp.ndarray):
+    max = jnp.max(values)
+    avg = jnp.mean(values)
+    percentile = jnp.percentile(values, 90)
+
+    return Measures(max, avg, percentile, values)
 
 class SignedGraph(NamedTuple):
     """
@@ -59,31 +59,31 @@ def to_SignedGraph(
 
     node_degrees = jnp.bincount(edge_index[0])
 
-    degree_measures = Measures.init(node_degrees)
-
     num_nodes = jnp.max(edge_index) + 1
     num_edges = edge_index.shape[1]
 
+    degree_measures = init_measures(jnp.expand_dims(node_degrees, axis=1))
+
     centrality = node_degrees
-    centrality = centrality / degree_measures.average
+    centrality = centrality / degree_measures.max
     for i in range(3):
         edge_centrality = centrality[edge_index[1]]
         centrality = centrality.at[edge_index[0]].add(edge_centrality)
-        centrality = centrality / degree_measures.average
+        centrality = centrality / degree_measures.max
 
-    centrality_measures = Measures.init(centrality)
+    centrality_measures = init_measures(jnp.expand_dims(centrality, axis=1))
 
-    #plot deg and centralities
-    # two subplots
-    fig, axs = plt.subplots(2)
-    fig.suptitle('Degree and centrality distribution')
-    axs[0].hist(node_degrees, histtype='step', bins=100)
-    axs[0].set_title('Degree')
-    axs[1].hist(centrality, histtype='step', bins=100)
-    axs[1].set_title('Centrality')
-    plt.show()
+    print(centrality_measures)
 
-    node_degrees = jnp.expand_dims(node_degrees, axis=1)
+    # #plot deg and centralities
+    # # two subplots
+    # fig, axs = plt.subplots(2)
+    # fig.suptitle('Degree and centrality distribution')
+    # axs[0].hist(node_degrees, histtype='step', bins=100)
+    # axs[0].set_title('Degree')
+    # axs[1].hist(centrality, histtype='step', bins=100)
+    # axs[1].set_title('Centrality')
+    # plt.show()
 
     return SignedGraph(
         edge_index, 
