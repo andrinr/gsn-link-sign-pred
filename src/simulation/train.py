@@ -73,7 +73,6 @@ def train(
 
             metrics, _= sm.evaluate(
                 spring_state,
-
                 batch_graph.edge_index,
                 batch_graph.sign,
                 batch_graph.train_mask,

@@ -13,12 +13,14 @@ class NeuralForceParams(NamedTuple):
     b3 : jnp.ndarray
 
 def init_neural_force_params(
+    num_dimensions : int,
     key : jax.random.PRNGKey,
     factor : float) -> NeuralForceParams:
 
     keys = jax.random.split(key, num=5)
-    
-    sizes = [6, 12, 6, 3, 1]
+
+    s0 = num_dimensions * 4 + 6
+    sizes = [s0, s0, s0 // 2, num_dimensions, num_dimensions]
 
     params = {}
 

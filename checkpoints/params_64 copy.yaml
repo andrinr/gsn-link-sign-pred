@@ -1,8 +1,0 @@
-center_attraction: -0.18842363357543945
-distance_threshold: 16.336414337158203
-enemy_distance: 22.901264190673828
-enemy_stiffness: 16.70391273498535
-friend_distance: 11.156438827514648
-friend_stiffness: 6.848570823669434
-neutral_distance: 15.600605964660645
-neutral_stiffness: 2.296434164047241

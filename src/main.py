@@ -2,7 +2,7 @@
 import sys
 import inquirer
 from torch_geometric.utils import is_undirected
-from torch_geometric.loader import ClusterData, ClusterLoader
+from torch_geometric.loader import ClusterData, ClusterLoader, GraphSAINTSampler
 import yaml
 from jax import random
 import jax.numpy as jnp
@@ -32,22 +32,22 @@ def main(argv) -> None:
     NEURAL_FORCE = False
     PRE_TRAIN_NEURAL_FORCE = False      
     OPTIMIZE_NEURAL_FORCE = False
-    OPTIMIZE_HEURISTIC_FORCE = True
+    OPTIMIZE_HEURISTIC_FORCE = False
     EMBEDDING_DIM = 64
     INIT_POS_RANGE = 1.0
-    TEST_DT = 0.0025
-    DAMPING = 0.032
-    CENTERING = -0.005
+    TEST_DT = 0.001
+    DAMPING = 0.064
+    CENTERING = 0
 
     # Training parameters
-    NUM_EPOCHS = 60
+    NUM_EPOCHS = 50
     MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = False
-    BATCH_SIZE = 12
-    TRAIN_DT = 0.005
+    BATCH_NUMBER = 6
+    TRAIN_DT = 0.001
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 2048
-    TEST_SHOTS = 10
+    TEST_SHOTS = 1
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -81,68 +81,35 @@ def main(argv) -> None:
     if GRAPH_PARTITIONING and (OPTIMIZE_NEURAL_FORCE or OPTIMIZE_HEURISTIC_FORCE):
         cluster_data = ClusterData(
             dataset, 
-            num_parts=BATCH_SIZE)
+            num_parts=BATCH_NUMBER,
+            keep_inter_cluster_edges=True)
         
         loader = ClusterLoader(cluster_data)
         for batch in loader:
             signedGraph = g.to_SignedGraph(batch)
-            if signedGraph.num_nodes > 300:
+            print(f"num_nodes: {signedGraph.num_nodes}")
+            if signedGraph.num_nodes > 50:
                 batches.append(signedGraph)
-            
+
     else:
-        signedGraph = g.to_SignedGraph(dataset)
-        batches.append(signedGraph)
+        batches.append(g.to_SignedGraph(dataset))
         
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(params_path):
         stream = open(params_path, 'r')
-        heuristic_force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
-        print(heuristic_force_params)
+        heuristic_force_params = yaml.load(stream, Loader=yaml.FullLoader)
+        heuristic_force_params = sm.HeuristicForceParams(**heuristic_force_params)
         print("loaded spring params checkpoint")
     else:
         heuristic_force_params = sm.HeuristicForceParams(
-            friend_intercept=0.0,
-            friend_slope=jnp.array([0.3, 1.0, 0.2]),
-            friend_segment=jnp.array([0.5, 3.0]),
-            enemy_intercept=-4.0,
-            enemy_slope=jnp.array([0.5, 0.1, 1.0]),
-            enemy_segment=jnp.array([2.0, 6.0]),
-            neutral_intercept=0.0,
-            neutral_slope=jnp.array([0.2, 0.2, 0.2]),
-            neutral_segment=jnp.array([0.5, 1.3]))
+            friend_distance=5.0,
+            friend_stiffness=0.3,
+            neutral_distance=10.0,
+            neutral_stiffness=0.3,
+            enemy_distance=20.0,
+            enemy_stiffness=0.3,
+            degree_multiplier=50.0)
         print("no spring params checkpoint found, using default params")
-
-        # plot piecewise linear functions
-        n = 300
-        x = jnp.linspace(-0.1, 10, n)
-        x = jnp.expand_dims(x, axis=1)
-        y_friend = sm.heuristic_force(
-            params=heuristic_force_params,
-            distance=x,
-            sign=jnp.ones(n))
-        y_friend = y_friend.squeeze()
-
-        y_enemy = sm.heuristic_force(
-            params=heuristic_force_params,
-            distance=x,
-            sign=jnp.ones(n) * -1)
-        y_enemy = y_enemy.squeeze()
-
-        y_neutral = sm.heuristic_force(
-            params=heuristic_force_params,
-            distance=x,
-            sign=jnp.zeros(n))
-        y_neutral = y_neutral.squeeze()
-
-        print(x.shape)
-        print(y_friend.shape)
-
-        plt.plot(x, y_friend, label='friend')
-        plt.plot(x, y_enemy, label='enemy')
-        plt.plot(x, y_neutral, label='neutral')
-        plt.legend()
-        plt.title('Piecewise linear functions')
-        plt.show()
 
     simulation_params_train = sm.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS // MULTISTPES_GRADIENT,
@@ -161,6 +128,7 @@ def main(argv) -> None:
         print("loaded force params checkpoint")
     else:
         neural_force_params = sm.init_neural_force_params(
+            num_dimensions=EMBEDDING_DIM,
             key=key_force,
             factor=0.1)
         print("no force params checkpoint found, using default params")
@@ -168,7 +136,7 @@ def main(argv) -> None:
     if OPTIMIZE_NEURAL_FORCE and PRE_TRAIN_NEURAL_FORCE and NEURAL_FORCE:
         neural_force_params = sm.pre_train(
             key=key_training,
-            learning_rate=1e-2,
+            learning_rate=0.1,
             num_epochs=400,
             heuristic_force_params=heuristic_force_params,
             neural_force_params=neural_force_params)
@@ -182,9 +150,9 @@ def main(argv) -> None:
             force_params=force_params,
             training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
-                learning_rate=0.09,
+                learning_rate=0.06,
                 use_neural_force=NEURAL_FORCE,
-                batch_size=BATCH_SIZE,
+                batch_size=BATCH_NUMBER,
                 init_pos_range=INIT_POS_RANGE,
                 embedding_dim=EMBEDDING_DIM,
                 multi_step=MULTISTPES_GRADIENT),
@@ -250,7 +218,19 @@ def main(argv) -> None:
         answers = inquirer.prompt(questions)
         if answers['save'] == 'Yes':
             with open(params_path, 'w') as file:
-                yaml.dump(force_params, file, default_flow_style=False)
+                params_dict = {}
+                # get value from jax traced array
+                params_dict['friend_distance'] = force_params.friend_distance.item()
+                params_dict['friend_stiffness'] = force_params.friend_stiffness.item()
+                params_dict['neutral_distance'] = force_params.neutral_distance.item()
+                params_dict['neutral_stiffness'] = force_params.neutral_stiffness.item()
+                params_dict['enemy_distance'] = force_params.enemy_distance.item()
+                params_dict['enemy_stiffness'] = force_params.enemy_stiffness.item()
+                params_dict['degree_multiplier'] = force_params.degree_multiplier.item()
+                
+                yaml.dump(params_dict, file)
+
+                
 
     # Store the trained parameters in a file
     if OPTIMIZE_NEURAL_FORCE:
@@ -399,12 +379,12 @@ def main(argv) -> None:
             n=graph.num_nodes,
             m=graph.num_edges,
             range=INIT_POS_RANGE,
-            embedding_dim=48
+            embedding_dim=64
     	)
     
         for i in range(8):
             simulation_params_test = sm.SimulationParams(
-                iterations=500,
+                iterations=(i+1) * 64,
                 dt=TEST_DT,
                 damping=DAMPING,
                 centering=CENTERING)
@@ -415,7 +395,6 @@ def main(argv) -> None:
                 force_params=force_params,
                 use_neural_force=NEURAL_FORCE,
                 graph=training_graph)
-            dim = 2 ** (i + 1)
 
             metrics = sm.evaluate(
                 spring_state,
@@ -426,14 +405,6 @@ def main(argv) -> None:
             
             print(metrics)
 
-            print(f"dim: {dim}")
-            if i < tree_depth - 1:
-                spring_state = spring_state._replace(
-                    position=jnp.concatenate(
-                        [spring_state.position, jax.random.uniform(key_shots[shot], (graph.num_nodes, 2), minval=-INIT_POS_RANGE, maxval=INIT_POS_RANGE)], axis=1),
-                    velocity=jnp.concatenate(
-                        [spring_state.velocity, jnp.zeros((graph.num_nodes, 2))], axis=1))
-    
     metrics = sm.evaluate(
         spring_state,
         graph.edge_index,
@@ -479,11 +450,23 @@ def main(argv) -> None:
 
     error = jnp.square(sign - predicted_sign)
 
-    plt.scatter(avg_distance, error, c=predicted_sign, cmap='viridis')
+    plt.scatter(distance, error, c=predicted_sign, cmap='viridis', s=0.5)
     plt.colorbar()
     plt.xlabel('avg distance to center')
     plt.ylabel('error')
     plt.title('error per edge')
+    plt.show()
+
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=2)
+    pca.fit(spring_state.position)
+    embedding = pca.transform(spring_state.position)
+
+    plt.scatter(embedding[:,0], embedding[:,1], cmap='viridis', s=0.5)
+    plt.colorbar()
+    plt.xlabel('PCA 1')
+    plt.ylabel('PCA 2')
+    plt.title('PCA embedding')
     plt.show()
 
     error_per_node = jnp.zeros(graph.num_nodes)
