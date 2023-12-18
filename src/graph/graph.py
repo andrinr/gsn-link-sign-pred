@@ -36,9 +36,10 @@ class SignedGraph(NamedTuple):
 
 def to_SignedGraph(
     data : Data,
+    treat_as_undirected : bool,
     reindexing : bool = True) -> SignedGraph:
 
-    data, train_mask, test_mask = g.permute_split(data, 0.8)
+    data, train_mask, test_mask = g.permute_split(data, 0.8, treat_as_undirected)
 
     if reindexing:
         keep = torch.unique(data.edge_index)

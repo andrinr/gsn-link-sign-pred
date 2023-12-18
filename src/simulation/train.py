@@ -10,7 +10,6 @@ import simulation as sm
 class TrainingParams(NamedTuple):
     num_epochs : int
     learning_rate : float
-    use_neural_force : bool
     batch_size : int
     init_pos_range : float
     embedding_dim : int
@@ -19,10 +18,10 @@ class TrainingParams(NamedTuple):
 def train(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
-    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
+    force_params : sm.HeuristicForceParams,
     training_params : TrainingParams,
     simulation_params : sm.SimulationParams,
-) -> (sm.HeuristicForceParams | sm.NeuralForceParams, list[float], list[sm.Metrics]):
+) -> (sm.HeuristicForceParams, list[float], list[sm.Metrics]):
 
     print("\n Training...")
 
@@ -60,15 +59,18 @@ def train(
                 simulation_params, #0
                 spring_state, #1
                 force_params, #2
-                training_params.use_neural_force, #3
                 batch_graph)
         
+            print(force_params)
+            print(grad)
+            print(loss_value)
 
             nn_force_update, force_optimizier_state = force_optimizer_multi_step.update(
                 grad, force_optimizier_state, force_params)
             
             force_params = optax.apply_updates(force_params, nn_force_update)
 
+            print(force_params)
             epoch_loss += loss_value
 
             metrics, _= sm.evaluate(

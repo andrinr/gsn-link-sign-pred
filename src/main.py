@@ -29,22 +29,20 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     # Simulation parameters
-    NEURAL_FORCE = False
-    PRE_TRAIN_NEURAL_FORCE = False      
-    OPTIMIZE_NEURAL_FORCE = False
-    OPTIMIZE_HEURISTIC_FORCE = False
+    OPTIMIZE_HEURISTIC_FORCE = True
+    TREAT_AS_UNDIRECTED = False
     EMBEDDING_DIM = 64
     INIT_POS_RANGE = 1.0
     TEST_DT = 0.001
-    DAMPING = 0.064
+    DAMPING = 0.032
     CENTERING = 0
 
     # Training parameters
-    NUM_EPOCHS = 50
+    NUM_EPOCHS = 60
     MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = False
-    BATCH_NUMBER = 6
-    TRAIN_DT = 0.001
+    BATCH_NUMBER = 1
+    TRAIN_DT = 0.002
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 2048
     TEST_SHOTS = 1
@@ -52,12 +50,6 @@ def main(argv) -> None:
     # Paths
     DATA_PATH = 'src/data/'
     CECKPOINT_PATH = 'checkpoints/'
-
-    assert not (OPTIMIZE_NEURAL_FORCE and OPTIMIZE_HEURISTIC_FORCE), "Cannot optimize spring params and use NN force at the same time"
-    assert not (not NEURAL_FORCE and OPTIMIZE_NEURAL_FORCE), "Cannot optimize force without using NN force"
-
-    if not OPTIMIZE_NEURAL_FORCE and not OPTIMIZE_HEURISTIC_FORCE:
-        NUM_EPOCHS = 0
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -67,7 +59,7 @@ def main(argv) -> None:
     #jax.config.update("jax_enable_x64", True)
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
-    if not is_undirected(dataset.edge_index):
+    if not is_undirected(dataset.edge_index) and TREAT_AS_UNDIRECTED:
         transform = T.ToUndirected(reduce="min")
         dataset = transform(dataset)
 
@@ -78,7 +70,7 @@ def main(argv) -> None:
     print(f"num_edges: {num_edges}")
 
     batches = []
-    if GRAPH_PARTITIONING and (OPTIMIZE_NEURAL_FORCE or OPTIMIZE_HEURISTIC_FORCE):
+    if GRAPH_PARTITIONING and OPTIMIZE_HEURISTIC_FORCE:
         cluster_data = ClusterData(
             dataset, 
             num_parts=BATCH_NUMBER,
@@ -86,13 +78,13 @@ def main(argv) -> None:
         
         loader = ClusterLoader(cluster_data)
         for batch in loader:
-            signedGraph = g.to_SignedGraph(batch)
+            signedGraph = g.to_SignedGraph(batch, TREAT_AS_UNDIRECTED)
             print(f"num_nodes: {signedGraph.num_nodes}")
             if signedGraph.num_nodes > 50:
                 batches.append(signedGraph)
 
     else:
-        batches.append(g.to_SignedGraph(dataset))
+        batches.append(g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED))
         
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(params_path):
@@ -120,38 +112,16 @@ def main(argv) -> None:
     # Create initial values for neural network parameters
     key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
-    # params including embdding size
-    force_params_name = f"{CECKPOINT_PATH}force_params_{EMBEDDING_DIM}.yaml"
-    if os.path.exists(force_params_name):
-        stream = open(force_params_name, 'r')
-        neural_force_params = yaml.load(stream, Loader=yaml.UnsafeLoader)
-        print("loaded force params checkpoint")
-    else:
-        neural_force_params = sm.init_neural_force_params(
-            num_dimensions=EMBEDDING_DIM,
-            key=key_force,
-            factor=0.1)
-        print("no force params checkpoint found, using default params")
-    
-    if OPTIMIZE_NEURAL_FORCE and PRE_TRAIN_NEURAL_FORCE and NEURAL_FORCE:
-        neural_force_params = sm.pre_train(
-            key=key_training,
-            learning_rate=0.1,
-            num_epochs=400,
-            heuristic_force_params=heuristic_force_params,
-            neural_force_params=neural_force_params)
-        
-    force_params = neural_force_params if NEURAL_FORCE else heuristic_force_params
-        
-    if OPTIMIZE_HEURISTIC_FORCE or OPTIMIZE_NEURAL_FORCE:
+    force_params = heuristic_force_params
+
+    if OPTIMIZE_HEURISTIC_FORCE:
         force_params, loss_hist, metrics_hist, force_params_hist = sm.train(
             random_key=key_training,
             batches=batches,
             force_params=force_params,
             training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
-                learning_rate=0.06,
-                use_neural_force=NEURAL_FORCE,
+                learning_rate=0.1,
                 batch_size=BATCH_NUMBER,
                 init_pos_range=INIT_POS_RANGE,
                 embedding_dim=EMBEDDING_DIM,
@@ -173,39 +143,6 @@ def main(argv) -> None:
         plt.title('Measures')
         plt.show()
 
-        if not NEURAL_FORCE:
-            # plot piecewise linear functions
-            n = 300
-            x = jnp.linspace(-3, 10, n)
-            x = jnp.expand_dims(x, axis=1)
-            y_friend = sm.heuristic_force(
-                params=force_params,
-                distance=x,
-                sign=jnp.ones(n))
-            y_friend = y_friend.squeeze()
-
-            y_enemy = sm.heuristic_force(
-                params=force_params,
-                distance=x,
-                sign=jnp.ones(n) * -1)
-            y_enemy = y_enemy.squeeze()
-
-            y_neutral = sm.heuristic_force(
-                params=force_params,
-                distance=x,
-                sign=jnp.zeros(n))
-            y_neutral = y_neutral.squeeze()
-
-            print(x.shape)
-            print(y_friend.shape)
-
-            plt.plot(x, y_friend, label='friend')
-            plt.plot(x, y_enemy, label='enemy')
-            plt.plot(x, y_neutral, label='neutral')
-            plt.legend()
-            plt.title('Piecewise linear functions')
-            plt.show()
-            
     # write spring params to file, the file is still a traced jax object
     if OPTIMIZE_HEURISTIC_FORCE:
         # ask user if they want to save the parameters
@@ -228,24 +165,7 @@ def main(argv) -> None:
                 params_dict['enemy_stiffness'] = force_params.enemy_stiffness.item()
                 params_dict['degree_multiplier'] = force_params.degree_multiplier.item()
                 
-                yaml.dump(params_dict, file)
-
-                
-
-    # Store the trained parameters in a file
-    if OPTIMIZE_NEURAL_FORCE:
-        # ask user if they want to save the parameters
-        questions = [
-            inquirer.List('save',
-                message="Do you want to save the neural network parameters?",
-                choices=['Yes', 'No'],
-            ),
-        ]
-        answers = inquirer.prompt(questions)
-        if answers['save'] == 'Yes':
-
-            with open(force_params_name, 'w') as file:
-                yaml.dump(force_params, file)
+                yaml.dump(params_dict, file)   
 
     shot_metrics = []
     key_shots = random.split(key_test, TEST_SHOTS)     
@@ -253,7 +173,7 @@ def main(argv) -> None:
 
     for shot in range(TEST_SHOTS):
 
-        graph = g.to_SignedGraph(dataset)
+        graph = g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED)
    
         # initialize spring state
         spring_state = sm.init_spring_state(
@@ -280,20 +200,12 @@ def main(argv) -> None:
         training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-        if NEURAL_FORCE:
-            spring_state = sm.simulate(
-                simulation_params=simulation_params_test,
-                spring_state=spring_state, 
-                force_params=force_params,
-                use_neural_force=NEURAL_FORCE,
-                graph=training_graph)
-        else:
-            spring_state = sm.simulate(
-                simulation_params=simulation_params_test,
-                spring_state=spring_state, 
-                force_params=force_params,
-                use_neural_force=NEURAL_FORCE,
-                graph=training_graph)
+       
+        spring_state = sm.simulate(
+            simulation_params=simulation_params_test,
+            spring_state=spring_state, 
+            force_params=force_params,
+            graph=training_graph)
 
         metrics, _ = sm.evaluate(
             spring_state,
@@ -337,7 +249,7 @@ def main(argv) -> None:
     #     damping=DAMPING,
     # )
 
-    graph = g.to_SignedGraph(dataset)
+    graph = g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED)
    
     # initialize spring state
     spring_state = sm.init_spring_state(
@@ -364,46 +276,37 @@ def main(argv) -> None:
     training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
     training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-    if NEURAL_FORCE:
+
+    # initialize spring state
+    spring_state = sm.init_spring_state(
+        rng=key_shots[shot],
+        n=graph.num_nodes,
+        m=graph.num_edges,
+        range=INIT_POS_RANGE,
+        embedding_dim=64
+    )
+
+    for i in range(8):
+        simulation_params_test = sm.SimulationParams(
+            iterations=(i+1) * 64,
+            dt=TEST_DT,
+            damping=DAMPING,
+            centering=CENTERING)
+            
         spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
             force_params=force_params,
-            use_neural_force=NEURAL_FORCE,
             graph=training_graph)
-    else:
-        tree_depth = int(np.log2(EMBEDDING_DIM))
-        # initialize spring state
-        spring_state = sm.init_spring_state(
-            rng=key_shots[shot],
-            n=graph.num_nodes,
-            m=graph.num_edges,
-            range=INIT_POS_RANGE,
-            embedding_dim=64
-    	)
-    
-        for i in range(8):
-            simulation_params_test = sm.SimulationParams(
-                iterations=(i+1) * 64,
-                dt=TEST_DT,
-                damping=DAMPING,
-                centering=CENTERING)
-                
-            spring_state = sm.simulate(
-                simulation_params=simulation_params_test,
-                spring_state=spring_state, 
-                force_params=force_params,
-                use_neural_force=NEURAL_FORCE,
-                graph=training_graph)
 
-            metrics = sm.evaluate(
-                spring_state,
-                graph.edge_index,
-                graph.sign,
-                graph.train_mask,
-                graph.test_mask)
-            
-            print(metrics)
+        metrics = sm.evaluate(
+            spring_state,
+            graph.edge_index,
+            graph.sign,
+            graph.train_mask,
+            graph.test_mask)
+        
+        print(metrics)
 
     metrics = sm.evaluate(
         spring_state,
@@ -477,10 +380,9 @@ def main(argv) -> None:
 
     print(f"error_per_node: {error_per_node.shape}")
 
-    plt.scatter(graph.degree.values, error_per_node)
-    plt.colorbar()
+    plt.scatter(graph.degree.values, error_per_node, s=0.5)
     plt.xlabel('node degree')
-    plt.ylabel('predicted sign')
+    plt.ylabel('error')
     plt.title('predicted sign per node degree')
     plt.show()
     

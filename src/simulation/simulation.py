@@ -9,8 +9,7 @@ import simulation as sm
 def simulate(
     simulation_params : sm.SimulationParams,
     spring_state : sm.SpringState,
-    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
-    use_neural_force : bool,
+    force_params : sm.HeuristicForceParams,
     graph : g.SignedGraph
 ) -> sm.SpringState:
     
@@ -18,7 +17,6 @@ def simulate(
     simulation_update = lambda i, state: sm.update_spring_state(
         simulation_params = simulation_params, 
         force_params = force_params,
-        use_neural_force = use_neural_force,
         spring_state = state,
         graph = graph)
 
@@ -34,8 +32,7 @@ def simulate(
 def simulate_and_loss(
     simulation_params : sm.SimulationParams,
     spring_state : sm.SpringState,
-    force_params : sm.HeuristicForceParams | sm.NeuralForceParams,
-    use_neural_force : bool,
+    force_params : sm.HeuristicForceParams,
     graph : g.SignedGraph,
 ) -> sm.SpringState:
 
@@ -50,11 +47,10 @@ def simulate_and_loss(
         simulation_params = simulation_params,
         spring_state = spring_state,
         force_params = force_params,
-        use_neural_force = use_neural_force,
         graph=training_graph)
 
     # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
-    x_0s = jnp.linspace(-5.0, 5.0, 10)
+    x_0s = jnp.linspace(-0.5, 0.5, 10)
     losses = jnp.array([loss(spring_state, graph, x_0) for x_0 in x_0s])
 
     loss_value = jnp.mean(losses)
