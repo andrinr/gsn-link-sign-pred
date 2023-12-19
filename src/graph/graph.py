@@ -16,7 +16,7 @@ class Measures(NamedTuple):
 def init_measures(values : jnp.ndarray):
     max = jnp.max(values)
     avg = jnp.mean(values)
-    percentile = jnp.percentile(values, 90)
+    percentile = jnp.percentile(values, 80)
 
     return Measures(max, avg, percentile, values)
 
@@ -72,9 +72,11 @@ def to_SignedGraph(
         centrality = centrality.at[edge_index[0]].add(edge_centrality)
         centrality = centrality / degree_measures.max
 
-    centrality_measures = init_measures(jnp.expand_dims(centrality, axis=1))
+    centrality = jnp.expand_dims(centrality, axis=1)
+    centrality_measures = init_measures(centrality)
 
-    print(centrality_measures)
+    centrality = jnp.minimum(centrality, centrality_measures.percentile) / centrality_measures.percentile
+    centrality_measures = centrality_measures._replace(values=centrality)
 
     # #plot deg and centralities
     # # two subplots

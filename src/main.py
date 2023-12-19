@@ -29,12 +29,12 @@ def main(argv) -> None:
         Number of iterations for the optimizer
     """
     # Simulation parameters
-    OPTIMIZE_HEURISTIC_FORCE = True
-    TREAT_AS_UNDIRECTED = False
+    OPTIMIZE_HEURISTIC_FORCE = False
+    TREAT_AS_UNDIRECTED = True
     EMBEDDING_DIM = 64
     INIT_POS_RANGE = 1.0
     TEST_DT = 0.001
-    DAMPING = 0.032
+    DAMPING = 0.128
     CENTERING = 0
 
     # Training parameters
@@ -44,7 +44,7 @@ def main(argv) -> None:
     BATCH_NUMBER = 1
     TRAIN_DT = 0.002
     PER_EPOCH_SIM_ITERATIONS = 300
-    FINAL_SIM_ITERATIONS = 2048
+    FINAL_SIM_ITERATIONS = 900
     TEST_SHOTS = 1
 
     # Paths

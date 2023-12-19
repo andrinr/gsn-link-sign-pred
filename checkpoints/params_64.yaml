@@ -1,7 +1,7 @@
-degree_multiplier: 40.608970642089844
-enemy_distance: 26.732606887817383
-enemy_stiffness: 48.734920501708984
-friend_distance: 10.908242225646973
-friend_stiffness: 26.732595443725586
-neutral_distance: 17.354572296142578
-neutral_stiffness: 11.245150566101074
+degree_multiplier: 16.37881851196289
+enemy_distance: 20.954212188720703
+enemy_stiffness: 44.67811584472656
+friend_distance: 10.9813871383667
+friend_stiffness: 24.14854621887207
+neutral_distance: -0.9772602915763855
+neutral_stiffness: -0.774266242980957

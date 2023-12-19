@@ -23,17 +23,14 @@ def update_spring_state(
 
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
-    factor = (force_params.degree_multiplier * \
-              min(graph.centrality.values, graph.centrality.percentile) \
-                / graph.centrality.percentile + 1)
-    node_accelerations = node_accelerations * factor
+    node_accelerations = node_accelerations * (graph.centrality.values * force_params.degree_multiplier + 1)
 
     velocity = spring_state.velocity * (1 - simulation_params.damping)
     velocity = velocity + simulation_params.dt * node_accelerations
 
-    velocity_magnitude = jnp.linalg.norm(velocity, axis=1, keepdims=True)
-    # limit the velocity to a maximum value
-    velocity = velocity * min(velocity_magnitude, 20) / (velocity_magnitude + 1.0)
+    # velocity_magnitude = jnp.linalg.norm(velocity, axis=1, keepdims=True)
+    # # limit the velocity to a maximum value
+    # velocity = velocity * jnp.minimum(velocity_magnitude, 20) / (velocity_magnitude + 1.0)
     
     position = spring_state.position + simulation_params.dt * velocity
 
