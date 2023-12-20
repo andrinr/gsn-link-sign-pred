@@ -20,13 +20,6 @@ from io_helpers import get_dataset
 def main(argv) -> None:
     """
     Main function
-
-    Parameters:
-    ----------  
-    -s : int (default=64)
-        Embedding dimension
-    -o : int (default=0)
-        Number of iterations for the optimizer
     """
     # Simulation parameters
     OPTIMIZE_HEURISTIC_FORCE = False
