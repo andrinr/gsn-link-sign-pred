@@ -1,15 +1,30 @@
 ## Introduction
 
 
-In signed networks, each edge is associated with a sign to indicate the nature of the relationship between the two associated nodes. These signs can have meanings such as trust or distrust, friendship or animosity, influence or opposition. In social media networks, users can oftentimes indicate their relationship to a person or another object as positive or negative. Most online platforms also rely on a recommender system, where a set of people or objects is recommended \cite{recommender}. The choice of recommendations relies on link prediction and link sign prediction, whereas link prediction suggest a new edge for a given node and link sign prediction classifies the link as positive or negative \cite{linkpred, linksignpred}. In this paper we focus  on link sign prediction.
+We consider the problem of predicting the sign of a given edge in signed undirected graphs, commonly refereed to as link sign prediction. The prediction is made based strictly on the graph structure and a randomly selected training set of edge signs. 
 
-We are given a signed undirected network $G = (V, E, \sigma)$, where $V$ is the set of nodes, $E$ is the set of edges and the function $\sigma: V \times V \rightarrow \{-1, 1\}$, which maps an edge $(i, j) \in E$ to a sign $\sigma(i, j) \in \{-1, 1\}$. 
+Given a signed graph $G = (V, E, \sigma)$, where $V$, $E$ are the set of nodes and edges and the function $\sigma: V \times V \rightarrow \{-1, 1\}$ maps each edge $(i, j) \in E$ to a sign $\in \{-1, 1\}$. From the graph we construct a training graph $G_{train} = (V, E, \sigma_{train})$ where $V, E$ are identical and $\sigma_{train}$ is defined as follows:
 
-Given the raw network, we sample a set of test edges $E_{test} \subset E$ and map its sign to a neutral value 0. Therefore the function $\sigma$ is now defined as $\sigma: V \times V \rightarrow \{-1, 0, 1\}$. Analogously we define the sets $E_{train}$ which is defined as $E_{train} = E \setminus E_{test}$. As in previous work, we do not use a validation set. 
+(sigma is 0 with a 20% probability)
+$$
+\sigma_{train}(i, j) = \begin{cases}
+\sigma(i, j) & \text{if } P(X \leq 0.8) \\
+0 & \text{otherwise}    
+\end{cases}
+$$
 
-( add some remarks about why dont use a validation set and how the test and train datasets are conceptually different from the classical case)
+where $X$ is a random variable with a uniform distribution between 0 and 1. 
 
-The task is to predict the sign of an edge $(u, v) \in E_{test}$, where $E_{test} \subset E$, where the prediction method can only rely on the structural information of the network and the signs of the edges in $E_{train}$.
+Commonly the problem is solved in a two step procedure. 
+
+\begin{enumerate}
+    \item A node embedding $X \in \mathbb{R}^{N \times d}$ is computed for the entire graph. Where $N$ is the number of nodes and $d$ is the dimensionality of the node embedding. We denote the embedding of node $i$ as $x_i$.
+    \item The sign of an edge $(i, j)$ is predicted using the euclidean distance between the node embeddings $x_i$ and $x_j$ and a logistic regression model.
+\end{enumerate}
+
+
+
+First node representation vectors $X$ are generated for the entire graph. Where $X \in \mathbb{R}^{N \times d}$, where $N$ is the number of nodes and $d$ is the dimensionality of the node representation vectors. Then the sign of an edge $(i, j)$ is predicted using the distance between the node representation vectors $X_i$ and $X_j$. If the distance is below a threshold, a positive sign is predicted, otherwise a negative sign is predicted.
 
 ### Node Embedding
 

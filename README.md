@@ -36,3 +36,27 @@ In the case of a OMM error ``GRAPH_PARTITIONING`` can be set to ``True`` and the
 Once the training is finished, the script will ask you if you want to save the trained parameters. If you do, the parameters will be saved in the ``checkpoints`` folder and automatically loaded the next time you run the script.
 
 ## Introduction
+
+## Jax and Automatic Differentiation
+
+Most programms can be decomposed into a series of differentibale arithmetic operations. Using the chain rule, the partial derivative of very complex functions can be calculated even inlcuding control flow. This is called automatic differentiation. 
+
+Automatic differentiation is a crucial part of the backpropagation algorithm used in neural networks. It computes the gradient of the loss function with respect to the parameters of the model. This same approach can be used to compute the gradient of any function with respect to any of its input parameters. Recently there has been a lot of research, where automatic differentiation is used to optimize functions other than neural networks.
+
+JAX is a library for high-performance numerical computing that can automatically differentiate native Python and NumPy functions. It can differentiate through loops, branches, recursion, and closures, and it can take derivatives of derivatives of derivatives. It supports reverse-mode differentiation (a.k.a. backpropagation) via grad as well as forward-mode differentiation, and the two can be composed arbitrarily to any order. JAX also allows for JIT (Just in Time) compilation of functions. This can be used to speed up the execution of functions significantly.
+
+Since there is no library for graph neural networks which works with a edge index representation, I have implemented the message passing network myself. The logic of it can be found in springs.py. For performance reasons it is crucial to refrain from using for loops and instead use matrix operations. 
+
+For example to obtain the corresponding node positions of each edge we use:
+    
+```python
+position_i = state.position[edge_index[0]]
+position_j = state.position[edge_index[1]]
+```
+
+This can then be used to compute the accelerations for each edge. However we need to sum over all edge velocities which are connected to the same node. This can be achieved as follows:
+
+```python
+node_accelerations = jnp.zeros_like(spring_state.position)
+node_accelerations = node_accelerations.at[edge_index[0]].add(edge_acceleration)
+```

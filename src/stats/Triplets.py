@@ -33,15 +33,21 @@ class Triplets:
             # find a neighbor of u that is also a neighbor of v
             neighs_u_and_v = neighs_u.intersection(neighs_v)
 
+            if len(neighs_u_and_v) == 0:
+                continue
+
             # pick a random neighbor of u that is also a neighbor of v
             w = np.random.choice(list(neighs_u_and_v))
 
-            e2 = graph.get_edge_index(self.data, u, w) 
+            e2 = graph.get_edge_index(self.data, u, w)
             if len(e2) > 1:
                 e2 = e2[0]
             e3 = graph.get_edge_index(self.data, v, w)
             if len(e3) > 1:
                 e3 = e3[0]
+
+            e2 = e2.item()
+            e3 = e3.item()
 
             triangle = frozenset([e1, e2, e3])
 
@@ -59,6 +65,11 @@ class Triplets:
         print(self.data.edge_attr)
 
         for triplet in self.triplets:
+            # access elements of triplet which is a frozenset
+            triplet = list(triplet)
+            if len(triplet) != 3:
+                continue
+
             uv = triplet[0]
             vu = triplet[1]
             uw = triplet[2]
@@ -78,7 +89,7 @@ class Triplets:
 
         n = len(self.triplets)
 
-        self.p_balanced = n_balanced / n
+        self.p_balanced = n_balanced / (n_balanced + n_unbalanced)
 
         return self
     
@@ -120,3 +131,6 @@ class Triplets:
                         correct_unbalanced[j] += 1 if predicted == actual else 0
         
         return total_balanced, correct_balanced, total_unbalanced, correct_unbalanced
+    
+        # change print string
+        __str__ = __repr__ = lambda self: f"Triplets(n_triplets={self.n_triplets}, p_balanced={self.p_balanced})"

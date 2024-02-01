@@ -11,11 +11,13 @@ import os
 import torch_geometric.transforms as T
 import numpy as np
 import jax
+import torch
 
 # Local dependencies
 import simulation as sm
 import graph as g
 from io_helpers import get_dataset
+import stats as stats
 
 def main(argv) -> None:
     """
@@ -61,6 +63,13 @@ def main(argv) -> None:
 
     print(f"num_nodes: {num_nodes}")
     print(f"num_edges: {num_edges}")
+
+    s = stats.Triplets(dataset)(n_triplets=3000, seed=0)
+    print(s.p_balanced)
+
+    print(dataset.edge_attr)
+    print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
+
 
     batches = []
     if GRAPH_PARTITIONING and OPTIMIZE_HEURISTIC_FORCE:
