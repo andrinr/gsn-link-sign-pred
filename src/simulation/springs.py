@@ -23,7 +23,8 @@ def update_spring_state(
 
     node_accelerations = jnp.zeros_like(spring_state.position)
     node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
-    node_accelerations = node_accelerations * (graph.centrality.values * force_params.degree_multiplier + 1)
+    # node_accelerations = node_accelerations * (graph.centrality.values * force_params.degree_multiplier + 0.1)
+    # node_accelerations = spring_state.position * -simulation_params.centering + node_accelerations
 
     velocity = spring_state.velocity * (1 - simulation_params.damping)
     velocity = velocity + simulation_params.dt * node_accelerations
@@ -47,27 +48,62 @@ def acceleration(
     position_i = state.position[graph.edge_index[0]]
     position_j = state.position[graph.edge_index[1]]
 
+    degree_i = graph.degree.values[graph.edge_index[0]]
+    degree_j = graph.degree.values[graph.edge_index[1]]
+    degree_i_neg = graph.neg_degree.values[graph.edge_index[0]]
+    degree_j_neg = graph.neg_degree.values[graph.edge_index[1]]
+
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
-    force = heuristic_force(params, distance, graph.sign)
+    force_factor = heuristic_force(params, degree_i, degree_j, degree_i_neg, degree_j_neg, distance, graph.sign)
 
-    return force * spring_vector_norm
+    return force_factor * spring_vector_norm
 
 def heuristic_force(
     params : sm.HeuristicForceParams,
+    degree_i : jnp.ndarray,
+    degree_j : jnp.ndarray,
+    degree_negative_i : jnp.ndarray,
+    degree_negative_j : jnp.ndarray,
     distance : jnp.ndarray,
     sign : jnp.ndarray
 ) -> jnp.ndarray:
     
-    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness /2
-    neutral = (distance - params.neutral_distance) * params.neutral_stiffness /2
-    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness /2
+    input = jnp.concatenate([degree_i, degree_j, degree_negative_i, degree_negative_j, distance], axis=1)
+
+    friend = jnp.dot(input, params.friend.w0) + params.friend.b0
+    friend = jax.nn.relu(friend)
+    friend = jnp.dot(friend, params.friend.w1) + params.friend.b1
+
+    neutral = jnp.dot(input, params.neutral.w0) + params.neutral.b0
+    neutral = jax.nn.relu(neutral)
+    neutral = jnp.dot(neutral, params.neutral.w1) + params.neutral.b1
+  
+    enemy = jnp.dot(input, params.enemy.w0) + params.enemy.b0
+    enemy = jax.nn.relu(enemy)
+    enemy = jnp.dot(enemy, params.enemy.w1) + params.enemy.b1
+   
+
+    # friend = jnp.maximum(distance - params.friend.rest_length, 0) * \
+    #     params.friend.attraction_stiffness * (1 + params.friend.degree_i_multiplier * degree_i) * (1 + params.friend.degree_j_multiplier * degree_j)
+    # friend += jnp.minimum(distance - params.friend.rest_length, 0) *\
+    #       params.friend.repulsion_stiffness * (1 + params.friend.degree_i_multiplier * degree_i) * (1 + params.friend.degree_j_multiplier * degree_j)
+
+    # neutral = jnp.maximum(distance - params.neutral.rest_length, 0) * \
+    #     params.neutral.attraction_stiffness * (1 + params.neutral.degree_i_multiplier * degree_i) * (1 + params.neutral.degree_j_multiplier * degree_j)
+    # neutral += jnp.minimum(distance - params.neutral.rest_length, 0) * \
+    #     params.neutral.repulsion_stiffness * (1 + params.neutral.degree_i_multiplier * degree_i) * (1 + params.neutral.degree_j_multiplier * degree_j)
+
+    # enemy = jnp.maximum(distance - params.enemy.rest_length, 0) * \
+    #     params.enemy.attraction_stiffness * (1 + params.enemy.degree_i_multiplier * degree_i) * (1 + params.enemy.degree_j_multiplier * degree_j)
+    # enemy += jnp.minimum(distance - params.enemy.rest_length, 0) * \
+    #     params.enemy.repulsion_stiffness * (1 + params.enemy.degree_i_multiplier * degree_i) * (1 + params.enemy.degree_j_multiplier * degree_j)
 
     sign = jnp.expand_dims(sign, axis=1)
 
-    force = jnp.where(sign == 1, attraction, neutral)
-    force = jnp.where(sign == -1, retraction, force)
+    force = jnp.where(sign == 1, friend, enemy)
+    force = jnp.where(sign == 0, neutral, force)
 
     return force

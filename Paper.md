@@ -54,17 +54,32 @@ $$f^{+}_{i,j} = \alpha^{+} \cdot max(l^{+} - \|{ X_j - X_i}\|_2, 0) \frac{X_j - 
 
 Therefore the total force acting on a node $v_i$ is:
 
-$$f_i = \sum_{j \in N^{-}_i} f^{-}_{i,j} + \sum_{j \in N^{0}_i} f^{0}_{i,j} + \sum_{j \in N^{+}_i} f^{+}_{i,j}$$
+$$f_i(t) = \sum_{j \in N^{-}_i} f^{-}_{i,j}(t) + \sum_{j \in N^{0}_i} f^{0}_{i,j}(t) + \sum_{j \in N^{+}_i} f^{+}_{i,j}(t)$$
 
-The total force acting on a node $v_i$ is then used to update the position of the node $v_i$ using the kick drift kick method. We use the notation $x_i(t)$ to denote the position of node $v_i$ at time $t$ and $v_i(t)$ to denote the velocity of node $v_i$ at time $t$. To avoid divergence of the simulation, we use a viscous damping factor $d$.
+The forces are then used to update the node positions and velocities using the following equations:
 
-$$v_i(t + \frac{h}{2}) = v_i(t) + \frac{h}{2} \cdot f_i(t) - d \cdot \|{v_i(t)}\|_2$$
+$$x_i(t + \Delta t) = x_i(t) + h \cdot v_i(t) + \frac{1}{2 m_i}\Delta t^2 f_i(t)$$
 
-$$x_i(t + h) = x_i(t) + h \cdot v_i(t + \frac{h}{2})$$
+$$v_i(t + \Delta t) = v_i(t) + \frac{1}{4m_i} \Delta t (f_i(t) + f_i(t + \Delta t))$$
 
-$$v_i(t + h) = v_i(t + \frac{h}{2}) + \frac{h}{2} \cdot f_i(t + h) - d \cdot \|{v_i(t + \frac{h}{2})}\|_2$$
 
-where $h$ is the size of a timestep.
+With the above equations we are able to change the node positions towards an energy minima. 
+
+Let us now define a node state:
+
+$$s_i = \begin{bmatrix} x_i \\ v_i \end{bmatrix}$$
+
+We can then define the update step as:
+
+$$ \begin{bmatrix} x_i(t + \Delta t) \\v_i(t + \Delta t) \end{bmatrix} = \begin{bmatrix} x_i(t) \\ v_i(t) \end{bmatrix} + \Delta t \begin{bmatrix} v_i(t) \\ \frac{1}{2m_i} \times (f_i(t) + f_{i}(t+\Delta t))\end{bmatrix} + \frac{\Delta t^2}{2} \begin{bmatrix} f_i(t) \\ 0 \end{bmatrix} $$
+
+which becomes:
+
+$$ \frac{\partial P(s_i)}{\partial s_i} = \begin{bmatrix} \frac{\partial P(s_i)}{\partial x_i} & \frac{\partial P(s_i)}{\partial v_i} \end{bmatrix}
+
+= \begin{bmatrix} 1 + \frac{\Delta t ^2}{2m} \frac{\partial F(x_i)}{\partial x_i } & \Delta t 
+\\ \frac{\Delta t}{2m} \left( \frac{\partial F(x_i)}{\partial x_i}  + \frac{\partial F(x_{i+1})}{\partial x_{i}} \right) & 1 \end{bmatrix}$$
+
 
 The simulation is run for a fixed number of iterations. After the simulation has converged, the node positions are used as node embeddings. To predict a sign of an edge $(u, v) \in E_{test}$, we simply take the distance between the two embeddings $x_u$ and $x_v$ and compare it to a threshold. If the distance is below the threshold, we predict a positive sign, otherwise we predict a negative sign.
 

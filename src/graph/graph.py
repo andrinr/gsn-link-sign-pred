@@ -28,6 +28,7 @@ class SignedGraph(NamedTuple):
     sign : jnp.ndarray
     sign_one_hot : jnp.ndarray
     degree : Measures
+    neg_degree : Measures
     centrality : Measures
     num_nodes : int
     num_edges : int
@@ -60,10 +61,21 @@ def to_SignedGraph(
 
     node_degrees = jnp.bincount(edge_index[0])
 
+    node_neg_degrees = jnp.zeros(node_degrees.shape)
+    node_neg_degrees = node_neg_degrees.at[edge_index[0]].add(signs < 0)
+    node_neg_degrees = node_neg_degrees / node_degrees
+    neg_degree_measures = init_measures(jnp.expand_dims(node_neg_degrees, axis=1))
+
+
     num_nodes = jnp.max(edge_index) + 1
     num_edges = edge_index.shape[1]
 
-    degree_measures = init_measures(jnp.expand_dims(node_degrees, axis=1))
+    node_degrees = jnp.expand_dims(node_degrees, axis=1)
+    degree_measures = init_measures(node_degrees)
+
+    node_degrees = jnp.minimum(node_degrees, degree_measures.percentile) / degree_measures.percentile
+    degree_measures = degree_measures._replace(values=node_degrees)
+
 
     centrality = node_degrees
     centrality = centrality / degree_measures.max
@@ -93,6 +105,7 @@ def to_SignedGraph(
         signs, 
         signs_one_hot,
         degree_measures,
+        neg_degree_measures,
         centrality_measures,
         num_nodes, 
         num_edges,

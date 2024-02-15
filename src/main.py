@@ -24,23 +24,23 @@ def main(argv) -> None:
     Main function
     """
     # Simulation parameters
-    OPTIMIZE_HEURISTIC_FORCE = False
+    OPTIMIZE_FORCE_PARAMS = False
     TREAT_AS_UNDIRECTED = True
-    EMBEDDING_DIM = 64
+    EMBEDDING_DIM = 20
     INIT_POS_RANGE = 1.0
     TEST_DT = 0.001
-    DAMPING = 0.128
-    CENTERING = 0
+    DAMPING = 0.1
+    CENTERING = 0.15
 
     # Training parameters
-    NUM_EPOCHS = 60
+    NUM_EPOCHS = 40
     MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = False
-    BATCH_NUMBER = 1
+    BATCH_NUMBER = 15
     TRAIN_DT = 0.002
     PER_EPOCH_SIM_ITERATIONS = 300
     FINAL_SIM_ITERATIONS = 900
-    TEST_SHOTS = 1
+    TEST_SHOTS = 10
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -72,7 +72,7 @@ def main(argv) -> None:
 
 
     batches = []
-    if GRAPH_PARTITIONING and OPTIMIZE_HEURISTIC_FORCE:
+    if GRAPH_PARTITIONING and OPTIMIZE_FORCE_PARAMS:
         cluster_data = ClusterData(
             dataset, 
             num_parts=BATCH_NUMBER,
@@ -87,23 +87,36 @@ def main(argv) -> None:
 
     else:
         batches.append(g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED))
-        
+
+
     params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
     if os.path.exists(params_path):
         stream = open(params_path, 'r')
-        heuristic_force_params = yaml.load(stream, Loader=yaml.FullLoader)
-        heuristic_force_params = sm.HeuristicForceParams(**heuristic_force_params)
+        heuristic_force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
+        # heuristic_force_params = sm.HeuristicForceParams(**heuristic_force_params)
         print("loaded spring params checkpoint")
     else:
         heuristic_force_params = sm.HeuristicForceParams(
-            friend_distance=5.0,
-            friend_stiffness=0.3,
-            neutral_distance=10.0,
-            neutral_stiffness=0.3,
-            enemy_distance=20.0,
-            enemy_stiffness=0.3,
-            degree_multiplier=50.0)
+            friend=sm.MLP(
+                w0=jax.random.normal(random.PRNGKey(0), (5, 5)),
+                b0=jnp.zeros(5),
+                w1=jax.random.normal(random.PRNGKey(1), (5,1)),
+                b1=jnp.zeros(1)),
+            neutral=sm.MLP(
+                w0=jax.random.normal(random.PRNGKey(2), (5, 5)),
+                b0=jnp.zeros(5),
+                w1=jax.random.normal(random.PRNGKey(3), (5,1)),
+                b1=jnp.zeros(1)),
+            enemy=sm.MLP(
+                w0=jax.random.normal(random.PRNGKey(4), (5, 5)),
+                b0=jnp.zeros(5),
+                w1=jax.random.normal(random.PRNGKey(5), (5,1)),
+                b1=jnp.zeros(1)),
+                
+        )
+
         print("no spring params checkpoint found, using default params")
+
 
     simulation_params_train = sm.SimulationParams(
         iterations=PER_EPOCH_SIM_ITERATIONS // MULTISTPES_GRADIENT,
@@ -116,14 +129,15 @@ def main(argv) -> None:
 
     force_params = heuristic_force_params
 
-    if OPTIMIZE_HEURISTIC_FORCE:
+    if OPTIMIZE_FORCE_PARAMS:
+        
         force_params, loss_hist, metrics_hist, force_params_hist = sm.train(
             random_key=key_training,
             batches=batches,
             force_params=force_params,
             training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
-                learning_rate=0.1,
+                learning_rate=0.02,
                 batch_size=BATCH_NUMBER,
                 init_pos_range=INIT_POS_RANGE,
                 embedding_dim=EMBEDDING_DIM,
@@ -136,17 +150,44 @@ def main(argv) -> None:
         plt.title('Loss')
         plt.show()
 
+        # get set1 color map
+        colors = plt.cm.get_cmap('Set1', 10)
+
+        fig, ax1 = plt.subplots()
         # plot metrics over time
-        plt.plot(epochs, [metrics.auc for metrics in metrics_hist])
-        plt.plot(epochs, [metrics.f1_binary for metrics in metrics_hist])
-        plt.plot(epochs, [metrics.f1_micro for metrics in metrics_hist])
-        plt.plot(epochs, [metrics.f1_macro for metrics in metrics_hist])
-        plt.legend(['AUC', 'F1 binary', 'F1 micro', 'F1 macro'])
-        plt.title('Measures')
+        ax1.plot(epochs, [metrics.auc for metrics in metrics_hist], color=colors(0))
+        # ax1.plot(epochs, [metrics.f1_binary for metrics in metrics_hist])
+        # ax1.plot(epochs, [metrics.f1_micro for metrics in metrics_hist])
+        ax1.plot(epochs, [metrics.f1_macro for metrics in metrics_hist], color=colors(1))
+        #ax1.plot(epochs, loss_hist, color=colors(2))
+        ax1.legend(['AUC', 'F1 macro'], loc='lower left')
+        # ax1.title('Measures')
+        # ax1.show()
+        ax1.set_xlabel('Epochs')
+        ax1.set_ylabel('Accuracy')
+
+        ax2 = ax1.twinx()
+        # use different color axis for this axis
+
+
+        colors = plt.cm.get_cmap('Set2', 10)
+        # plot params over time
+        # ax2.plot(epochs, [params.friend_distance for params in force_params_hist], color=colors(0.15))
+        # ax2.plot(epochs, [params.friend_stiffness for params in force_params_hist], color=colors(0.25))
+        # ax2.plot(epochs, [params.neutral_distance for params in force_params_hist], color=colors(0.35))
+        # ax2.plot(epochs, [params.neutral_stiffness for params in force_params_hist] , color=colors(0.45))
+        # ax2.plot(epochs, [params.enemy_distance for params in force_params_hist], color=colors(0.55))
+        # ax2.plot(epochs, [params.enemy_stiffness for params in force_params_hist], color=colors(0.65))
+        # ax2.plot(epochs, [params.degree_multiplier for params in force_params_hist], color=colors(0.75))
+        # # set legend and legend position to lower right corner
+        # ax2.legend(["$\\l^{+}$", '$\\alpha^{+}$', "$\\l^{0}$", '$\\alpha^{0}$', "$\\l^{-}$", '$\\alpha^{-}$', "$\\zeta$"], loc='lower right')
+        # ax2.set_ylabel('Parameter values')
+
+        # ax2.title('Force params')
         plt.show()
 
     # write spring params to file, the file is still a traced jax object
-    if OPTIMIZE_HEURISTIC_FORCE:
+    if OPTIMIZE_FORCE_PARAMS:
         # ask user if they want to save the parameters
         questions = [
             inquirer.List('save',
@@ -157,17 +198,7 @@ def main(argv) -> None:
         answers = inquirer.prompt(questions)
         if answers['save'] == 'Yes':
             with open(params_path, 'w') as file:
-                params_dict = {}
-                # get value from jax traced array
-                params_dict['friend_distance'] = force_params.friend_distance.item()
-                params_dict['friend_stiffness'] = force_params.friend_stiffness.item()
-                params_dict['neutral_distance'] = force_params.neutral_distance.item()
-                params_dict['neutral_stiffness'] = force_params.neutral_stiffness.item()
-                params_dict['enemy_distance'] = force_params.enemy_distance.item()
-                params_dict['enemy_stiffness'] = force_params.enemy_stiffness.item()
-                params_dict['degree_multiplier'] = force_params.degree_multiplier.item()
-                
-                yaml.dump(params_dict, file)   
+                yaml.dump(force_params, file)   
 
     shot_metrics = []
     key_shots = random.split(key_test, TEST_SHOTS)     
@@ -229,6 +260,16 @@ def main(argv) -> None:
     print(f"true_negatives: {np.mean([metrics.true_negatives for metrics in shot_metrics])}")
     print(f"false_negatives: {np.mean([metrics.false_negatives for metrics in shot_metrics])}")
 
+    # standard deviation
+    print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
+    print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
+    print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
+    print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
+    print(f"std true_positives: {np.std([metrics.true_positives for metrics in shot_metrics])}")
+    print(f"std false_positives: {np.std([metrics.false_positives for metrics in shot_metrics])}")
+    print(f"std true_negatives: {np.std([metrics.true_negatives for metrics in shot_metrics])}")
+    print(f"std false_negatives: {np.std([metrics.false_negatives for metrics in shot_metrics])}")  
+
     # print extreme metrics over all shots
     print(f"extreme metrics over {TEST_SHOTS} shots:")
     print(f"auc: {np.max([metrics.auc for metrics in shot_metrics])}")
@@ -288,7 +329,7 @@ def main(argv) -> None:
         embedding_dim=64
     )
 
-    for i in range(8):
+    for i in range(16):
         simulation_params_test = sm.SimulationParams(
             iterations=(i+1) * 64,
             dt=TEST_DT,
@@ -382,10 +423,10 @@ def main(argv) -> None:
 
     print(f"error_per_node: {error_per_node.shape}")
 
-    plt.scatter(graph.degree.values, error_per_node, s=0.5)
+    plt.scatter(graph.degree.values, error_per_node, s=1.5)
     plt.xlabel('node degree')
     plt.ylabel('error')
-    plt.title('predicted sign per node degree')
+    # plt.title(')
     plt.show()
     
 

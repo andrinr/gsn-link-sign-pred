@@ -44,6 +44,9 @@ def train(
     random_keys = jax.random.split(random_key, training_params.num_epochs)
 
     for epoch_index in epochs:
+
+        print(simulation_params.iterations)
+
         for batch_index, batch_graph in enumerate(batches):
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
@@ -61,9 +64,9 @@ def train(
                 force_params, #2
                 batch_graph)
         
-            print(force_params)
-            print(grad)
-            print(loss_value)
+            # print(force_params)
+            # print(grad)
+            # print(loss_value)
 
             nn_force_update, force_optimizier_state = force_optimizer_multi_step.update(
                 grad, force_optimizier_state, force_params)

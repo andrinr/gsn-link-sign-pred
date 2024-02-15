@@ -50,7 +50,7 @@ def simulate_and_loss(
         graph=training_graph)
 
     # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
-    x_0s = jnp.linspace(-0.5, 0.5, 10)
+    x_0s = jnp.linspace(-1.0, 1.0, 10)
     losses = jnp.array([loss(spring_state, graph, x_0) for x_0 in x_0s])
 
     loss_value = jnp.mean(losses)
@@ -70,7 +70,7 @@ def predict(
     position_i = spring_state.position[graph.edge_index[0]]
     position_j = spring_state.position[graph.edge_index[1]]
 
-    distance = jnp.linalg.norm(position_j - position_i, axis=1) - 15.0
+    distance = jnp.linalg.norm(position_j - position_i, axis=1) - 2.5
 
     # apply sigmoid function to get sign (0 for negative, 1 for positive)
     predicted_sign = 1 / (1 + jnp.exp(1 * (distance-x_0)))
@@ -106,6 +106,8 @@ def loss(
         sign_binary == 1, 
         incorrect_predictions * weight_positives, 
         incorrect_predictions * weight_negatives)
+    
+    incorrect_predictions_weighted *= jnp.where(graph.test_mask, 0.8, 0.2)
 
     loss = jnp.mean(incorrect_predictions_weighted)
 
