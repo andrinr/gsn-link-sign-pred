@@ -24,23 +24,28 @@ def main(argv) -> None:
     Main function
     """
     # Simulation parameters
-    OPTIMIZE_FORCE_PARAMS = False
+    OPTIMIZE_FORCE_PARAMS = True
     TREAT_AS_UNDIRECTED = True
     EMBEDDING_DIM = 20
     INIT_POS_RANGE = 1.0
     TEST_DT = 0.001
-    DAMPING = 0.02
+    DAMPING = 0.03
     CENTERING = 0.15
 
     # Training parameters
-    NUM_EPOCHS = 50
+    NUM_EPOCHS = 100
     MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = False
-    BATCH_NUMBER = 15
+    BATCH_NUMBER = 10
     TRAIN_DT = 0.002
-    PER_EPOCH_SIM_ITERATIONS = 300
-    FINAL_SIM_ITERATIONS = 900
-    TEST_SHOTS = 10
+    PER_EPOCH_SIM_ITERATIONS = 200
+    FINAL_SIM_ITERATIONS = 600
+    TEST_SHOTS = 5
+
+    N_EPOCH_SEQUENCE = [50, 40, 30, 20, 20, 20, 40]
+    TRAIN_ITER_SEQUENCE = [50, 60, 70, 80, 100, 150, 200]
+    DT_SEQUENCE = [0.01, 0.01, 0.005, 0.005, 0.005, 0.002, 0.002]
+    DAMPING_SEQUENCE = [0.2, 0.1, 0.05, 0.05, 0.03, 0.03, 0.03]
 
     # Paths
     DATA_PATH = 'src/data/'
@@ -122,28 +127,47 @@ def main(argv) -> None:
     force_params = heuristic_force_params
 
     if OPTIMIZE_FORCE_PARAMS:
-        simulation_params_train = sm.SimulationParams(
-            iterations=PER_EPOCH_SIM_ITERATIONS,
-            dt=TRAIN_DT,
-            damping=DAMPING,
-            centering=CENTERING)
+        loss_hist = []
+        metrics_hist = []
+        force_params_hist = []
+        dt_hist = []
+        damping_hist = []
+        iterations_hist = []
 
-    
-        force_params, loss_hist, metrics_hist, force_params_hist = sm.train(
-            random_key=key_training,
-            batches=batches,
-            force_params=force_params,
-            training_params= sm.TrainingParams(
-                num_epochs=NUM_EPOCHS,
-                learning_rate=0.04,
-                batch_size=BATCH_NUMBER,
-                init_pos_range=INIT_POS_RANGE,
-                embedding_dim=EMBEDDING_DIM,
-                multi_step=MULTISTPES_GRADIENT),
-            simulation_params=simulation_params_train)
+
+        for settings in zip(N_EPOCH_SEQUENCE, TRAIN_ITER_SEQUENCE, DT_SEQUENCE, DAMPING_SEQUENCE):
+            NUM_EPOCHS, PER_EPOCH_SIM_ITERATIONS, TRAIN_DT, DAMPING = settings
+
+            simulation_params_train = sm.SimulationParams(
+                iterations=PER_EPOCH_SIM_ITERATIONS,
+                dt=TRAIN_DT,
+                damping=DAMPING,
+                centering=CENTERING)
+
+            force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
+                random_key=key_training,
+                batches=batches,
+                force_params=force_params,
+                training_params= sm.TrainingParams(
+                    num_epochs=NUM_EPOCHS,
+                    learning_rate=0.04,
+                    batch_size=BATCH_NUMBER,
+                    init_pos_range=INIT_POS_RANGE,
+                    embedding_dim=EMBEDDING_DIM,
+                    multi_step=MULTISTPES_GRADIENT),
+                simulation_params=simulation_params_train)
+            
+            #concatenate lists
+            loss_hist = loss_hist + loss_hist_
+            metrics_hist = metrics_hist + metrics_hist_
+            force_params_hist = force_params_hist + force_params_hist_
+
+            dt_hist = dt_hist + list(jnp.ones(NUM_EPOCHS) * TRAIN_DT)
+            iterations_hist = iterations_hist + list(jnp.ones(NUM_EPOCHS) * PER_EPOCH_SIM_ITERATIONS)
+            damping_hist = damping_hist + list(jnp.ones(NUM_EPOCHS) * DAMPING)
 
         # plot loss over time
-        epochs = range(NUM_EPOCHS)
+        epochs = np.arange(0, len(loss_hist))
         plt.plot(epochs, loss_hist)
         plt.title('Loss')
         plt.show()
@@ -151,37 +175,25 @@ def main(argv) -> None:
         # get set1 color map
         colors = plt.cm.get_cmap('Set1', 10)
 
-        fig, ax1 = plt.subplots()
+        # Three subplots with shared x axis
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
         # plot metrics over time
         ax1.plot(epochs, [metrics.auc for metrics in metrics_hist], color=colors(0))
-        # ax1.plot(epochs, [metrics.f1_binary for metrics in metrics_hist])
-        # ax1.plot(epochs, [metrics.f1_micro for metrics in metrics_hist])
         ax1.plot(epochs, [metrics.f1_macro for metrics in metrics_hist], color=colors(1))
-        #ax1.plot(epochs, loss_hist, color=colors(2))
         ax1.legend(['AUC', 'F1 macro'], loc='lower left')
-        # ax1.title('Measures')
-        # ax1.show()
         ax1.set_xlabel('Epochs')
         ax1.set_ylabel('Accuracy')
 
-        ax2 = ax1.twinx()
-        # use different color axis for this axis
+        ax2.plot(epochs, dt_hist, color=colors(2))
+        ax2.plot(epochs, damping_hist, color=colors(3))
 
+        ax2.legend(['dt', 'damping'], loc='lower left')
+        ax2.set_xlabel('Epochs')
 
-        colors = plt.cm.get_cmap('Set2', 10)
-        # plot params over time
-        # ax2.plot(epochs, [params.friend_distance for params in force_params_hist], color=colors(0.15))
-        # ax2.plot(epochs, [params.friend_stiffness for params in force_params_hist], color=colors(0.25))
-        # ax2.plot(epochs, [params.neutral_distance for params in force_params_hist], color=colors(0.35))
-        # ax2.plot(epochs, [params.neutral_stiffness for params in force_params_hist] , color=colors(0.45))
-        # ax2.plot(epochs, [params.enemy_distance for params in force_params_hist], color=colors(0.55))
-        # ax2.plot(epochs, [params.enemy_stiffness for params in force_params_hist], color=colors(0.65))
-        # ax2.plot(epochs, [params.degree_multiplier for params in force_params_hist], color=colors(0.75))
-        # # set legend and legend position to lower right corner
-        # ax2.legend(["$\\l^{+}$", '$\\alpha^{+}$', "$\\l^{0}$", '$\\alpha^{0}$', "$\\l^{-}$", '$\\alpha^{-}$', "$\\zeta$"], loc='lower right')
-        # ax2.set_ylabel('Parameter values')
+        ax3.plot(epochs, iterations_hist, color=colors(4))
+        ax3.legend(['iterations'], loc='lower left')
+        ax3.set_xlabel('Epochs')
 
-        # ax2.title('Force params')
         plt.show()
 
     # write spring params to file, the file is still a traced jax object

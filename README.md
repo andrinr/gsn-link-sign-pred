@@ -1,15 +1,6 @@
-# *SpringE*: Fast Node Representation Generation for Link Sign Prediction
+# Force Directed Node Embedding for Link Sign Prediction
 
 This is the code for the paper called (Papername) which was published in (Journalname). The paper can be found here: (Link to paper)
-
-## Table of Contents
-
-- [Running the code](#running-the-code)
-- [Introduction](#introduction)
-- [JAX and Automatic Differentiation](#jax-and-automatic-differentiation)
-- [Message Passing Networks](#message-passing-networks)
-- [Training process](#training-process)
-
 
 ## Running the code
 
@@ -60,3 +51,26 @@ This can then be used to compute the accelerations for each edge. However we nee
 node_accelerations = jnp.zeros_like(spring_state.position)
 node_accelerations = node_accelerations.at[edge_index[0]].add(edge_acceleration)
 ```
+
+### Stable training
+
+Sometimes the gradient will have NaN values, I am not entirely sure why this happens. However this can be fixed by ensuring that ```jax.config.update("jax_enable_x64", True)``` is set in the main script.
+
+The training schedule is set with the following parameters:
+
+```python
+N_EPOCH_SEQUENCE = [50, 40, 30, 20, 20, 20, 40]
+TRAIN_ITER_SEQUENCE = [50, 60, 70, 80, 100, 150, 200]
+DT_SEQUENCE = [0.01, 0.01, 0.005, 0.005, 0.005, 0.002, 0.002]
+DAMPING_SEQUENCE = [0.2, 0.1, 0.05, 0.05, 0.03, 0.03, 0.03]
+```
+
+This means that the first 50 iterations are trained with a time step of 0.01 and a damping factor of 0.2. Gradually the time step is decreased and the damping factor is increased. This is done to ensure that the loss surface is smooth and that the model is less likely to get stuck in a local minimum. The above parameters are rather arbitrary and there is probably a better way to set them.
+
+Depending on the dataset and the number of simulation iterations during training, the required memory exceeds the available GPU memory (if JAX is installed in GPU mode). The required memory increases with the number of iterations, as the loss needs to be backpropagated through all iterations. In this case the graph can be partitioned into smaller subgraphs, the loss can be computed for each subgraph and the gradients can be applied after every batch. If desired one can also use gradient accumulation to further reduce the memory requirements by setting ``MULTISTPES_GRADIENT`` to a number larger than 1.
+
+Enabling this feature can be done by setting ``GRAPH_PARTITIONING`` to ``True`` and the ``BATCH_NUMBER`` should be set to appropriate value. The batch number should be as small as possible but large enough to avoid the OMM error.
+
+### Checkpoints
+
+After a successful training the model parameters can optionally be saved. The model parameters are saved in the ``checkpoints`` folder and automatically loaded the next time you run the script. 
