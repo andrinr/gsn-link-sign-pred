@@ -52,12 +52,23 @@ def acceleration(
     degree_j = graph.degree.values[graph.edge_index[1]]
     degree_i_neg = graph.neg_degree.values[graph.edge_index[0]]
     degree_j_neg = graph.neg_degree.values[graph.edge_index[1]]
+    degree_i_pos = graph.pos_degree.values[graph.edge_index[0]]
+    degree_j_pos = graph.pos_degree.values[graph.edge_index[1]]
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
-    force_factor = heuristic_force(params, degree_i, degree_j, degree_i_neg, degree_j_neg, distance, graph.sign)
+    force_factor = heuristic_force(
+        params, 
+        degree_i, 
+        degree_j, 
+        degree_i_neg, 
+        degree_j_neg, 
+        degree_i_pos,
+        degree_j_pos,
+        distance, 
+        graph.sign)
 
     return force_factor * spring_vector_norm
 
@@ -67,24 +78,29 @@ def heuristic_force(
     degree_j : jnp.ndarray,
     degree_negative_i : jnp.ndarray,
     degree_negative_j : jnp.ndarray,
+    degree_positive_i : jnp.ndarray,
+    degree_positive_j : jnp.ndarray,
     distance : jnp.ndarray,
     sign : jnp.ndarray
 ) -> jnp.ndarray:
     
-    input = jnp.concatenate([degree_i, degree_j, degree_negative_i, degree_negative_j, distance], axis=1)
+    input = jnp.concatenate([
+        degree_i, degree_j, 
+        degree_negative_i, degree_negative_j, 
+        degree_positive_i, degree_positive_j,
+        distance], axis=1)
 
     friend = jnp.dot(input, params.friend.w0) + params.friend.b0
-    friend = jax.nn.relu(friend)
+    # friend = jax.nn.relu(friend)
     friend = jnp.dot(friend, params.friend.w1) + params.friend.b1
 
     neutral = jnp.dot(input, params.neutral.w0) + params.neutral.b0
-    neutral = jax.nn.relu(neutral)
+    # neutral = jax.nn.relu(neutral)
     neutral = jnp.dot(neutral, params.neutral.w1) + params.neutral.b1
   
     enemy = jnp.dot(input, params.enemy.w0) + params.enemy.b0
-    enemy = jax.nn.relu(enemy)
+    # enemy = jax.nn.relu(enemy)
     enemy = jnp.dot(enemy, params.enemy.w1) + params.enemy.b1
-   
 
     # friend = jnp.maximum(distance - params.friend.rest_length, 0) * \
     #     params.friend.attraction_stiffness * (1 + params.friend.degree_i_multiplier * degree_i) * (1 + params.friend.degree_j_multiplier * degree_j)

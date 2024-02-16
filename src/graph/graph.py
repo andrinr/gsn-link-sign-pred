@@ -29,6 +29,7 @@ class SignedGraph(NamedTuple):
     sign_one_hot : jnp.ndarray
     degree : Measures
     neg_degree : Measures
+    pos_degree : Measures
     centrality : Measures
     num_nodes : int
     num_edges : int
@@ -59,12 +60,37 @@ def to_SignedGraph(
     test_mask = jnp.array(test_mask)
     train_mask = jnp.array(train_mask)
 
+    signs_train = jnp.where(train_mask, signs, 0)
+
     node_degrees = jnp.bincount(edge_index[0])
 
+    centrality = node_degrees
+    centrality = centrality / jnp.max(centrality)
+    for i in range(3):
+        edge_centrality = centrality[edge_index[1]]
+        centrality = centrality.at[edge_index[0]].add(edge_centrality)
+        centrality = centrality / jnp.max(centrality)
+
+    #centrality = jnp.expand_dims(centrality, axis=1)
+    centrality_measures = init_measures(jnp.expand_dims(centrality, axis=1))
+
+    centrality = jnp.minimum(centrality, centrality_measures.percentile) / centrality_measures.percentile
+    centrality_measures = centrality_measures._replace(values=jnp.expand_dims(centrality, axis=1))
+
+
+    print(jnp.sum(node_degrees == 0))
     node_neg_degrees = jnp.zeros(node_degrees.shape)
-    node_neg_degrees = node_neg_degrees.at[edge_index[0]].add(signs < 0)
+    node_neg_degrees = node_neg_degrees.at[edge_index[0]].add(signs_train < 0)
     node_neg_degrees = node_neg_degrees / node_degrees
     neg_degree_measures = init_measures(jnp.expand_dims(node_neg_degrees, axis=1))
+
+    node_pos_degrees = jnp.zeros(node_degrees.shape)
+    node_pos_degrees = node_pos_degrees.at[edge_index[0]].add(signs_train > 0)
+    node_pos_degrees = node_pos_degrees / node_degrees
+    pos_degree_measures = init_measures(jnp.expand_dims(node_pos_degrees, axis=1))
+
+    print(neg_degree_measures)
+    print(pos_degree_measures)
 
 
     num_nodes = jnp.max(edge_index) + 1
@@ -77,18 +103,8 @@ def to_SignedGraph(
     degree_measures = degree_measures._replace(values=node_degrees)
 
 
-    centrality = node_degrees
-    centrality = centrality / degree_measures.max
-    for i in range(3):
-        edge_centrality = centrality[edge_index[1]]
-        centrality = centrality.at[edge_index[0]].add(edge_centrality)
-        centrality = centrality / degree_measures.max
-
-    centrality = jnp.expand_dims(centrality, axis=1)
-    centrality_measures = init_measures(centrality)
-
-    centrality = jnp.minimum(centrality, centrality_measures.percentile) / centrality_measures.percentile
-    centrality_measures = centrality_measures._replace(values=centrality)
+   
+    print(centrality_measures.values)
 
     # #plot deg and centralities
     # # two subplots
@@ -106,6 +122,7 @@ def to_SignedGraph(
         signs_one_hot,
         degree_measures,
         neg_degree_measures,
+        pos_degree_measures,
         centrality_measures,
         num_nodes, 
         num_edges,

@@ -3,6 +3,7 @@ import jax
 import jax.numpy as jnp
 from tqdm import tqdm
 import optax
+from jax import custom_vjp
 
 import graph as g
 import simulation as sm
@@ -15,13 +16,26 @@ class TrainingParams(NamedTuple):
     embedding_dim : int
     multi_step : int
 
+@custom_vjp
+def clip_gradient(lo, hi, x):
+  return x  # identity function
+
+def clip_gradient_fwd(lo, hi, x):
+  return x, (lo, hi)  # save bounds as residuals
+
+def clip_gradient_bwd(res, g):
+  lo, hi = res
+  return (None, None, jnp.clip(g, lo, hi))  # use None to indicate zero cotangents for lo and hi
+
+clip_gradient.defvjp(clip_gradient_fwd, clip_gradient_bwd)
+
 def train(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
     force_params : sm.HeuristicForceParams,
     training_params : TrainingParams,
     simulation_params : sm.SimulationParams,
-) -> (sm.HeuristicForceParams, list[float], list[sm.Metrics]):
+) -> tuple[sm.HeuristicForceParams, list[float], list[sm.Metrics]]:
 
     print("\n Training...")
 
@@ -63,6 +77,10 @@ def train(
                 spring_state, #1
                 force_params, #2
                 batch_graph)
+            
+            grad = clip_gradient(-1, 1, grad)
+            
+
         
             # print(force_params)
             # print(grad)

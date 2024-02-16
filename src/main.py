@@ -29,11 +29,11 @@ def main(argv) -> None:
     EMBEDDING_DIM = 20
     INIT_POS_RANGE = 1.0
     TEST_DT = 0.001
-    DAMPING = 0.1
+    DAMPING = 0.02
     CENTERING = 0.15
 
     # Training parameters
-    NUM_EPOCHS = 40
+    NUM_EPOCHS = 50
     MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = False
     BATCH_NUMBER = 15
@@ -51,7 +51,7 @@ def main(argv) -> None:
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".95"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
-    #jax.config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", True)
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index) and TREAT_AS_UNDIRECTED:
@@ -98,31 +98,23 @@ def main(argv) -> None:
     else:
         heuristic_force_params = sm.HeuristicForceParams(
             friend=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(0), (5, 5)),
-                b0=jnp.zeros(5),
-                w1=jax.random.normal(random.PRNGKey(1), (5,1)),
+                w0=jax.random.normal(random.PRNGKey(0), (7, 4)),
+                b0=jnp.zeros(4),
+                w1=jax.random.normal(random.PRNGKey(1), (4,1)),
                 b1=jnp.zeros(1)),
             neutral=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(2), (5, 5)),
-                b0=jnp.zeros(5),
-                w1=jax.random.normal(random.PRNGKey(3), (5,1)),
+                w0=jax.random.normal(random.PRNGKey(2), (7, 4)),
+                b0=jnp.zeros(4),
+                w1=jax.random.normal(random.PRNGKey(3), (4,1)),
                 b1=jnp.zeros(1)),
             enemy=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(4), (5, 5)),
-                b0=jnp.zeros(5),
-                w1=jax.random.normal(random.PRNGKey(5), (5,1)),
+                w0=jax.random.normal(random.PRNGKey(4), (7, 4)),
+                b0=jnp.zeros(4),
+                w1=jax.random.normal(random.PRNGKey(5), (4,1)),
                 b1=jnp.zeros(1)),
-                
         )
 
         print("no spring params checkpoint found, using default params")
-
-
-    simulation_params_train = sm.SimulationParams(
-        iterations=PER_EPOCH_SIM_ITERATIONS // MULTISTPES_GRADIENT,
-        dt=TRAIN_DT,
-        damping=DAMPING,
-        centering=CENTERING)
 
     # Create initial values for neural network parameters
     key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
@@ -130,14 +122,20 @@ def main(argv) -> None:
     force_params = heuristic_force_params
 
     if OPTIMIZE_FORCE_PARAMS:
-        
+        simulation_params_train = sm.SimulationParams(
+            iterations=PER_EPOCH_SIM_ITERATIONS,
+            dt=TRAIN_DT,
+            damping=DAMPING,
+            centering=CENTERING)
+
+    
         force_params, loss_hist, metrics_hist, force_params_hist = sm.train(
             random_key=key_training,
             batches=batches,
             force_params=force_params,
             training_params= sm.TrainingParams(
                 num_epochs=NUM_EPOCHS,
-                learning_rate=0.02,
+                learning_rate=0.04,
                 batch_size=BATCH_NUMBER,
                 init_pos_range=INIT_POS_RANGE,
                 embedding_dim=EMBEDDING_DIM,
