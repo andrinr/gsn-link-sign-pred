@@ -32,12 +32,11 @@ clip_gradient.defvjp(clip_gradient_fwd, clip_gradient_bwd)
 def train(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
-    force_params : sm.HeuristicForceParams,
+    use_neural_force : bool,
+    force_params : sm.NeuralForceParams | sm.SpringForceParams,
     training_params : TrainingParams,
     simulation_params : sm.SimulationParams,
-) -> tuple[sm.HeuristicForceParams, list[float], list[sm.Metrics]]:
-
-    print("\n Training...")
+) -> tuple[sm.NeuralForceParams, list[float], list[sm.Metrics]]:
 
     optimizer = optax.adam(training_params.learning_rate)
     force_optimizer_multi_step = optax.MultiSteps(
@@ -45,9 +44,8 @@ def train(
     force_optimizier_state = force_optimizer_multi_step.init(
         force_params)
     
-    value_and_grad_fn = jax.value_and_grad(sm.simulate_and_loss, argnums=2, has_aux=True)
+    value_and_grad_fn = jax.value_and_grad(sm.simulate_and_loss, argnums=3, has_aux=True)
     
-    # init progress bar, add total number of epochs, add loss and metrics
     epochs = tqdm(range(training_params.num_epochs))
 
     loss_history = []
@@ -58,8 +56,6 @@ def train(
     random_keys = jax.random.split(random_key, training_params.num_epochs)
 
     for epoch_index in epochs:
-
-        print(simulation_params.iterations)
 
         for batch_index, batch_graph in enumerate(batches):
             # initialize spring state
@@ -75,23 +71,18 @@ def train(
             (loss_value, (spring_state, signs_pred)), grad = value_and_grad_fn(
                 simulation_params, #0
                 spring_state, #1
-                force_params, #2
+                use_neural_force, #2
+                force_params, #3
                 batch_graph)
             
             grad = clip_gradient(-1, 1, grad)
             
-
-        
-            # print(force_params)
-            # print(grad)
-            # print(loss_value)
 
             nn_force_update, force_optimizier_state = force_optimizer_multi_step.update(
                 grad, force_optimizier_state, force_params)
             
             force_params = optax.apply_updates(force_params, nn_force_update)
 
-            print(force_params)
             epoch_loss += loss_value
 
             metrics, _= sm.evaluate(

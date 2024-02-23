@@ -2,7 +2,7 @@
 import sys
 import inquirer
 from torch_geometric.utils import is_undirected
-from torch_geometric.loader import ClusterData, ClusterLoader, GraphSAINTSampler
+from torch_geometric.loader import ClusterData, ClusterLoader
 import yaml
 from jax import random
 import jax.numpy as jnp
@@ -11,7 +11,6 @@ import os
 import torch_geometric.transforms as T
 import numpy as np
 import jax
-import torch
 
 # Local dependencies
 import simulation as sm
@@ -23,64 +22,70 @@ def main(argv) -> None:
     """
     Main function
     """
-    # Simulation parameters
-    OPTIMIZE_FORCE_PARAMS = True
+
     TREAT_AS_UNDIRECTED = True
     EMBEDDING_DIM = 20
-    INIT_POS_RANGE = 1.0
-    TEST_DT = 0.001
-    DAMPING = 0.03
-    CENTERING = 0.15
-
-    # Training parameters
-    NUM_EPOCHS = 100
-    MULTISTPES_GRADIENT = 1
-    GRAPH_PARTITIONING = False
-    BATCH_NUMBER = 10
-    TRAIN_DT = 0.002
-    PER_EPOCH_SIM_ITERATIONS = 200
-    FINAL_SIM_ITERATIONS = 600
-    TEST_SHOTS = 5
-
-    N_EPOCH_SEQUENCE = [50, 40, 30, 20, 20, 20, 40]
-    TRAIN_ITER_SEQUENCE = [50, 60, 70, 80, 100, 150, 200]
-    DT_SEQUENCE = [0.01, 0.01, 0.005, 0.005, 0.005, 0.002, 0.002]
-    DAMPING_SEQUENCE = [0.2, 0.1, 0.05, 0.05, 0.03, 0.03, 0.03]
 
     # Paths
     DATA_PATH = 'src/data/'
     CECKPOINT_PATH = 'checkpoints/'
+
+    # Define the range of the random distribution for the initial positions
+    INIT_POS_RANGE = 1.0
+    TEST_DT = 0.001
+    TEST_ITERATIONS = 600
+    TEST_DAMPING = 0.03
+    TEST_SHOTS = 5
+
+    # TRAINING PARAMETERS
+    MULTISTPES_GRADIENT = 1
+    GRAPH_PARTITIONING = False
+    N_SUBGRAPHS = 10
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".95"
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
+    # Set the precision to 64 bit in case of NaN gradients
     jax.config.update("jax_enable_x64", True)
+
+    questions = [inquirer.Checkbox('multiples',
+        message="Select the options: (Press <space> to select, Enter when finished).",
+        choices=['Use Neural Force (SE-NN)', 'Train Parameters'],
+        default=[]),
+    ]
+
+    answers = inquirer.prompt(questions)
+    
+    # read answers from inquirer
+    train_parameters = False
+    use_neural_froce = False
+    if 'Train Parameters' in answers['multiples']:
+        train_parameters = True
+    if 'Use Neural Force (SE-NN)' in answers['multiples']:
+        use_neural_froce = True
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index) and TREAT_AS_UNDIRECTED:
         transform = T.ToUndirected(reduce="min")
         dataset = transform(dataset)
 
-    num_nodes = dataset.num_nodes
-    num_edges = dataset.num_edges
-
-    print(f"num_nodes: {num_nodes}")
-    print(f"num_edges: {num_edges}")
-
-    s = stats.Triplets(dataset)(n_triplets=3000, seed=0)
-    print(s.p_balanced)
-
-    print(dataset.edge_attr)
-    print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
-
+    # uncomment to print dataset information
+    # num_nodes = dataset.num_nodes
+    # num_edges = dataset.num_edges
+    # s = stats.Triplets(dataset)(n_triplets=3000, seed=0)
+    # print(f"num_nodes: {num_nodes}")
+    # print(f"num_edges: {num_edges}")
+    # print(s.p_balanced)
+    # print(dataset.edge_attr)
+    # print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
 
     batches = []
-    if GRAPH_PARTITIONING and OPTIMIZE_FORCE_PARAMS:
+    if GRAPH_PARTITIONING and train_parameters:
         cluster_data = ClusterData(
             dataset, 
-            num_parts=BATCH_NUMBER,
+            num_parts=N_SUBGRAPHS,
             keep_inter_cluster_edges=True)
         
         loader = ClusterLoader(cluster_data)
@@ -89,19 +94,28 @@ def main(argv) -> None:
             print(f"num_nodes: {signedGraph.num_nodes}")
             if signedGraph.num_nodes > 50:
                 batches.append(signedGraph)
-
     else:
         batches.append(g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED))
 
-
-    params_path = f"{CECKPOINT_PATH}params_{EMBEDDING_DIM}.yaml"
-    if os.path.exists(params_path):
-        stream = open(params_path, 'r')
-        heuristic_force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
-        # heuristic_force_params = sm.HeuristicForceParams(**heuristic_force_params)
-        print("loaded spring params checkpoint")
-    else:
-        heuristic_force_params = sm.HeuristicForceParams(
+    force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_params_{EMBEDDING_DIM}.yaml"
+    print(force_params_path)
+    load_checkpoint = False
+    if os.path.exists(force_params_path):
+        questions = [
+            inquirer.List('load',
+                message="We found a checkpoint for the force parameters. Do you want to load it?",
+                choices=['Yes', 'No'],
+            )]
+        
+        answers = inquirer.prompt(questions)
+        if answers['load'] == 'Yes':
+            load_checkpoint = True
+        
+    if os.path.exists(force_params_path) and load_checkpoint:
+        stream = open(force_params_path, 'r')
+        force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
+    elif use_neural_froce:
+        force_params = sm.NeuralForceParams(
             friend=sm.MLP(
                 w0=jax.random.normal(random.PRNGKey(0), (7, 4)),
                 b0=jnp.zeros(4),
@@ -118,15 +132,29 @@ def main(argv) -> None:
                 w1=jax.random.normal(random.PRNGKey(5), (4,1)),
                 b1=jnp.zeros(1)),
         )
-
-        print("no spring params checkpoint found, using default params")
+    else:
+        force_params = sm.SpringForceParams(
+            friend_distance=1.0,
+            friend_stiffness=1.0,
+            neutral_distance=1.0,
+            neutral_stiffness=0.1,
+            enemy_distance=5.5,
+            enemy_stiffness=2.0,
+            degree_multiplier=3.0)
+            
+    schedule_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_schedule.yaml"
+    if os.path.exists(schedule_params_path) and train_parameters:
+        stream = open(schedule_params_path, 'r')
+        schedule_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
+    elif train_parameters:
+        raise ValueError("no training schedule params found")
 
     # Create initial values for neural network parameters
     key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
-    force_params = heuristic_force_params
+    force_params = force_params
 
-    if OPTIMIZE_FORCE_PARAMS:
+    if train_parameters:
         loss_hist = []
         metrics_hist = []
         force_params_hist = []
@@ -134,24 +162,32 @@ def main(argv) -> None:
         damping_hist = []
         iterations_hist = []
 
+        for index, settings in enumerate(zip(
+            schedule_params['number_of_simulations'],
+            schedule_params['simulation_iterations'],
+            schedule_params['simulation_dt'],
+            schedule_params['simulation_damping'])):
 
-        for settings in zip(N_EPOCH_SEQUENCE, TRAIN_ITER_SEQUENCE, DT_SEQUENCE, DAMPING_SEQUENCE):
-            NUM_EPOCHS, PER_EPOCH_SIM_ITERATIONS, TRAIN_DT, DAMPING = settings
+            number_of_simulations = settings[0]
+            iterations = settings[1]
+            dt = settings[2]
+            damping = settings[3]
 
-            simulation_params_train = sm.SimulationParams(
-                iterations=PER_EPOCH_SIM_ITERATIONS,
-                dt=TRAIN_DT,
-                damping=DAMPING,
-                centering=CENTERING)
+            simulation_params_train = sm.SimulationParams(iterations=iterations, dt=dt, damping=damping)
+
+            print(f"Training run {index + 1} of {len(schedule_params['number_of_simulations'])}")
+            print(f"Running {number_of_simulations} simulations with {iterations} iterations each")
+            print(f"Simulation parameters are dt: {dt}, damping: {damping}")
 
             force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
                 random_key=key_training,
                 batches=batches,
+                use_neural_force=use_neural_froce,
                 force_params=force_params,
                 training_params= sm.TrainingParams(
-                    num_epochs=NUM_EPOCHS,
+                    num_epochs=number_of_simulations,
                     learning_rate=0.04,
-                    batch_size=BATCH_NUMBER,
+                    batch_size=N_SUBGRAPHS,
                     init_pos_range=INIT_POS_RANGE,
                     embedding_dim=EMBEDDING_DIM,
                     multi_step=MULTISTPES_GRADIENT),
@@ -162,9 +198,9 @@ def main(argv) -> None:
             metrics_hist = metrics_hist + metrics_hist_
             force_params_hist = force_params_hist + force_params_hist_
 
-            dt_hist = dt_hist + list(jnp.ones(NUM_EPOCHS) * TRAIN_DT)
-            iterations_hist = iterations_hist + list(jnp.ones(NUM_EPOCHS) * PER_EPOCH_SIM_ITERATIONS)
-            damping_hist = damping_hist + list(jnp.ones(NUM_EPOCHS) * DAMPING)
+            dt_hist = dt_hist + list(jnp.ones(number_of_simulations) * dt)
+            iterations_hist = iterations_hist + list(jnp.ones(number_of_simulations) * iterations)
+            damping_hist = damping_hist + list(jnp.ones(number_of_simulations) * damping)
 
         # plot loss over time
         epochs = np.arange(0, len(loss_hist))
@@ -196,18 +232,16 @@ def main(argv) -> None:
 
         plt.show()
 
-    # write spring params to file, the file is still a traced jax object
-    if OPTIMIZE_FORCE_PARAMS:
-        # ask user if they want to save the parameters
+    if train_parameters:
         questions = [
             inquirer.List('save',
-                message="Do you want to save the spring parameters?",
+                message="Do you want to save the force parameters?",
                 choices=['Yes', 'No'],
             ),
         ]
         answers = inquirer.prompt(questions)
         if answers['save'] == 'Yes':
-            with open(params_path, 'w') as file:
+            with open(force_params_path, 'w') as file:
                 yaml.dump(force_params, file)   
 
     shot_metrics = []
@@ -227,15 +261,10 @@ def main(argv) -> None:
             embedding_dim=EMBEDDING_DIM
         )
 
-        # training_signs = graphsigns.copy()
-        # training_signs = training_signs.at[train_mask].set(0)
-
-
         simulation_params_test = sm.SimulationParams(
-            iterations=FINAL_SIM_ITERATIONS,
+            iterations=TEST_ITERATIONS,
             dt=TEST_DT,
-            damping=DAMPING,
-            centering=CENTERING)
+            damping=TEST_DAMPING)
 
         training_signs = graph.sign.copy()
         training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -243,10 +272,10 @@ def main(argv) -> None:
         training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-       
         spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
+            use_neural_force=use_neural_froce,
             force_params=force_params,
             graph=training_graph)
 
@@ -316,19 +345,16 @@ def main(argv) -> None:
     # training_signs = graphsigns.copy()
     # training_signs = training_signs.at[train_mask].set(0)
 
-
     simulation_params_test = sm.SimulationParams(
-        iterations=FINAL_SIM_ITERATIONS,
+        iterations=TEST_ITERATIONS,
         dt=TEST_DT,
-        damping=DAMPING,
-        centering=CENTERING)
+        damping=TEST_DAMPING)
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
     training_graph = graph._replace(sign=training_signs)
     training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
     training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
-
 
     # initialize spring state
     spring_state = sm.init_spring_state(
@@ -343,12 +369,12 @@ def main(argv) -> None:
         simulation_params_test = sm.SimulationParams(
             iterations=(i+1) * 64,
             dt=TEST_DT,
-            damping=DAMPING,
-            centering=CENTERING)
+            damping=TEST_DAMPING)
             
         spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
+            use_neural_force=use_neural_froce,
             force_params=force_params,
             graph=training_graph)
 
@@ -438,8 +464,6 @@ def main(argv) -> None:
     plt.ylabel('error')
     # plt.title(')
     plt.show()
-    
-
     
 if __name__ == "__main__":
     main(sys.argv[1:])

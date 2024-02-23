@@ -14,33 +14,56 @@ def min(
 
 def update_spring_state(
     simulation_params : sm.SimulationParams,
-    force_params : sm.HeuristicForceParams,
+    use_neural_force : bool,
+    force_params : sm.NeuralForceParams | sm.SpringForceParams,
     spring_state : sm.SpringState, 
     graph : g.SignedGraph,
 ) -> sm.SpringState:
 
-    edge_acceleration = acceleration(force_params, spring_state, graph)
-
-    node_accelerations = jnp.zeros_like(spring_state.position)
-    node_accelerations = node_accelerations.at[graph.edge_index[0]].add(edge_acceleration)
-    # node_accelerations = node_accelerations * (graph.centrality.values * force_params.degree_multiplier + 0.1)
-    # node_accelerations = spring_state.position * -simulation_params.centering + node_accelerations
+    if use_neural_force:
+        node_accelerations = neural_node_acceleration(force_params, spring_state, graph)
+    else:
+        node_accelerations = spring_node_acceleration(force_params, spring_state, graph)
 
     velocity = spring_state.velocity * (1 - simulation_params.damping)
     velocity = velocity + simulation_params.dt * node_accelerations
 
-    # velocity_magnitude = jnp.linalg.norm(velocity, axis=1, keepdims=True)
-    # # limit the velocity to a maximum value
-    # velocity = velocity * jnp.minimum(velocity_magnitude, 20) / (velocity_magnitude + 1.0)
-    
     position = spring_state.position + simulation_params.dt * velocity
 
     spring_state = spring_state._replace(velocity=velocity, position=position)
     
     return spring_state
   
-def acceleration(
-    params : sm.HeuristicForceParams,
+def spring_node_acceleration(
+    params : sm.SpringForceParams,
+    state : sm.SpringState,
+    graph : g.SignedGraph) -> jnp.ndarray:
+
+    position_i = state.position[graph.edge_index[0]]
+    position_j = state.position[graph.edge_index[1]]
+
+    spring_vector = position_j - position_i
+    distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
+    spring_vector_norm = spring_vector / (distance + EPSILON)
+
+    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness /2
+    neutral = (distance - params.neutral_distance) * params.neutral_stiffness /2
+    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness /2
+   
+    sign = jnp.expand_dims(graph.sign, axis=1)
+
+    per_edge_force = jnp.where(sign == 1, attraction, neutral)
+    per_edge_force = jnp.where(sign == -1, retraction, per_edge_force)
+    per_edge_force *= spring_vector_norm
+
+    per_node_force = jnp.zeros_like(state.position)
+    per_node_force = per_node_force.at[graph.edge_index[0]].add(per_edge_force)
+    per_node_acceleration = per_node_force * (graph.centrality.values * params.degree_multiplier + 0.1)    
+
+    return per_node_acceleration
+
+def neural_node_acceleration(
+    params : sm.NeuralForceParams,
     state : sm.SpringState,
     graph : g.SignedGraph
 ) -> jnp.ndarray:
@@ -59,67 +82,30 @@ def acceleration(
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
-    force_factor = heuristic_force(
-        params, 
-        degree_i, 
-        degree_j, 
-        degree_i_neg, 
-        degree_j_neg, 
-        degree_i_pos,
-        degree_j_pos,
-        distance, 
-        graph.sign)
-
-    return force_factor * spring_vector_norm
-
-def heuristic_force(
-    params : sm.HeuristicForceParams,
-    degree_i : jnp.ndarray,
-    degree_j : jnp.ndarray,
-    degree_negative_i : jnp.ndarray,
-    degree_negative_j : jnp.ndarray,
-    degree_positive_i : jnp.ndarray,
-    degree_positive_j : jnp.ndarray,
-    distance : jnp.ndarray,
-    sign : jnp.ndarray
-) -> jnp.ndarray:
-    
     input = jnp.concatenate([
         degree_i, degree_j, 
-        degree_negative_i, degree_negative_j, 
-        degree_positive_i, degree_positive_j,
+        degree_i_neg, degree_j_neg, 
+        degree_i_pos, degree_j_pos,
         distance], axis=1)
 
     friend = jnp.dot(input, params.friend.w0) + params.friend.b0
-    # friend = jax.nn.relu(friend)
     friend = jnp.dot(friend, params.friend.w1) + params.friend.b1
 
     neutral = jnp.dot(input, params.neutral.w0) + params.neutral.b0
-    # neutral = jax.nn.relu(neutral)
     neutral = jnp.dot(neutral, params.neutral.w1) + params.neutral.b1
   
     enemy = jnp.dot(input, params.enemy.w0) + params.enemy.b0
-    # enemy = jax.nn.relu(enemy)
     enemy = jnp.dot(enemy, params.enemy.w1) + params.enemy.b1
 
-    # friend = jnp.maximum(distance - params.friend.rest_length, 0) * \
-    #     params.friend.attraction_stiffness * (1 + params.friend.degree_i_multiplier * degree_i) * (1 + params.friend.degree_j_multiplier * degree_j)
-    # friend += jnp.minimum(distance - params.friend.rest_length, 0) *\
-    #       params.friend.repulsion_stiffness * (1 + params.friend.degree_i_multiplier * degree_i) * (1 + params.friend.degree_j_multiplier * degree_j)
+    sign = jnp.expand_dims(graph.sign, axis=1)
 
-    # neutral = jnp.maximum(distance - params.neutral.rest_length, 0) * \
-    #     params.neutral.attraction_stiffness * (1 + params.neutral.degree_i_multiplier * degree_i) * (1 + params.neutral.degree_j_multiplier * degree_j)
-    # neutral += jnp.minimum(distance - params.neutral.rest_length, 0) * \
-    #     params.neutral.repulsion_stiffness * (1 + params.neutral.degree_i_multiplier * degree_i) * (1 + params.neutral.degree_j_multiplier * degree_j)
+    per_edge_force = jnp.where(sign == 1, friend, enemy)
+    per_edge_force = jnp.where(sign == 0, neutral, per_edge_force)
+    per_edge_force *= spring_vector_norm
 
-    # enemy = jnp.maximum(distance - params.enemy.rest_length, 0) * \
-    #     params.enemy.attraction_stiffness * (1 + params.enemy.degree_i_multiplier * degree_i) * (1 + params.enemy.degree_j_multiplier * degree_j)
-    # enemy += jnp.minimum(distance - params.enemy.rest_length, 0) * \
-    #     params.enemy.repulsion_stiffness * (1 + params.enemy.degree_i_multiplier * degree_i) * (1 + params.enemy.degree_j_multiplier * degree_j)
+    per_node_force = jnp.zeros_like(state.position)
+    per_node_force = per_node_force.at[graph.edge_index[0]].add(per_edge_force)
 
-    sign = jnp.expand_dims(sign, axis=1)
-
-    force = jnp.where(sign == 1, friend, enemy)
-    force = jnp.where(sign == 0, neutral, force)
-
-    return force
+    # mass is constant for all nodes
+    per_node_acceleration = per_node_force
+    return per_node_acceleration

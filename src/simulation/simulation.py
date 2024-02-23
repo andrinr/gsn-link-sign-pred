@@ -9,13 +9,15 @@ import simulation as sm
 def simulate(
     simulation_params : sm.SimulationParams,
     spring_state : sm.SpringState,
-    force_params : sm.HeuristicForceParams,
+    use_neural_force : bool,
+    force_params : sm.NeuralForceParams,
     graph : g.SignedGraph
 ) -> sm.SpringState:
     
     # capture the spring_params and signs in the closure
     simulation_update = lambda i, state: sm.update_spring_state(
         simulation_params = simulation_params, 
+        use_neural_force = use_neural_force,
         force_params = force_params,
         spring_state = state,
         graph = graph)
@@ -32,7 +34,8 @@ def simulate(
 def simulate_and_loss(
     simulation_params : sm.SimulationParams,
     spring_state : sm.SpringState,
-    force_params : sm.HeuristicForceParams,
+    use_neural_force : bool,
+    force_params : sm.NeuralForceParams,
     graph : g.SignedGraph,
 ) -> sm.SpringState:
 
@@ -46,6 +49,7 @@ def simulate_and_loss(
     spring_state = simulate(
         simulation_params = simulation_params,
         spring_state = spring_state,
+        use_neural_force = use_neural_force,
         force_params = force_params,
         graph=training_graph)
 

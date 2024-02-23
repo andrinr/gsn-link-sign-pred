@@ -77,8 +77,6 @@ def to_SignedGraph(
     centrality = jnp.minimum(centrality, centrality_measures.percentile) / centrality_measures.percentile
     centrality_measures = centrality_measures._replace(values=jnp.expand_dims(centrality, axis=1))
 
-
-    print(jnp.sum(node_degrees == 0))
     node_neg_degrees = jnp.zeros(node_degrees.shape)
     node_neg_degrees = node_neg_degrees.at[edge_index[0]].add(signs_train < 0)
     node_neg_degrees = node_neg_degrees / node_degrees
@@ -89,10 +87,6 @@ def to_SignedGraph(
     node_pos_degrees = node_pos_degrees / node_degrees
     pos_degree_measures = init_measures(jnp.expand_dims(node_pos_degrees, axis=1))
 
-    print(neg_degree_measures)
-    print(pos_degree_measures)
-
-
     num_nodes = jnp.max(edge_index) + 1
     num_edges = edge_index.shape[1]
 
@@ -101,20 +95,6 @@ def to_SignedGraph(
 
     node_degrees = jnp.minimum(node_degrees, degree_measures.percentile) / degree_measures.percentile
     degree_measures = degree_measures._replace(values=node_degrees)
-
-
-   
-    print(centrality_measures.values)
-
-    # #plot deg and centralities
-    # # two subplots
-    # fig, axs = plt.subplots(2)
-    # fig.suptitle('Degree and centrality distribution')
-    # axs[0].hist(node_degrees, histtype='step', bins=100)
-    # axs[0].set_title('Degree')
-    # axs[1].hist(centrality, histtype='step', bins=100)
-    # axs[1].set_title('Centrality')
-    # plt.show()
 
     return SignedGraph(
         edge_index, 

@@ -1,6 +1,6 @@
 import torch_geometric.transforms as T
 import matplotlib.pyplot as plt
-from simulation import SpringState, predict, HeuristicForceParams
+from simulation import SpringState, predict, NeuralForceParams
 from graph import SignedGraph
 import simulation as sim
 from graph import to_SignedGraph
@@ -11,7 +11,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from torch_geometric.data import Data
     
-def plot_embedding(spring_state : SpringState, spring_params : HeuristicForceParams, graph : SignedGraph, axis : plt.Axes):
+def plot_embedding(spring_state : SpringState, spring_params : NeuralForceParams, graph : SignedGraph, axis : plt.Axes):
         # plot the embeddings
     embeddings = spring_state.position
     predicted_sign = predict(spring_state, spring_params, graph)
@@ -47,7 +47,7 @@ def plot_embedding(spring_state : SpringState, spring_params : HeuristicForcePar
 def params_plot(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : HeuristicForceParams, 
+        spring_params : NeuralForceParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -302,7 +302,7 @@ def params_plot(
 def selected_wrong_classification(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : HeuristicForceParams, 
+        spring_params : NeuralForceParams, 
         init_range : float,
         dim : int,
         iterations : int,

@@ -15,18 +15,6 @@ def get_dataset(data_path : str, argv : list) -> (Data, str):
     answers = inquirer.prompt(questions)
     dataset_name = answers['dataset']
 
-    opts,batch_index = getopt.getopt(argv,"s:h:d:i:p:o",
-        ["embedding_size=","time_step=", "damping=", "iterations="])
-    for opt, arg in opts:
-        if opt == '-s':
-            EMBEDDING_DIM = int(arg)
-        elif opt == '-h':
-            DT = int(arg)
-        elif opt == '-d':
-            DAMPING = int(arg)
-        elif opt == '-i':
-            FINAL_SIM_ITERATIONS = int(arg)
-
     pre_transform = T.Compose([])
     match dataset_name:
         case "BitcoinOTC":

@@ -1,15 +1,6 @@
-from typing import Any, NamedTuple
+from typing import NamedTuple
 import jax.numpy as jnp
 import jax
-
-# class HeuristicForceParams(NamedTuple):
-#     friend_distance: float
-#     friend_stiffness: float
-#     neutral_distance: float
-#     neutral_stiffness: float
-#     enemy_distance: float
-#     enemy_stiffness: float
-#     degree_multiplier: float
 
 class Spring(NamedTuple):
     attraction_stiffness: float
@@ -18,22 +9,26 @@ class Spring(NamedTuple):
     degree_i_multiplier: float
     degree_j_multiplier: float  
 
-# class HeuristicForceParams(NamedTuple):
-#     friend : Spring
-#     neutral : Spring
-#     enemy : Spring
-
 class MLP(NamedTuple):
     w0 : jnp.ndarray
     w1 : jnp.ndarray
     b0 : jnp.ndarray
     b1 : jnp.ndarray
 
-class HeuristicForceParams(NamedTuple):
+class NeuralForceParams(NamedTuple):
     friend : MLP
     neutral : MLP
     enemy : MLP
-    
+
+class SpringForceParams(NamedTuple):
+    friend_distance: float
+    friend_stiffness: float
+    neutral_distance: float
+    neutral_stiffness: float
+    enemy_distance: float
+    enemy_stiffness: float
+    degree_multiplier: float
+
 class SpringState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
@@ -55,5 +50,3 @@ class SimulationParams(NamedTuple):
     iterations : int
     dt : float
     damping : float
-    centering : float
-
