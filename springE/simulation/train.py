@@ -85,12 +85,13 @@ def train(
 
             epoch_loss += loss_value
 
-            metrics, _= sm.evaluate(
-                spring_state,
-                batch_graph.edge_index,
-                batch_graph.sign,
-                batch_graph.train_mask,
-                batch_graph.test_mask)
+            if epoch_index % 10 == 0:
+                metrics, _= sm.evaluate(
+                    spring_state,
+                    batch_graph.edge_index,
+                    batch_graph.sign,
+                    batch_graph.train_mask,
+                    batch_graph.test_mask)
 
             # update progress bar
             epochs.set_postfix({

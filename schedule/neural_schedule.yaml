@@ -30,3 +30,7 @@ simulation_damping:
   - 0.03
   - 0.03
   - 0.03
+learning_rate: 0.04
+test_dt: 0.001
+test_iterations: 500
+test_damping: 0.03

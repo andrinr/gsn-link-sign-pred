@@ -28,13 +28,11 @@ def main(argv) -> None:
 
     # Paths
     DATA_PATH = 'src/data/'
-    CECKPOINT_PATH = 'checkpoints/'
+    CECKPOINT_PATH = 'training_checkpoints/'
+    SCHEDULE_PATH = 'schedule/'
 
     # Define the range of the random distribution for the initial positions
     INIT_POS_RANGE = 1.0
-    TEST_DT = 0.001
-    TEST_ITERATIONS = 600
-    TEST_DAMPING = 0.03
     TEST_SHOTS = 5
 
     # TRAINING PARAMETERS
@@ -103,7 +101,7 @@ def main(argv) -> None:
     if os.path.exists(force_params_path):
         questions = [
             inquirer.List('load',
-                message="We found a checkpoint for the force parameters. Do you want to load it?",
+                message=f"We found a checkpoint for {'neural' if use_neural_froce else 'spring'} force parameters. Do you want to load it?",
                 choices=['Yes', 'No'],
             )]
         
@@ -142,7 +140,7 @@ def main(argv) -> None:
             enemy_stiffness=2.0,
             degree_multiplier=3.0)
             
-    schedule_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_schedule.yaml"
+    schedule_params_path = f"{SCHEDULE_PATH}{'neural' if use_neural_froce else 'spring'}_schedule.yaml"
     if os.path.exists(schedule_params_path) and train_parameters:
         stream = open(schedule_params_path, 'r')
         schedule_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
@@ -186,7 +184,7 @@ def main(argv) -> None:
                 force_params=force_params,
                 training_params= sm.TrainingParams(
                     num_epochs=number_of_simulations,
-                    learning_rate=0.04,
+                    learning_rate=schedule_params['learning_rate'],
                     batch_size=N_SUBGRAPHS,
                     init_pos_range=INIT_POS_RANGE,
                     embedding_dim=EMBEDDING_DIM,
@@ -262,9 +260,9 @@ def main(argv) -> None:
         )
 
         simulation_params_test = sm.SimulationParams(
-            iterations=TEST_ITERATIONS,
-            dt=TEST_DT,
-            damping=TEST_DAMPING)
+            iterations=schedule_params['test_iterations'],
+            dt=schedule_params['test_dt'],
+            damping=schedule_params['test_damping'])
 
         training_signs = graph.sign.copy()
         training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -342,14 +340,6 @@ def main(argv) -> None:
         embedding_dim=EMBEDDING_DIM
     )
 
-    # training_signs = graphsigns.copy()
-    # training_signs = training_signs.at[train_mask].set(0)
-
-    simulation_params_test = sm.SimulationParams(
-        iterations=TEST_ITERATIONS,
-        dt=TEST_DT,
-        damping=TEST_DAMPING)
-
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
     training_graph = graph._replace(sign=training_signs)
@@ -362,14 +352,14 @@ def main(argv) -> None:
         n=graph.num_nodes,
         m=graph.num_edges,
         range=INIT_POS_RANGE,
-        embedding_dim=64
+        embedding_dim=EMBEDDING_DIM
     )
 
     for i in range(16):
         simulation_params_test = sm.SimulationParams(
-            iterations=(i+1) * 64,
-            dt=TEST_DT,
-            damping=TEST_DAMPING)
+            iterations=64,
+            dt=schedule_params['test_dt'],
+            damping=schedule_params['test_damping'])
             
         spring_state = sm.simulate(
             simulation_params=simulation_params_test,
