@@ -1,4 +1,4 @@
-!!python/object/new:simulation.states.HeuristicForceParams
+!!python/object/new:simulation.states.NeuralForceParams
 - !!python/object/new:simulation.states.MLP
   - !!python/object/apply:jax._src.array._reconstruct_array
     - &id001 !!python/name:numpy.core.multiarray._reconstruct ''
@@ -11,11 +11,11 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
-        - 5
+        - 7
+        - 4
       - &id003 !!python/object/apply:numpy.dtype
         args:
-        - f4
+        - f8
         - false
         - true
         state: !!python/tuple
@@ -29,8 +29,10 @@
         - 0
       - false
       - !!binary |
-        wnuTvz+bu0DyAl2/G/AMwO35177S5ZRAxx3JQDF8N77deadAwVgPv6/tYMHDi0FB7hKiv5bEecHq
-        b4A/1KySQAE00b/N1wa+sLdUQKp9XD6xo45AGnqPv9fpZb/CJbdA54/Zvg==
+        xaBgX0HIE8Aodc/cv7gRwPJw+tKM4g5AJ8ueM5ViFsAmHVELjwf4PyydG1UGO/s/rd/xtTxaAMAu
+        viHr0rHSv2djRgC5pAtAZKwyWOAfEkBZ9dUUcGsIwEraTvFN/hFAyIxUhxbPG0C8Z+inEJogQBZY
+        oQYnKBfAoTNDsv0NHEBbJsPQWVEAQIFE61196/o/9a82KZ2UEMD9Ugp4GY/7P5ELhFlzmu2/fWMf
+        V1ls87/Hob275FOjv3pAN2WJBOC/Q3gOXtEO/z9eYe1GbeUJQHPUgWlKvgfAkH0jb9dy7T8=
     - named_shape: &id004 {}
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -44,12 +46,12 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
+        - 4
         - 1
       - *id003
       - false
       - !!binary |
-        7pQcQQ2TD8H/weG9QUkaQS50Dz4=
+        qqBTDxNqFkC96T4oUwIXQHUtKorD+xDAilGepZIZFkA=
     - named_shape: &id005 {}
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -63,11 +65,11 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
+        - 4
       - *id003
       - false
       - !!binary |
-        SUpEQLOLnUAAAAAAa5h5QP+Ypb0=
+        AofECtFL+j8ukEA8pQbzP4yr3hpOLPO/3+X0q9wI9T8=
     - named_shape: &id006 {}
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -85,7 +87,7 @@
       - *id003
       - false
       - !!binary |
-        6vwIQA==
+        lvv4xEqn8T8=
     - named_shape: &id007 {}
       weak_type: false
 - !!python/object/new:simulation.states.MLP
@@ -100,13 +102,15 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
-        - 5
+        - 7
+        - 4
       - *id003
       - false
       - !!binary |
-        IwABwOqXAEEK4uQ/XY2/v8RPDMBzCiS/8kyEP7aQqz9xJjo+o8heQHddJL+uJYJBm/0OwG30N7/8
-        qHvBS+IwPzQ6WUFfn/6/6wwuQBFUhcHXO36+a1ORP/yEQ7+cGS6/d47CQA==
+        P2/oO0UL7L/VTWoJ+czRvy/0hj7YZfs/KsaRtqNc278cnY/lGlfyv/nGOVDT8fA/YbAdYv2v/r9C
+        lRXMBuj6P0pevfLbTCBAFnFHdQecF8ClNsGB4SQVQDuKpVSqhRLADWJOaWw6JUDr5OFpwV4mwA+4
+        GPM7TCJAh5ZVkE9IJMCqGaYQoocEQMr4lUFx5QLA+sCGPgSqCUAcZ/imoqL5v19EOdwaxxLAXKup
+        htaxHEAXnmyJVRAUwExUlB4JShJAZphF5LMv8r/JRh6zh4a7v6mNBNVPItw/dT3XeJhmlL8=
     - named_shape: *id004
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -120,12 +124,12 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
+        - 4
         - 1
       - *id003
       - false
       - !!binary |
-        y5pTv1eGV8GA03NAJmYYPyzNQEE=
+        ITmXGEw5FcA6Pcb7QuMdQLjxYsm5UxvASNqu2uapFEA=
     - named_shape: *id005
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -139,11 +143,11 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
+        - 4
       - *id003
       - false
       - !!binary |
-        AAAAAK6XBz9GLO4/Euy4vuTP0EA=
+        qMvL0t/P7L8mts6FomTkP/iuow9xtui/FTkzgNIv3T8=
     - named_shape: *id006
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -161,7 +165,7 @@
       - *id003
       - false
       - !!binary |
-        eAmdQA==
+        AoJvfyJt6z8=
     - named_shape: *id007
       weak_type: false
 - !!python/object/new:simulation.states.MLP
@@ -176,13 +180,15 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
-        - 5
+        - 7
+        - 4
       - *id003
       - false
       - !!binary |
-        iv7LwOAKFz+LGDxBitK0wFc3SUFPiKjAzrPavZvcZEFJX7bAp+hdQUaHCsFDqY4/EEL3QInrzsCX
-        m+JARNUVwMxDjr/7PQFBdYUSwGJkAkFtzyNBZOj1v1UVZ0C1uh5BVIsoQA==
+        WzXz0Y6OEUA3YH9aDM4NQN7JyfvkHRVAtyzWUJr2GEByZku1hdUaQC/bWDoLyQxAg/3eSs+8GED2
+        4Wn7HX8UQNAR1824BgNApqKWG5nY9j8ac6R1FRHVP2oRFV3j4fY/9eWiLCHzJUDGWfYSs1QiQAkF
+        M4xTvSJASZQwfDahI0ARwTBY/NQNQPfAe1bdFhpAiG0HbELzD0AAuIlunUAFQNx/FPzHEyFA+qaF
+        ukFuIUC1m9N8JKUlQIrh5PLkGiNAcykMBK6nDcBP2ZI21v8IwIxJLcu4IBLAVK6myc9+FcA=
     - named_shape: *id004
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -196,12 +202,12 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
+        - 4
         - 1
       - *id003
       - false
       - !!binary |
-        AaCCQUN68j6xeCLBtGppQS96NsE=
+        2T8x2oY9IcApfV6u2u4hwBJVDkNEbCLAxxlImu2AKMA=
     - named_shape: *id005
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -215,11 +221,11 @@
     - !!python/tuple
       - 1
       - !!python/tuple
-        - 5
+        - 4
       - *id003
       - false
       - !!binary |
-        MzDNwMllcL6qB0ZBKPLJwE2BPkE=
+        tVdAd/O/IEAzesFLtEYgQAcsbFsH/CFA+PnYd7SwIEA=
     - named_shape: *id006
       weak_type: false
   - !!python/object/apply:jax._src.array._reconstruct_array
@@ -237,6 +243,6 @@
       - *id003
       - false
       - !!binary |
-        Q8kmwQ==
+        JwJef0zgHsA=
     - named_shape: *id007
       weak_type: false

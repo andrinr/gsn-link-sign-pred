@@ -11,6 +11,7 @@ import os
 import torch_geometric.transforms as T
 import numpy as np
 import jax
+import time
 
 # Local dependencies
 import simulation as sm
@@ -23,11 +24,10 @@ def main(argv) -> None:
     Main function
     """
 
-    TREAT_AS_UNDIRECTED = True
     EMBEDDING_DIM = 20
 
     # Paths
-    DATA_PATH = 'src/data/'
+    DATA_PATH = 'springE/data/'
     CECKPOINT_PATH = 'training_checkpoints/'
     SCHEDULE_PATH = 'schedule/'
 
@@ -50,8 +50,8 @@ def main(argv) -> None:
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",
-        choices=['Use Neural Force (SE-NN)', 'Train Parameters'],
-        default=[]),
+        choices=['Use Neural Force (SE-NN)', 'Train Parameters', 'Convert to undirected'],
+        default=['Convert to undirected']),
     ]
 
     answers = inquirer.prompt(questions)
@@ -59,13 +59,16 @@ def main(argv) -> None:
     # read answers from inquirer
     train_parameters = False
     use_neural_froce = False
+    convert_to_undirected = False
     if 'Train Parameters' in answers['multiples']:
         train_parameters = True
     if 'Use Neural Force (SE-NN)' in answers['multiples']:
         use_neural_froce = True
+    if 'Convert to undirected' in answers['multiples']:
+        convert_to_undirected = True
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
-    if not is_undirected(dataset.edge_index) and TREAT_AS_UNDIRECTED:
+    if not is_undirected(dataset.edge_index) and convert_to_undirected:
         transform = T.ToUndirected(reduce="min")
         dataset = transform(dataset)
 
@@ -88,12 +91,12 @@ def main(argv) -> None:
         
         loader = ClusterLoader(cluster_data)
         for batch in loader:
-            signedGraph = g.to_SignedGraph(batch, TREAT_AS_UNDIRECTED)
+            signedGraph = g.to_SignedGraph(batch, convert_to_undirected)
             print(f"num_nodes: {signedGraph.num_nodes}")
             if signedGraph.num_nodes > 50:
                 batches.append(signedGraph)
     else:
-        batches.append(g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED))
+        batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
 
     force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_params_{EMBEDDING_DIM}.yaml"
     print(force_params_path)
@@ -141,7 +144,7 @@ def main(argv) -> None:
             degree_multiplier=3.0)
             
     schedule_params_path = f"{SCHEDULE_PATH}{'neural' if use_neural_froce else 'spring'}_schedule.yaml"
-    if os.path.exists(schedule_params_path) and train_parameters:
+    if os.path.exists(schedule_params_path):
         stream = open(schedule_params_path, 'r')
         schedule_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
     elif train_parameters:
@@ -230,25 +233,22 @@ def main(argv) -> None:
 
         plt.show()
 
-    if train_parameters:
-        questions = [
-            inquirer.List('save',
-                message="Do you want to save the force parameters?",
-                choices=['Yes', 'No'],
-            ),
-        ]
-        answers = inquirer.prompt(questions)
-        if answers['save'] == 'Yes':
-            with open(force_params_path, 'w') as file:
-                yaml.dump(force_params, file)   
-
     shot_metrics = []
+    times = []
     key_shots = random.split(key_test, TEST_SHOTS)     
     graph = {}
 
     for shot in range(TEST_SHOTS):
 
-        graph = g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED)
+        graph = g.to_SignedGraph(dataset, convert_to_undirected)
+
+        training_signs = graph.sign.copy()
+        training_signs = jnp.where(graph.train_mask, training_signs, 0)
+        training_graph = graph._replace(sign=training_signs)
+        training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+        training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+
+        start_time = time.time()
    
         # initialize spring state
         spring_state = sm.init_spring_state(
@@ -263,19 +263,17 @@ def main(argv) -> None:
             iterations=schedule_params['test_iterations'],
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
-
-        training_signs = graph.sign.copy()
-        training_signs = jnp.where(graph.train_mask, training_signs, 0)
-        training_graph = graph._replace(sign=training_signs)
-        training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
-        training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
-
+        
         spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
             use_neural_force=use_neural_froce,
             force_params=force_params,
             graph=training_graph)
+        
+        end_time = time.time()
+        times.append(end_time - start_time)
+
 
         metrics, _ = sm.evaluate(
             spring_state,
@@ -292,31 +290,34 @@ def main(argv) -> None:
     print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
-    print(f"true_positives: {np.mean([metrics.true_positives for metrics in shot_metrics])}")
-    print(f"false_positives: {np.mean([metrics.false_positives for metrics in shot_metrics])}")
-    print(f"true_negatives: {np.mean([metrics.true_negatives for metrics in shot_metrics])}")
-    print(f"false_negatives: {np.mean([metrics.false_negatives for metrics in shot_metrics])}")
+    # print(f"true_positives: {np.mean([metrics.true_positives for metrics in shot_metrics])}")
+    # print(f"false_positives: {np.mean([metrics.false_positives for metrics in shot_metrics])}")
+    # print(f"true_negatives: {np.mean([metrics.true_negatives for metrics in shot_metrics])}")
+    # print(f"false_negatives: {np.mean([metrics.false_negatives for metrics in shot_metrics])}")
 
     # standard deviation
     print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
     print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
-    print(f"std true_positives: {np.std([metrics.true_positives for metrics in shot_metrics])}")
-    print(f"std false_positives: {np.std([metrics.false_positives for metrics in shot_metrics])}")
-    print(f"std true_negatives: {np.std([metrics.true_negatives for metrics in shot_metrics])}")
-    print(f"std false_negatives: {np.std([metrics.false_negatives for metrics in shot_metrics])}")  
+    # print(f"std true_positives: {np.std([metrics.true_positives for metrics in shot_metrics])}")
+    # print(f"std false_positives: {np.std([metrics.false_positives for metrics in shot_metrics])}")
+    # print(f"std true_negatives: {np.std([metrics.true_negatives for metrics in shot_metrics])}")
+    # print(f"std false_negatives: {np.std([metrics.false_negatives for metrics in shot_metrics])}")  
 
-    # print extreme metrics over all shots
-    print(f"extreme metrics over {TEST_SHOTS} shots:")
-    print(f"auc: {np.max([metrics.auc for metrics in shot_metrics])}")
-    print(f"f1_binary: {np.max([metrics.f1_binary for metrics in shot_metrics])}")
-    print(f"f1_micro: {np.max([metrics.f1_micro for metrics in shot_metrics])}")
-    print(f"f1_macro: {np.max([metrics.f1_macro for metrics in shot_metrics])}")
-    print(f"true_positives: {np.max([metrics.true_positives for metrics in shot_metrics])}")
-    print(f"false_positives: {np.max([metrics.false_positives for metrics in shot_metrics])}")
-    print(f"true_negatives: {np.max([metrics.true_negatives for metrics in shot_metrics])}")
-    print(f"false_negatives: {np.max([metrics.false_negatives for metrics in shot_metrics])}")
+    print(f"average time per shot: {np.mean(times)}")
+
+    if train_parameters:
+        questions = [
+            inquirer.List('save',
+                message="Do you want to save the force parameters?",
+                choices=['Yes', 'No'],
+            ),
+        ]
+        answers = inquirer.prompt(questions)
+        if answers['save'] == 'Yes':
+            with open(force_params_path, 'w') as file:
+                yaml.dump(force_params, file)   
 
     # selected_wrong_classification(
     #     dataset=dataset,
@@ -329,7 +330,7 @@ def main(argv) -> None:
     #     damping=DAMPING,
     # )
 
-    graph = g.to_SignedGraph(dataset, TREAT_AS_UNDIRECTED)
+    graph = g.to_SignedGraph(dataset, convert_to_undirected)
    
     # initialize spring state
     spring_state = sm.init_spring_state(
