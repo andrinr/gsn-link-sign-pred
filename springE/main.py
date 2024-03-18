@@ -11,7 +11,7 @@ import os
 import torch_geometric.transforms as T
 import numpy as np
 import jax
-import time
+from timeit import default_timer as timer
 
 # Local dependencies
 import simulation as sm
@@ -38,7 +38,6 @@ def main(argv) -> None:
     # TRAINING PARAMETERS
     MULTISTPES_GRADIENT = 1
     GRAPH_PARTITIONING = False
-    N_SUBGRAPHS = 10
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -50,7 +49,7 @@ def main(argv) -> None:
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",
-        choices=['Use Neural Force (SE-NN)', 'Train Parameters', 'Convert to undirected'],
+        choices=['Use Neural Force (SE-NN)', 'Train Parameters', 'Convert to undirected', 'Partition Graph'],
         default=['Convert to undirected']),
     ]
 
@@ -60,12 +59,24 @@ def main(argv) -> None:
     train_parameters = False
     use_neural_froce = False
     convert_to_undirected = False
+    graph_partitioning = False
+    number_of_subgraphs = 10
     if 'Train Parameters' in answers['multiples']:
         train_parameters = True
     if 'Use Neural Force (SE-NN)' in answers['multiples']:
         use_neural_froce = True
     if 'Convert to undirected' in answers['multiples']:
         convert_to_undirected = True
+    if 'Partition Graph' in answers['multiples']:
+        graph_partitioning = True
+
+    if graph_partitioning:
+        questions = [inquirer.Text('n_subgraphs',
+            message="Enter the number of subgraphs",
+            default='10'),
+        ]
+        answers = inquirer.prompt(questions)
+        number_of_subgraphs = int(answers['n_subgraphs'])
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index) and convert_to_undirected:
@@ -81,23 +92,7 @@ def main(argv) -> None:
     # print(s.p_balanced)
     # print(dataset.edge_attr)
     # print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
-
-    batches = []
-    if GRAPH_PARTITIONING and train_parameters:
-        cluster_data = ClusterData(
-            dataset, 
-            num_parts=N_SUBGRAPHS,
-            keep_inter_cluster_edges=True)
         
-        loader = ClusterLoader(cluster_data)
-        for batch in loader:
-            signedGraph = g.to_SignedGraph(batch, convert_to_undirected)
-            print(f"num_nodes: {signedGraph.num_nodes}")
-            if signedGraph.num_nodes > 50:
-                batches.append(signedGraph)
-    else:
-        batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
-
     force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_params_{EMBEDDING_DIM}.yaml"
     print(force_params_path)
     load_checkpoint = False
@@ -111,6 +106,22 @@ def main(argv) -> None:
         answers = inquirer.prompt(questions)
         if answers['load'] == 'Yes':
             load_checkpoint = True
+
+    batches = []
+    if GRAPH_PARTITIONING and train_parameters:
+        cluster_data = ClusterData(
+            dataset, 
+            num_parts=number_of_subgraphs,
+            keep_inter_cluster_edges=True)
+        
+        loader = ClusterLoader(cluster_data)
+        for batch in loader:
+            signedGraph = g.to_SignedGraph(batch, convert_to_undirected)
+            print(f"num_nodes: {signedGraph.num_nodes}")
+            if signedGraph.num_nodes > 50:
+                batches.append(signedGraph)
+    else:
+        batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
         
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')
@@ -188,7 +199,7 @@ def main(argv) -> None:
                 training_params= sm.TrainingParams(
                     num_epochs=number_of_simulations,
                     learning_rate=schedule_params['learning_rate'],
-                    batch_size=N_SUBGRAPHS,
+                    batch_size=number_of_subgraphs,
                     init_pos_range=INIT_POS_RANGE,
                     embedding_dim=EMBEDDING_DIM,
                     multi_step=MULTISTPES_GRADIENT),
@@ -248,7 +259,8 @@ def main(argv) -> None:
         training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-        start_time = time.time()
+        start_time = timer()
+        print(f"Running shot {shot + 1} of {TEST_SHOTS}")
    
         # initialize spring state
         spring_state = sm.init_spring_state(
@@ -271,7 +283,8 @@ def main(argv) -> None:
             force_params=force_params,
             graph=training_graph)
         
-        end_time = time.time()
+        end_time = timer()
+        print(f"Shot {shot + 1} took {end_time - start_time} seconds")
         times.append(end_time - start_time)
 
 
