@@ -46,6 +46,9 @@ def main(argv) -> None:
 
     # Set the precision to 64 bit in case of NaN gradients
     jax.config.update("jax_enable_x64", True)
+    # for a fair comparison with PyTorch, we disable JIT compilation
+    jax.config.update('jax_disable_jit', True)
+
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",

@@ -10,7 +10,8 @@ Try ``conda create --name <env> --file env.yaml`` to create a conda environment 
 
 If this does not work, try to install the dependencies manually. Make sure to use a Python version lower than the latest version as some of the dependencies are sometimes not compatible with the latest version (pytorch for example). 
 
-Also make sure to install pytorch in CPU only mode and JAX with GPU support, this will make sure that JAX and pytorch do not conflict with each other.
+Install pytorch in CPU only mode and JAX with GPU support, this will make sure that JAX and pytorch do not conflict with each other. Pytorch is only used as a dataloader, the performance of jax is more important. 
+
 
 ### Running the code
 
