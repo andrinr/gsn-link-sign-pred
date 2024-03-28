@@ -6,11 +6,12 @@ This is the code for the paper called (Papername) which was published in (Journa
 
 ### Dependencies
 
-Try ``conda create --name <env> --file env.yaml`` to create a conda environment with all the dependencies. Then activate the environment with ``conda activate <env>``.
+Installation instructions for Ubuntu (conda venv recommended):
 
-If this does not work, try to install the dependencies manually. Make sure to use a Python version lower than the latest version as some of the dependencies are sometimes not compatible with the latest version (pytorch for example). 
-
-Also make sure to install pytorch in CPU only mode and JAX with GPU support, this will make sure that JAX and pytorch do not conflict with each other.
+1. Install jax: 
+``pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html``
+2. Install pytorch (CPU version !) ``pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu``
+3. Install other dependencies: ``pip install torch_geometric matplotlib scikit-learn pyyaml tqdm optax inquirer pandas``
 
 ### Running the code
 
