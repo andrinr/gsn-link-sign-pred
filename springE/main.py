@@ -45,10 +45,11 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     # Set the precision to 64 bit in case of NaN gradients
-    jax.config.update("jax_enable_x64", True)
-    # for a fair comparison with PyTorch, we disable JIT compilation
-    jax.config.update('jax_disable_jit', True)
-
+    jax.config.update("jax_enable_x64", False)
+    from jax.lib import xla_bridge
+    print(xla_bridge.get_backend().platform)
+    # disable jit compilation for debugging
+    jax.config.update("jax_disable_jit", True)
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",
