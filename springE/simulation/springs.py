@@ -82,29 +82,53 @@ def neural_node_acceleration(
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
-    input = jnp.concatenate([
+    direction = jnp.zeros((len(graph.edge_index[0]), 1))
+
+    input_i = jnp.concatenate([
         degree_i, degree_j, 
         degree_i_neg, degree_j_neg, 
         degree_i_pos, degree_j_pos,
-        distance], axis=1)
+        distance, direction], axis=1)
 
-    friend = jnp.dot(input, params.friend.w0) + params.friend.b0
-    friend = jnp.dot(friend, params.friend.w1) + params.friend.b1
+    friend_i = jnp.dot(input_i, params.friend.w0) + params.friend.b0
+    friend_i = jnp.dot(friend_i, params.friend.w1) + params.friend.b1
 
-    neutral = jnp.dot(input, params.neutral.w0) + params.neutral.b0
-    neutral = jnp.dot(neutral, params.neutral.w1) + params.neutral.b1
+    neutral_i = jnp.dot(input_i, params.neutral.w0) + params.neutral.b0
+    neutral_i = jnp.dot(neutral_i, params.neutral.w1) + params.neutral.b1
   
-    enemy = jnp.dot(input, params.enemy.w0) + params.enemy.b0
-    enemy = jnp.dot(enemy, params.enemy.w1) + params.enemy.b1
+    enemy_i = jnp.dot(input_i, params.enemy.w0) + params.enemy.b0
+    enemy_i = jnp.dot(enemy_i, params.enemy.w1) + params.enemy.b1
+
+    direction = jnp.ones((len(graph.edge_index[0]), 1))
+    
+    # input_j = jnp.concatenate([
+    #     degree_j, degree_i, 
+    #     degree_j_neg, degree_i_neg, 
+    #     degree_j_pos, degree_i_pos,
+    #     distance, direction], axis=1)
+
+    # friend_j = jnp.dot(input_j, params.friend.w0) + params.friend.b0
+    # friend_j = jnp.dot(friend_j, params.friend.w1) + params.friend.b1
+
+    # neutral_j = jnp.dot(input_j, params.neutral.w0) + params.neutral.b0
+    # neutral_j = jnp.dot(neutral_j, params.neutral.w1) + params.neutral.b1
+
+    # enemy_j = jnp.dot(input_j, params.enemy.w0) + params.enemy.b0
+    # enemy_j = jnp.dot(enemy_j, params.enemy.w1) + params.enemy.b1
 
     sign = jnp.expand_dims(graph.sign, axis=1)
 
-    per_edge_force = jnp.where(sign == 1, friend, enemy)
-    per_edge_force = jnp.where(sign == 0, neutral, per_edge_force)
-    per_edge_force *= spring_vector_norm
+    per_edge_force_i = jnp.where(sign == 1, friend_i, enemy_i)
+    per_edge_force_i = jnp.where(sign == 0, neutral_i, per_edge_force_i)
+    per_edge_force_i *= spring_vector_norm
+
+    # per_edge_force_j = jnp.where(sign == 1, friend_j, enemy_j)
+    # per_edge_force_j = jnp.where(sign == 0, neutral_j, per_edge_force_j)
+    # per_edge_force_j *= spring_vector_norm
 
     per_node_force = jnp.zeros_like(state.position)
-    per_node_force = per_node_force.at[graph.edge_index[0]].add(per_edge_force)
+    per_node_force = per_node_force.at[graph.edge_index[0]].add(per_edge_force_i)
+    # per_node_force = per_node_force.at[graph.edge_index[1]].add(per_edge_force_j)
 
     # mass is constant for all nodes
     per_node_acceleration = per_node_force

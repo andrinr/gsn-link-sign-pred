@@ -45,11 +45,11 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     # Set the precision to 64 bit in case of NaN gradients
-    jax.config.update("jax_enable_x64", False)
+    jax.config.update("jax_enable_x64", True)
     from jax.lib import xla_bridge
     print(xla_bridge.get_backend().platform)
     # disable jit compilation for debugging
-    jax.config.update("jax_disable_jit", True)
+    jax.config.update("jax_disable_jit", False)
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",
@@ -133,17 +133,17 @@ def main(argv) -> None:
     elif use_neural_froce:
         force_params = sm.NeuralForceParams(
             friend=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(0), (7, 4)),
+                w0=jax.random.normal(random.PRNGKey(0), (8, 4)),
                 b0=jnp.zeros(4),
                 w1=jax.random.normal(random.PRNGKey(1), (4,1)),
                 b1=jnp.zeros(1)),
             neutral=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(2), (7, 4)),
+                w0=jax.random.normal(random.PRNGKey(2), (8, 4)),
                 b0=jnp.zeros(4),
                 w1=jax.random.normal(random.PRNGKey(3), (4,1)),
                 b1=jnp.zeros(1)),
             enemy=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(4), (7, 4)),
+                w0=jax.random.normal(random.PRNGKey(4), (8, 4)),
                 b0=jnp.zeros(4),
                 w1=jax.random.normal(random.PRNGKey(5), (4,1)),
                 b1=jnp.zeros(1)),
