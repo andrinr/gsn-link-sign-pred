@@ -87,6 +87,7 @@ def main(argv) -> None:
         transform = T.ToUndirected(reduce="min")
         dataset = transform(dataset)
 
+
     # uncomment to print dataset information
     # num_nodes = dataset.num_nodes
     # num_edges = dataset.num_edges
@@ -126,27 +127,49 @@ def main(argv) -> None:
                 batches.append(signedGraph)
     else:
         batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
+
+    print(batches[0])
         
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')
         force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
     elif use_neural_froce:
+        # initializer = jax.nn.initializers.orthogonal()
+        # initializer = jax.nn.initializers.lecun_normal()
+        initializer = jax.nn.initializers.normal()
+        n_in = 13
+        n_hidden = 7
         force_params = sm.NeuralForceParams(
-            friend=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(0), (8, 4)),
-                b0=jnp.zeros(4),
-                w1=jax.random.normal(random.PRNGKey(1), (4,1)),
+            friend_in=sm.MLP(
+                w0=initializer(random.PRNGKey(0), (n_in, n_hidden)),
+                b0=jnp.zeros(n_hidden),
+                w1=initializer(random.PRNGKey(1), (n_hidden,1)),
                 b1=jnp.zeros(1)),
-            neutral=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(2), (8, 4)),
-                b0=jnp.zeros(4),
-                w1=jax.random.normal(random.PRNGKey(3), (4,1)),
+            neutral_in=sm.MLP(
+                w0=initializer(random.PRNGKey(2), (n_in, n_hidden)),
+                b0=jnp.zeros(n_hidden),
+                w1=initializer(random.PRNGKey(3), (n_hidden,1)),
                 b1=jnp.zeros(1)),
-            enemy=sm.MLP(
-                w0=jax.random.normal(random.PRNGKey(4), (8, 4)),
-                b0=jnp.zeros(4),
-                w1=jax.random.normal(random.PRNGKey(5), (4,1)),
+            enemy_in=sm.MLP(
+                w0=initializer(random.PRNGKey(4), (n_in, n_hidden)),
+                b0=jnp.zeros(n_hidden),
+                w1=initializer(random.PRNGKey(5), (n_hidden,1)),
                 b1=jnp.zeros(1)),
+            friend_out=sm.MLP(
+                w0=initializer(random.PRNGKey(6), (n_in, n_hidden)),
+                b0=jnp.zeros(n_hidden),
+                w1=initializer(random.PRNGKey(7), (n_hidden,1)),
+                b1=jnp.zeros(1)),
+            neutral_out=sm.MLP(
+                w0=initializer(random.PRNGKey(8), (n_in, n_hidden)),
+                b0=jnp.zeros(n_hidden),
+                w1=initializer(random.PRNGKey(9), (n_hidden,1)),
+                b1=jnp.zeros(1)),
+            enemy_out=sm.MLP(
+                w0=initializer(random.PRNGKey(10), (n_in, n_hidden)),
+                b0=jnp.zeros(n_hidden),
+                w1=initializer(random.PRNGKey(11), (n_hidden,1)),
+                b1=jnp.zeros(1))
         )
     else:
         force_params = sm.SpringForceParams(

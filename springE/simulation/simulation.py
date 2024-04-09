@@ -93,7 +93,7 @@ def loss(
 
     sign_binary = graph.sign * 0.5 + 0.5
 
-    incorrect_predictions = jnp.square(sign_binary - predicted_sign)
+    error = jnp.square(sign_binary - predicted_sign)
 
     fraction_negatives = jnp.sum(sign_binary == 0) / sign_binary.shape[0]
     fraction_positives =  1 - fraction_negatives
@@ -104,12 +104,12 @@ def loss(
     # score = (sign * predicted_sign) *  1 / fraction_positives + ((1 - sign) * (1 - predicted_sign)) * 1 / fraction_negatives
     
     # false negatives
-    jnp.where(sign_binary == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
+    jnp.where(sign_binary == 1, error * weight_positives, error * weight_negatives)
     
     incorrect_predictions_weighted = jnp.where(
         sign_binary == 1, 
-        incorrect_predictions * weight_positives, 
-        incorrect_predictions * weight_negatives)
+        error * weight_positives, 
+        error * weight_negatives)
     
     incorrect_predictions_weighted *= jnp.where(graph.test_mask, 0.8, 0.2)
 

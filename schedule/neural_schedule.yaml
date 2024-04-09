@@ -1,10 +1,10 @@
 number_of_simulations:
-  - 50
-  - 40
-  - 40
-  - 40
-  - 40
-  - 60
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
+  - 100
   - 80
 simulation_iterations:
   - 50

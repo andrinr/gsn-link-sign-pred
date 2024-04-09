@@ -16,9 +16,12 @@ class MLP(NamedTuple):
     b1 : jnp.ndarray
 
 class NeuralForceParams(NamedTuple):
-    friend : MLP
-    neutral : MLP
-    enemy : MLP
+    friend_in : MLP
+    neutral_in : MLP
+    enemy_in : MLP
+    friend_out : MLP
+    neutral_out : MLP
+    enemy_out : MLP
 
 class SpringForceParams(NamedTuple):
     friend_distance: float
