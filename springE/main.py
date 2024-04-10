@@ -12,24 +12,27 @@ import torch_geometric.transforms as T
 import numpy as np
 import jax
 from timeit import default_timer as timer
+import pandas as pd
 
 # Local dependencies
 import simulation as sm
 import graph as g
 from io_helpers import get_dataset
 import stats as stats
+from plot_helpers import plot_embedding
 
 def main(argv) -> None:
     """
     Main function
     """
 
-    EMBEDDING_DIM = 20
+    EMBEDDING_DIM = 2
 
     # Paths
     DATA_PATH = 'springE/data/'
     CECKPOINT_PATH = 'training_checkpoints/'
     SCHEDULE_PATH = 'schedule/'
+    OUTPUT_PATH = 'output/'
 
     # Define the range of the random distribution for the initial positions
     INIT_POS_RANGE = 1.0
@@ -45,11 +48,11 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     # Set the precision to 64 bit in case of NaN gradients
-    jax.config.update("jax_enable_x64", False)
+    jax.config.update("jax_enable_x64", True)
     from jax.lib import xla_bridge
     print(xla_bridge.get_backend().platform)
     # disable jit compilation for debugging
-    jax.config.update("jax_disable_jit", True)
+    jax.config.update("jax_disable_jit", False)
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",
@@ -218,35 +221,18 @@ def main(argv) -> None:
             iterations_hist = iterations_hist + list(jnp.ones(number_of_simulations) * iterations)
             damping_hist = damping_hist + list(jnp.ones(number_of_simulations) * damping)
 
-        # plot loss over time
-        epochs = np.arange(0, len(loss_hist))
-        plt.plot(epochs, loss_hist)
-        plt.title('Loss')
-        plt.show()
 
-        # get set1 color map
-        colors = plt.cm.get_cmap('Set1', 10)
-
-        # Three subplots with shared x axis
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True)
-        # plot metrics over time
-        ax1.plot(epochs, [metrics.auc for metrics in metrics_hist], color=colors(0))
-        ax1.plot(epochs, [metrics.f1_macro for metrics in metrics_hist], color=colors(1))
-        ax1.legend(['AUC', 'F1 macro'], loc='lower left')
-        ax1.set_xlabel('Epochs')
-        ax1.set_ylabel('Accuracy')
-
-        ax2.plot(epochs, dt_hist, color=colors(2))
-        ax2.plot(epochs, damping_hist, color=colors(3))
-
-        ax2.legend(['dt', 'damping'], loc='lower left')
-        ax2.set_xlabel('Epochs')
-
-        ax3.plot(epochs, iterations_hist, color=colors(4))
-        ax3.legend(['iterations'], loc='lower left')
-        ax3.set_xlabel('Epochs')
-
-        plt.show()
+        df = pd.DataFrame()
+        # save loss and metrics to csv
+        df['loss'] = loss_hist
+        df['auc'] = [metrics.auc for metrics in metrics_hist]
+        df['f1_binary'] = [metrics.f1_binary for metrics in metrics_hist]
+        df['f1_micro'] = [metrics.f1_micro for metrics in metrics_hist]
+        df['f1_macro'] = [metrics.f1_macro for metrics in metrics_hist]
+        df['dt'] = dt_hist
+        df['damping'] = damping_hist
+        df['iterations'] = iterations_hist
+        df.to_csv(f"{OUTPUT_PATH}{'neural' if use_neural_froce else 'spring'}_training_results_{EMBEDDING_DIM}.csv")
 
     shot_metrics = []
     times = []
@@ -307,22 +293,30 @@ def main(argv) -> None:
     print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
-    # print(f"true_positives: {np.mean([metrics.true_positives for metrics in shot_metrics])}")
-    # print(f"false_positives: {np.mean([metrics.false_positives for metrics in shot_metrics])}")
-    # print(f"true_negatives: {np.mean([metrics.true_negatives for metrics in shot_metrics])}")
-    # print(f"false_negatives: {np.mean([metrics.false_negatives for metrics in shot_metrics])}")
 
     # standard deviation
     print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
     print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
-    # print(f"std true_positives: {np.std([metrics.true_positives for metrics in shot_metrics])}")
-    # print(f"std false_positives: {np.std([metrics.false_positives for metrics in shot_metrics])}")
-    # print(f"std true_negatives: {np.std([metrics.true_negatives for metrics in shot_metrics])}")
-    # print(f"std false_negatives: {np.std([metrics.false_negatives for metrics in shot_metrics])}")  
 
     print(f"average time per shot: {np.mean(times)}")
+
+    questions = [
+        inquirer.List('save',
+            message="Do you want to visualize the results?",
+            choices=['Yes', 'No'],
+        ),
+    ]
+    answers = inquirer.prompt(questions)
+    if answers['save'] == 'Yes':
+        # create new axis
+        fig, ax = plt.subplots(1, 1)
+        plot_embedding(
+            spring_state,
+            graph,
+            ax)
+        plt.show()
 
     if train_parameters:
         questions = [
@@ -335,17 +329,6 @@ def main(argv) -> None:
         if answers['save'] == 'Yes':
             with open(force_params_path, 'w') as file:
                 yaml.dump(force_params, file)   
-
-    # selected_wrong_classification(
-    #     dataset=dataset,
-    #     key=key_test,
-    #     spring_params=spring_params,
-    #     init_range=INIT_POS_RANGE,
-    #     dim=EMBEDDING_DIM,
-    #     iterations=FINAL_SIM_ITERATIONS,
-    #     dt=TEST_DT,
-    #     damping=DAMPING,
-    # )
 
     graph = g.to_SignedGraph(dataset, convert_to_undirected)
    
@@ -364,66 +347,39 @@ def main(argv) -> None:
     training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
     training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-    # initialize spring state
-    spring_state = sm.init_spring_state(
-        rng=key_shots[shot],
-        n=graph.num_nodes,
-        m=graph.num_edges,
-        range=INIT_POS_RANGE,
-        embedding_dim=EMBEDDING_DIM
-    )
-
-    for i in range(16):
-        simulation_params_test = sm.SimulationParams(
-            iterations=64,
-            dt=schedule_params['test_dt'],
-            damping=schedule_params['test_damping'])
-            
-        spring_state = sm.simulate(
-            simulation_params=simulation_params_test,
-            spring_state=spring_state, 
-            use_neural_force=use_neural_froce,
-            force_params=force_params,
-            graph=training_graph)
-
-        metrics = sm.evaluate(
-            spring_state,
-            graph.edge_index,
-            graph.sign,
-            graph.train_mask,
-            graph.test_mask)
-        
-        print(metrics)
-
-    metrics = sm.evaluate(
-        spring_state,
-        graph.edge_index,
-        graph.sign,
-        graph.train_mask,
-        graph.test_mask)
-    
-    print(metrics)
-
-    # plot error per edge against avg node distance to center
-    embedding_i = spring_state.position[graph.edge_index[0]]
-    embedding_j = spring_state.position[graph.edge_index[1]]
-    distance_i = jnp.linalg.norm(embedding_i, axis=1, keepdims=True)
-    distance_j = jnp.linalg.norm(embedding_j, axis=1, keepdims=True)
-
-    avg_distance = (distance_i + distance_j) / 2
-    distance = jnp.linalg.norm(embedding_j - embedding_i, axis=1, keepdims=True)
-
     predicted_sign = sm.predict(
         spring_state = spring_state,
         graph = graph,
         x_0 = 0)
-    print(graph.sign)
-    print(predicted_sign)
+    
+    questions = [
+        inquirer.List('save',
+            message="Do you want to visualize the accuacy over the forward simulation time?",
+            choices=['Yes', 'No'],
+        ),
+    ]
+    answers = inquirer.prompt(questions)
+    if answers['save'] == 'Yes':
+        metrics = []
+        for i in range(1, 500):
+            metrics.append(sm.evaluate(
+                spring_state,
+                graph.edge_index,
+                graph.sign,
+                graph.train_mask,
+                graph.test_mask,
+                i))
+            
+        metrics = np.array(metrics)
+        plt.plot(metrics[:, 0], label='auc')
+        plt.plot(metrics[:, 1], label='f1_binary')
+        plt.plot(metrics[:, 2], label='f1_micro')
+        plt.plot(metrics[:, 3], label='f1_macro')
+        plt.legend()
+        plt.show()
 
     sign = jnp.where(graph.sign == 1, 1, 0)
-    print(sign)
     sign_pred = jnp.where(predicted_sign > 0.01, 1, 0)
-    print(sign_pred)
 
     true_positives = jnp.logical_and(sign == 1, sign_pred == 1)
     false_positives = jnp.logical_and(sign == 0, sign_pred == 1)
@@ -435,43 +391,6 @@ def main(argv) -> None:
     print(f"true_negatives: {jnp.sum(true_negatives)}")
     print(f"false_negatives: {jnp.sum(false_negatives)}")
 
-    print(f"sign: {sign}")
-    print(f"sign_pred: {sign_pred}")
-
-    error = jnp.square(sign - predicted_sign)
-
-    plt.scatter(distance, error, c=predicted_sign, cmap='viridis', s=0.5)
-    plt.colorbar()
-    plt.xlabel('avg distance to center')
-    plt.ylabel('error')
-    plt.title('error per edge')
-    plt.show()
-
-    from sklearn.decomposition import PCA
-    pca = PCA(n_components=2)
-    pca.fit(spring_state.position)
-    embedding = pca.transform(spring_state.position)
-
-    plt.scatter(embedding[:,0], embedding[:,1], cmap='viridis', s=0.5)
-    plt.colorbar()
-    plt.xlabel('PCA 1')
-    plt.ylabel('PCA 2')
-    plt.title('PCA embedding')
-    plt.show()
-
-    error_per_node = jnp.zeros(graph.num_nodes)
-    error_per_node = error_per_node.at[graph.edge_index[0]].add(error)
-    error_per_node = jnp.expand_dims(error_per_node, axis=1)
-    # normalize error by node degree, elementwise division
-    error_per_node = error_per_node / graph.degree.values
-
-    print(f"error_per_node: {error_per_node.shape}")
-
-    plt.scatter(graph.degree.values, error_per_node, s=1.5)
-    plt.xlabel('node degree')
-    plt.ylabel('error')
-    # plt.title(')
-    plt.show()
     
 if __name__ == "__main__":
     main(sys.argv[1:])

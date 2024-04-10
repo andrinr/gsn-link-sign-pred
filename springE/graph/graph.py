@@ -22,7 +22,7 @@ def init_measures(values : jnp.ndarray):
 
 class SignedGraph(NamedTuple):
     """
-    A signed directed graph.
+    A signed undirected graph.
     """
     edge_index : jnp.ndarray
     sign : jnp.ndarray

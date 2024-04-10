@@ -10,37 +10,48 @@ import jax
 import numpy as np
 from sklearn.decomposition import PCA
 from torch_geometric.data import Data
+from tqdm import tqdm
     
-def plot_embedding(spring_state : SpringState, spring_params : NeuralForceParams, graph : SignedGraph, axis : plt.Axes):
+def plot_embedding(spring_state : SpringState, graph : SignedGraph, axis : plt.Axes):
         # plot the embeddings
     embeddings = spring_state.position
-    predicted_sign = predict(spring_state, spring_params, graph)
-
-    axis.scatter(embeddings[:, 0], embeddings[:, 1])
-
+    dim = embeddings.shape[1]
+    if dim > 2:
+        print("Embedding dimension is greater than 2, PCA will be used to visualize the results")
+        from sklearn.decomposition import PCA
+        pca = PCA(n_components=2)
+        pca.fit(spring_state.position)
+        embeddings = pca.transform(spring_state.position)
+    
     # add edges to plot
-    for i in range(graph.edge_index.shape[1]):
+    # iterate using tqdm
+    for i in tqdm(range(graph.edge_index.shape[1])):
+    #for i in range(graph.edge_index.shape[1]):
         if graph.test_mask[i] == 1:
            
            axis.plot(
                 [embeddings[graph.edge_index[0][i]][0], embeddings[graph.edge_index[1][i]][0]], 
                 [embeddings[graph.edge_index[0][i]][1], embeddings[graph.edge_index[1][i]][1]], 
-                color= 'blue' if graph.sign[i] == 1 else 'red',
-                linestyle='dotted',
-                alpha=1.0)
+                color= '#39FAB7' if graph.sign[i] == 1 else '#FA5E39',
+                alpha=1.0,
+                # set line width
+                linewidth=0.3)
         
         else:
             axis.plot(
                 [embeddings[graph.edge_index[0][i]][0], embeddings[graph.edge_index[1][i]][0]], 
                 [embeddings[graph.edge_index[0][i]][1], embeddings[graph.edge_index[1][i]][1]], 
-                color= 'blue' if graph.sign[i] == 1 else 'red',
-                alpha=1.0)
+                color= '#39FAB7' if graph.sign[i] == 1 else '#FA5E39',
+                alpha=1.0,
+                linewidth=0.3)
+
+    axis.scatter(embeddings[:, 0], embeddings[:, 1], c='black', alpha=1.0, zorder=10, s=5)
 
     # add legend for edges
-    axis.plot([], [], color='blue', label='positive')
-    axis.plot([], [], color='red', label='negative')
-    axis.plot([], [], color='black', linestyle='dashed', label='test set')
-    axis.plot([], [], color='black', label='train & val set')
+    axis.plot([], [], color='#39FAB7', label='positive')
+    axis.plot([], [], color='#FA5E39', label='negative')
+    #axis.plot([], [], color='black', linestyle='dashed', label='test set')
+    #axis.plot([], [], color='black', label='train & val set')
     
     axis.legend()
 
