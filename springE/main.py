@@ -5,6 +5,7 @@ from torch_geometric.utils import is_undirected
 from torch_geometric.loader import ClusterData, ClusterLoader
 import yaml
 from jax import random
+from jax.lib import xla_bridge
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import os
@@ -26,7 +27,7 @@ def main(argv) -> None:
     Main function
     """
 
-    EMBEDDING_DIM = 2
+    EMBEDDING_DIM = 20
 
     # Paths
     DATA_PATH = 'springE/data/'
@@ -49,7 +50,6 @@ def main(argv) -> None:
 
     # Set the precision to 64 bit in case of NaN gradients
     jax.config.update("jax_enable_x64", True)
-    from jax.lib import xla_bridge
     print(xla_bridge.get_backend().platform)
     # disable jit compilation for debugging
     jax.config.update("jax_disable_jit", False)
@@ -212,7 +212,6 @@ def main(argv) -> None:
                     multi_step=MULTISTPES_GRADIENT),
                 simulation_params=simulation_params_train)
             
-            #concatenate lists
             loss_hist = loss_hist + loss_hist_
             metrics_hist = metrics_hist + metrics_hist_
             force_params_hist = force_params_hist + force_params_hist_
@@ -220,7 +219,6 @@ def main(argv) -> None:
             dt_hist = dt_hist + list(jnp.ones(number_of_simulations) * dt)
             iterations_hist = iterations_hist + list(jnp.ones(number_of_simulations) * iterations)
             damping_hist = damping_hist + list(jnp.ones(number_of_simulations) * damping)
-
 
         df = pd.DataFrame()
         # save loss and metrics to csv
@@ -277,7 +275,6 @@ def main(argv) -> None:
         print(f"Shot {shot + 1} took {end_time - start_time} seconds")
         times.append(end_time - start_time)
 
-
         metrics, _ = sm.evaluate(
             spring_state,
             graph.edge_index,
@@ -287,14 +284,11 @@ def main(argv) -> None:
         
         shot_metrics.append(metrics)
 
-    # print average metrics over all shots
     print(f"average metrics over {TEST_SHOTS} shots:")
     print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
     print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
-
-    # standard deviation
     print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
     print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
     print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
@@ -304,7 +298,187 @@ def main(argv) -> None:
 
     questions = [
         inquirer.List('save',
-            message="Do you want to visualize the results?",
+            message="Do you want to visualize the accuracy for the forward simulation?",
+            choices=['Yes', 'No'],
+        ),
+    ]
+    answers = inquirer.prompt(questions)
+    if answers['save'] == 'Yes':
+        graph = g.to_SignedGraph(dataset, convert_to_undirected)
+
+        training_signs = graph.sign.copy()
+        training_signs = jnp.where(graph.train_mask, training_signs, 0)
+        training_graph = graph._replace(sign=training_signs)
+        training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+        training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+
+        # initialize spring state
+        spring_state = sm.init_spring_state(
+            rng=key_shots[shot],
+            n=graph.num_nodes,
+            m=graph.num_edges,
+            range=INIT_POS_RANGE,
+            embedding_dim=EMBEDDING_DIM
+        )
+
+        iter_stride = 5
+        simulation_params_test = sm.SimulationParams(
+            iterations=iter_stride,
+            dt=schedule_params['test_dt'],
+            damping=schedule_params['test_damping'])
+        
+        metrics_hist = []
+        energy_hist = []
+        mean_edge_distance = []
+        iterations_hist = []
+        for i in range(1, 100):
+            iterations_hist.append(i*iter_stride)
+            spring_state = sm.simulate(
+                simulation_params=simulation_params_test,
+                spring_state=spring_state, 
+                use_neural_force=use_neural_froce,
+                force_params=force_params,
+                graph=training_graph)
+
+            metrics, _ = sm.evaluate(
+                spring_state,
+                graph.edge_index,
+                graph.sign,
+                graph.train_mask,
+                graph.test_mask)
+        
+            metrics_hist.append(metrics)
+            energy = jnp.linalg.norm(spring_state.position, axis=1, keepdims=True) ** 2 * 0.5
+            energy_hist.append(jnp.mean(jnp.abs(energy)))
+
+            pos_i = spring_state.position[graph.edge_index[0]]
+            pos_j = spring_state.position[graph.edge_index[1]]
+            edge_distance = jnp.linalg.norm(pos_i - pos_j, axis=1)
+            mean_edge_distance.append(jnp.mean(edge_distance))
+
+        auc = [metrics.auc for metrics in metrics_hist]
+        f1_binary = [metrics.f1_binary for metrics in metrics_hist]
+        f1_micro = [metrics.f1_micro for metrics in metrics_hist]
+        f1_macro = [metrics.f1_macro for metrics in metrics_hist]
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+
+        ax1.plot(iterations_hist, auc, label='auc', color='#d73027')
+        ax1.plot(iterations_hist, f1_binary, label='f1_binary', color='#fc8d59')
+        ax1.plot(iterations_hist, f1_micro, label='f1_micro', color='#91bfdb')
+        ax1.plot(iterations_hist, f1_macro, label='f1_macro', color='#4575b4')
+        ax1.set_xlabel('iterations')
+        ax1.set_ylabel('metrics')
+        ax1.legend()
+       
+        ax2.plot(iterations_hist, energy_hist, label='mean energy', color='#d73027')
+        ax2.plot(iterations_hist, mean_edge_distance, label='mean edge distance', color='#4575b4')
+        ax2.set_xlabel('iterations')
+        ax2.set_ylabel('values')
+        ax2.legend()
+        plt.show()
+
+    questions = [
+        inquirer.List('save',
+            message="Do you want to visualize a line through the loss surface?",
+            choices=['Yes', 'No'],
+        ),
+    ]
+    answers = inquirer.prompt(questions)
+
+    sim_params_list = [
+        sm.SimulationParams(
+            iterations=50,
+            dt=schedule_params['test_dt'],
+            damping=0.01),
+        sm.SimulationParams(
+            iterations=100,
+            dt=schedule_params['test_dt'],
+            damping=0.01),
+        sm.SimulationParams(
+            iterations=150,
+            dt=schedule_params['test_dt'],
+            damping=0.01),
+        sm.SimulationParams(
+            iterations=100,
+            dt=schedule_params['test_dt'],
+            damping=0.1),
+        sm.SimulationParams(
+            iterations=100,
+            dt=schedule_params['test_dt'],
+            damping=0.01),
+        sm.SimulationParams(
+            iterations=100,
+            dt=schedule_params['test_dt'],
+            damping=0.001),
+    ]
+
+    colors = ['#d73027', '#fc8d59', '#4575b4', '#984ea3', '#ff7f00']
+    if answers['save'] == 'Yes':
+        mut = 0.05
+        fig, axs = plt.subplots(2, 1)
+        for sim_index, sim_params in enumerate(sim_params_list):
+            graph = g.to_SignedGraph(dataset, convert_to_undirected)
+
+            training_signs = graph.sign.copy()
+            training_signs = jnp.where(graph.train_mask, training_signs, 0)
+            training_graph = graph._replace(sign=training_signs)
+            training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+            training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+
+            # initialize spring state
+            spring_state = sm.init_spring_state(
+                rng=key_shots[shot],
+                n=graph.num_nodes,
+                m=graph.num_edges,
+                range=INIT_POS_RANGE,
+                embedding_dim=EMBEDDING_DIM
+            )
+            
+            loss_values = []
+            force_params_mut = force_params
+            mutations = []
+            for i in range(-20, 20):
+
+                loss_value, (spring_state, predicted_sign) = sm.simulate_and_loss(
+                    simulation_params=sim_params,
+                    spring_state=spring_state, 
+                    use_neural_force=use_neural_froce,
+                    force_params=force_params_mut,
+                    graph=training_graph)
+                
+                loss_values.append(loss_value)
+                mutations.append(i * mut)
+                # make sure the above works for named tuples:
+                force_params_mut = force_params._replace(
+                    friend=sm.MLP(
+                        w0=force_params.friend.w0 + i * mut,
+                        w1=force_params.friend.w1 + i * mut,
+                        b0=force_params.friend.b0 + i * mut,
+                        b1=force_params.friend.b1 + i * mut),
+                    neutral=sm.MLP(
+                        w0=force_params.neutral.w0 + i * mut,
+                        w1=force_params.neutral.w1 + i * mut,
+                        b0=force_params.neutral.b0 + i * mut,
+                        b1=force_params.neutral.b1 + i * mut),
+                    enemy=sm.MLP(
+                        w0=force_params.enemy.w0 + i * mut,
+                        w1=force_params.enemy.w1 + i * mut,
+                        b0=force_params.enemy.b0 + i * mut,
+                        b1=force_params.enemy.b1 + i * mut))
+
+            axs[int(sim_index / 3)].plot(
+                mutations, loss_values, label='d=' + str(sim_params.damping) + ', iter=' + str(sim_params.iterations), color=colors[sim_index % 3])
+            axs[int(sim_index / 3)].set_xlabel('mutations')
+            axs[int(sim_index / 3)].set_ylabel('loss')
+
+        axs[0].legend()
+        axs[1].legend()
+        plt.show()
+        
+    questions = [
+        inquirer.List('save',
+            message="Do you want to plot the embeddings?",
             choices=['Yes', 'No'],
         ),
     ]
@@ -329,67 +503,6 @@ def main(argv) -> None:
         if answers['save'] == 'Yes':
             with open(force_params_path, 'w') as file:
                 yaml.dump(force_params, file)   
-
-    graph = g.to_SignedGraph(dataset, convert_to_undirected)
-   
-    # initialize spring state
-    spring_state = sm.init_spring_state(
-        rng=key_shots[shot],
-        n=graph.num_nodes,
-        m=graph.num_edges,
-        range=INIT_POS_RANGE,
-        embedding_dim=EMBEDDING_DIM
-    )
-
-    training_signs = graph.sign.copy()
-    training_signs = jnp.where(graph.train_mask, training_signs, 0)
-    training_graph = graph._replace(sign=training_signs)
-    training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
-    training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
-
-    predicted_sign = sm.predict(
-        spring_state = spring_state,
-        graph = graph,
-        x_0 = 0)
-    
-    questions = [
-        inquirer.List('save',
-            message="Do you want to visualize the accuacy over the forward simulation time?",
-            choices=['Yes', 'No'],
-        ),
-    ]
-    answers = inquirer.prompt(questions)
-    if answers['save'] == 'Yes':
-        metrics = []
-        for i in range(1, 500):
-            metrics.append(sm.evaluate(
-                spring_state,
-                graph.edge_index,
-                graph.sign,
-                graph.train_mask,
-                graph.test_mask,
-                i))
-            
-        metrics = np.array(metrics)
-        plt.plot(metrics[:, 0], label='auc')
-        plt.plot(metrics[:, 1], label='f1_binary')
-        plt.plot(metrics[:, 2], label='f1_micro')
-        plt.plot(metrics[:, 3], label='f1_macro')
-        plt.legend()
-        plt.show()
-
-    sign = jnp.where(graph.sign == 1, 1, 0)
-    sign_pred = jnp.where(predicted_sign > 0.01, 1, 0)
-
-    true_positives = jnp.logical_and(sign == 1, sign_pred == 1)
-    false_positives = jnp.logical_and(sign == 0, sign_pred == 1)
-    true_negatives = jnp.logical_and(sign == 0, sign_pred == 0)
-    false_negatives = jnp.logical_and(sign == 1, sign_pred == 0)
-
-    print(f"true_positives: {jnp.sum(true_positives)}")
-    print(f"false_positives: {jnp.sum(false_positives)}")
-    print(f"true_negatives: {jnp.sum(true_negatives)}")
-    print(f"false_negatives: {jnp.sum(false_negatives)}")
 
     
 if __name__ == "__main__":

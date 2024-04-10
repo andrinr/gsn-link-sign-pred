@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import jax
 from functools import partial
+from typing import Tuple
 
 import graph as g
 import simulation as sm
@@ -37,7 +38,7 @@ def simulate_and_loss(
     use_neural_force : bool,
     force_params : sm.NeuralForceParams,
     graph : g.SignedGraph,
-) -> sm.SpringState:
+) -> Tuple[float, Tuple[sm.SpringState, jnp.ndarray]]:
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -70,7 +71,8 @@ def predict(
     spring_state : sm.SpringState,
     graph : g.SignedGraph,
     x_0 : float
-):
+) -> jnp.ndarray:
+    
     position_i = spring_state.position[graph.edge_index[0]]
     position_j = spring_state.position[graph.edge_index[1]]
 
@@ -85,7 +87,7 @@ def loss(
     spring_state : sm.SpringState,
     graph : g.SignedGraph,
     x_0 : float
-):
+) -> float:
     predicted_sign = predict(
         spring_state = spring_state,
         graph = graph,
