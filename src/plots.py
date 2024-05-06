@@ -90,16 +90,6 @@ def main(argv) -> None:
         transform = T.ToUndirected(reduce="min")
         dataset = transform(dataset)
 
-    # uncomment to print dataset information
-    # num_nodes = dataset.num_nodes
-    # num_edges = dataset.num_edges
-    # s = stats.Triplets(dataset)(n_triplets=3000, seed=0)
-    # print(f"num_nodes: {num_nodes}")
-    # print(f"num_edges: {num_edges}")
-    # print(s.p_balanced)
-    # print(dataset.edge_attr)
-    # print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
-        
     force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_params_{EMBEDDING_DIM}.yaml"
     print(force_params_path)
     load_checkpoint = False
@@ -275,12 +265,22 @@ def main(argv) -> None:
         print(f"Shot {shot + 1} took {end_time - start_time} seconds")
         times.append(end_time - start_time)
 
-        metrics, _ = sm.evaluate(
+        metrics, pred = sm.evaluate(
             spring_state,
             graph.edge_index,
             graph.sign,
             graph.train_mask,
             graph.test_mask)
+        
+        pred_mu = sm.predict(spring_state, graph, 0)
+        pred_mu = pred_mu.at[graph.test_mask].get()
+        pred_mu = jnp.where(pred_mu > 0.5, 1, -1)
+
+        
+        print(f"log regr pred vs mu pred diff: {jnp.mean(jnp.abs(pred - pred_mu))}")
+        print(pred)
+        print(pred_mu)
+    
         
         shot_metrics.append(metrics)
 
@@ -339,14 +339,15 @@ def main(argv) -> None:
                 use_neural_force=use_neural_froce,
                 force_params=force_params,
                 graph=training_graph)
-
-            metrics, _ = sm.evaluate(
+            
+            metrics, pred = sm.evaluate(
                 spring_state,
                 graph.edge_index,
                 graph.sign,
                 graph.train_mask,
                 graph.test_mask)
-        
+            
+   
             metrics_hist.append(metrics)
             energy = jnp.linalg.norm(spring_state.position, axis=1, keepdims=True) ** 2 * 0.5
             energy_hist.append(jnp.mean(jnp.abs(energy)))
@@ -380,7 +381,7 @@ def main(argv) -> None:
 
     questions = [
         inquirer.List('save',
-            message="Do you want to visualize a line through the loss surface?",
+            message="Do you want to visualize the losses for different training parameters?",
             choices=['Yes', 'No'],
         ),
     ]
@@ -468,7 +469,11 @@ def main(argv) -> None:
                         b1=force_params.enemy.b1 + i * mut))
 
             axs[int(sim_index / 3)].plot(
-                mutations, loss_values, label='d=' + str(sim_params.damping) + ', iter=' + str(sim_params.iterations), color=colors[sim_index % 3])
+                mutations, loss_values, 
+                label='d=' + str(sim_params.damping) + 
+                ', iter=' + str(sim_params.iterations), 
+                color=colors[sim_index % 3])
+            
             axs[int(sim_index / 3)].set_xlabel('mutations')
             axs[int(sim_index / 3)].set_ylabel('loss')
 

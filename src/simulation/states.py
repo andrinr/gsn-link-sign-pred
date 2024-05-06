@@ -1,6 +1,7 @@
 from typing import NamedTuple
 import jax.numpy as jnp
 import jax
+from jax import random
 
 class Spring(NamedTuple):
     attraction_stiffness: float
@@ -20,6 +21,27 @@ class NeuralForceParams(NamedTuple):
     neutral : MLP
     enemy : MLP
 
+def init_neural_force_params() -> NeuralForceParams:
+    friend=MLP(
+        w0=random.normal(random.PRNGKey(0), (7, 4)),
+        b0=jnp.zeros(4),
+        w1=random.normal(random.PRNGKey(1), (4,1)),
+        b1=jnp.zeros(1))
+    
+    neutral=MLP(
+        w0=random.normal(random.PRNGKey(2), (7, 4)),
+        b0=jnp.zeros(4),
+        w1=random.normal(random.PRNGKey(3), (4,1)),
+        b1=jnp.zeros(1))
+    
+    enemy=MLP(
+        w0=random.normal(random.PRNGKey(4), (7, 4)),
+        b0=jnp.zeros(4),
+        w1=random.normal(random.PRNGKey(5), (4,1)),
+        b1=jnp.zeros(1))
+    
+    return NeuralForceParams(friend, neutral, enemy)
+
 class SpringForceParams(NamedTuple):
     friend_distance: float
     friend_stiffness: float
@@ -28,6 +50,16 @@ class SpringForceParams(NamedTuple):
     enemy_distance: float
     enemy_stiffness: float
     degree_multiplier: float
+
+def init_spring_force_params() -> SpringForceParams:
+    return SpringForceParams(
+        friend_distance=1.0,
+        friend_stiffness=1.0,
+        neutral_distance=1.0,
+        neutral_stiffness=0.1,
+        enemy_distance=5.5,
+        enemy_stiffness=2.0,
+        degree_multiplier=3.0)
 
 class SpringState(NamedTuple):
     position: jnp.ndarray
