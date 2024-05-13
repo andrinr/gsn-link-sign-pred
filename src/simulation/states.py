@@ -22,22 +22,24 @@ class NeuralForceParams(NamedTuple):
     enemy : MLP
 
 def init_neural_force_params() -> NeuralForceParams:
+    initializer = jax.nn.initializers.normal()
+    c = 0.01
     friend=MLP(
-        w0=random.normal(random.PRNGKey(0), (7, 4)),
+        w0=initializer(random.PRNGKey(0), (7, 4)) * c,
         b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(1), (4,1)),
+        w1=initializer(random.PRNGKey(1), (4,1)) * c,
         b1=jnp.zeros(1))
     
     neutral=MLP(
-        w0=random.normal(random.PRNGKey(2), (7, 4)),
+        w0=initializer(random.PRNGKey(2), (7, 4)) * c,
         b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(3), (4,1)),
+        w1=initializer(random.PRNGKey(3), (4,1)) * c,
         b1=jnp.zeros(1))
     
     enemy=MLP(
-        w0=random.normal(random.PRNGKey(4), (7, 4)),
+        w0=initializer(random.PRNGKey(4), (7, 4)) * c,
         b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(5), (4,1)),
+        w1=initializer(random.PRNGKey(5), (4,1)) * c,
         b1=jnp.zeros(1))
     
     return NeuralForceParams(friend, neutral, enemy)

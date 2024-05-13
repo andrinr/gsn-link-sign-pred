@@ -25,10 +25,11 @@ def update_spring_state(
     else:
         node_accelerations = spring_node_acceleration(force_params, spring_state, graph)
 
-    velocity = spring_state.velocity * (1 - simulation_params.damping)
-    velocity = velocity + simulation_params.dt * node_accelerations
+    velocity = spring_state.velocity
+    # velocity = spring_state.velocity * (1 - simulation_params.damping)
+    # velocity = velocity + simulation_params.dt * node_accelerations
 
-    position = spring_state.position + simulation_params.dt * velocity
+    position = spring_state.position + simulation_params.dt * node_accelerations
 
     spring_state = spring_state._replace(velocity=velocity, position=position)
     
