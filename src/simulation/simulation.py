@@ -59,7 +59,9 @@ def simulate_and_loss(
     losses = jnp.array([loss(spring_state, graph, x_0) for x_0 in x_0s])
 
     loss_value = jnp.mean(losses)
-    
+
+    #loss_value = jnp.mean(loss(spring_state, graph, 0))
+        
     predicted_sign = predict(
         spring_state = spring_state,
         graph = graph,
