@@ -372,11 +372,11 @@ def main(argv) -> None:
     ]
     answers = inquirer.prompt(questions)
 
-    iterations = np.linspace(50, 200, 4)
-    dampings = np.linspace(0.1, 0.08, 4)
+    iterations = np.linspace(50, 200, 3)
+    dampings = np.linspace(0.1, 0.08, 3)
 
     train_params = sm.TrainingParams(
-        num_epochs=500,
+        num_epochs=250,
         learning_rate=0.05,
         batch_size=number_of_subgraphs,
         init_pos_range=INIT_POS_RANGE,
