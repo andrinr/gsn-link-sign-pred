@@ -1,4 +1,4 @@
-from simulation import SpringState
+from training import SpringState
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
 import jax.numpy as jnp

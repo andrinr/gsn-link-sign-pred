@@ -21,6 +21,28 @@ class NeuralForceParams(NamedTuple):
     neutral : MLP
     enemy : MLP
 
+class SpringForceParams(NamedTuple):
+    friend_distance: float
+    friend_stiffness: float
+    neutral_distance: float
+    neutral_stiffness: float
+    enemy_distance: float
+    enemy_stiffness: float
+    degree_multiplier: float
+
+class SpringState(NamedTuple):
+    position : jnp.ndarray
+    velocity : jnp.ndarray
+
+class SimulationState(NamedTuple):
+    iteration : int
+    time : float
+
+class SimulationParams(NamedTuple):
+    iterations : int
+    dt : float
+    damping : float
+    
 def init_neural_force_params() -> NeuralForceParams:
     friend=MLP(
         w0=random.normal(random.PRNGKey(0), (7, 4)),
@@ -42,15 +64,6 @@ def init_neural_force_params() -> NeuralForceParams:
     
     return NeuralForceParams(friend, neutral, enemy)
 
-class SpringForceParams(NamedTuple):
-    friend_distance: float
-    friend_stiffness: float
-    neutral_distance: float
-    neutral_stiffness: float
-    enemy_distance: float
-    enemy_stiffness: float
-    degree_multiplier: float
-
 def init_spring_force_params() -> SpringForceParams:
     return SpringForceParams(
         friend_distance=1.0,
@@ -61,24 +74,11 @@ def init_spring_force_params() -> SpringForceParams:
         enemy_stiffness=2.0,
         degree_multiplier=3.0)
 
-class SpringState(NamedTuple):
-    position: jnp.ndarray
-    velocity: jnp.ndarray
-    
 def init_spring_state(
     rng : jax.random.PRNGKey, 
     n : int, m : int,
     range : float,
     embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
-    velocity = jnp.zeros((n, embedding_dim))
+    velocity = jnp.zeros_like(position)
     return SpringState(position, velocity)
-
-class SimulationState(NamedTuple):
-    iteration : int
-    time : float
-
-class SimulationParams(NamedTuple):
-    iterations : int
-    dt : float
-    damping : float

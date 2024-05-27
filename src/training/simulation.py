@@ -4,19 +4,19 @@ from functools import partial
 from typing import Tuple
 
 import graph as g
-import simulation as sm
+import training as train
 
 @partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate(
-    simulation_params : sm.SimulationParams,
-    spring_state : sm.SpringState,
+    simulation_params : train.SimulationParams,
+    spring_state : train.SpringState,
     use_neural_force : bool,
-    force_params : sm.NeuralForceParams,
+    force_params : train.NeuralForceParams,
     graph : g.SignedGraph
-) -> sm.SpringState:
+) -> train.SpringState:
     
     # capture the spring_params and signs in the closure
-    simulation_update = lambda i, state: sm.update_spring_state(
+    simulation_update = lambda i, state: train.update_spring_state(
         simulation_params = simulation_params, 
         use_neural_force = use_neural_force,
         force_params = force_params,
@@ -33,12 +33,12 @@ def simulate(
 
 @partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate_and_loss(
-    simulation_params : sm.SimulationParams,
-    spring_state : sm.SpringState,
+    simulation_params : train.SimulationParams,
+    spring_state : train.SpringState,
     use_neural_force : bool,
-    force_params : sm.NeuralForceParams,
+    force_params : train.NeuralForceParams,
     graph : g.SignedGraph,
-) -> Tuple[float, Tuple[sm.SpringState, jnp.ndarray]]:
+) -> Tuple[float, Tuple[train.SpringState, jnp.ndarray]]:
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -68,7 +68,7 @@ def simulate_and_loss(
     return loss_value, (spring_state, predicted_sign)
 
 def predict(
-    spring_state : sm.SpringState,
+    spring_state : train.SpringState,
     graph : g.SignedGraph,
     x_0 : float
 ) -> jnp.ndarray:
@@ -84,7 +84,7 @@ def predict(
     return predicted_sign
 
 def loss(
-    spring_state : sm.SpringState,
+    spring_state : train.SpringState,
     graph : g.SignedGraph,
     x_0 : float
 ) -> float:
@@ -103,9 +103,6 @@ def loss(
     weight_positives = 1 / fraction_positives
     weight_negatives = 1 / fraction_negatives
 
-    # score = (sign * predicted_sign) *  1 / fraction_positives + ((1 - sign) * (1 - predicted_sign)) * 1 / fraction_negatives
-    
-    # false negatives
     jnp.where(sign_binary == 1, incorrect_predictions * weight_positives, incorrect_predictions * weight_negatives)
     
     incorrect_predictions_weighted = jnp.where(

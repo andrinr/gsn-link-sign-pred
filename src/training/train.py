@@ -6,7 +6,7 @@ import optax
 from jax import custom_vjp
 
 import graph as g
-import simulation as sm
+import training as train
 
 class TrainingParams(NamedTuple):
     num_epochs : int
@@ -29,14 +29,14 @@ def clip_gradient_bwd(res, g):
 
 clip_gradient.defvjp(clip_gradient_fwd, clip_gradient_bwd)
 
-def train(
+def training_loop(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
     use_neural_force : bool,
-    force_params : sm.NeuralForceParams | sm.SpringForceParams,
+    force_params : train.NeuralForceParams | train.SpringForceParams,
     training_params : TrainingParams,
-    simulation_params : sm.SimulationParams,
-) -> tuple[sm.NeuralForceParams, list[float], list[sm.Metrics]]:
+    simulation_params : train.SimulationParams,
+) -> tuple[train.NeuralForceParams, list[float], list[train.Metrics]]:
 
     optimizer = optax.adam(training_params.learning_rate)
     force_optimizer_multi_step = optax.MultiSteps(
@@ -44,7 +44,7 @@ def train(
     force_optimizier_state = force_optimizer_multi_step.init(
         force_params)
     
-    value_and_grad_fn = jax.value_and_grad(sm.simulate_and_loss, argnums=3, has_aux=True)
+    value_and_grad_fn = jax.value_and_grad(train.simulate_and_loss, argnums=3, has_aux=True)
     
     epochs = tqdm(range(training_params.num_epochs))
 
@@ -60,7 +60,7 @@ def train(
         for batch_index, batch_graph in enumerate(batches):
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
-            spring_state = sm.init_spring_state(
+            spring_state = train.init_spring_state(
                 rng=random_keys[0],
                 range=training_params.init_pos_range,
                 n=batch_graph.num_nodes,
@@ -86,7 +86,7 @@ def train(
             epoch_loss += loss_value
 
             if epoch_index % 10 == 0:
-                metrics, _= sm.evaluate(
+                metrics, _= train.evaluate(
                     spring_state,
                     batch_graph.edge_index,
                     batch_graph.sign,

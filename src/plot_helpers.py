@@ -1,8 +1,7 @@
 import torch_geometric.transforms as T
 import matplotlib.pyplot as plt
-from simulation import SpringState, predict, NeuralForceParams
 from graph import SignedGraph
-import simulation as sim
+import training as train
 from graph import to_SignedGraph
 import jax.numpy as jnp
 import jax.random as random
@@ -12,7 +11,7 @@ from sklearn.decomposition import PCA
 from torch_geometric.data import Data
 from tqdm import tqdm
     
-def plot_embedding(spring_state : SpringState, graph : SignedGraph, axis : plt.Axes):
+def plot_embedding(spring_state : train.SpringState, graph : SignedGraph, axis : plt.Axes):
         # plot the embeddings
     embeddings = spring_state.position
     dim = embeddings.shape[1]
@@ -58,7 +57,7 @@ def plot_embedding(spring_state : SpringState, graph : SignedGraph, axis : plt.A
 def params_plot(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : NeuralForceParams, 
+        spring_params : train.NeuralForceParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -89,7 +88,7 @@ def params_plot(
             print(f"shot: {shot}")
 
             # initialize spring state
-            spring_state = sim.init_spring_state(
+            spring_state = train.init_spring_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -100,7 +99,7 @@ def params_plot(
             # training_signs = graphsigns.copy()
             # training_signs = training_signs.at[train_mask].set(0)
 
-            simulation_params_test = sim.SimulationParams(
+            simulation_params_test = train.SimulationParams(
                 iterations=iterations,
                 dt=dt,
                 damping=damping,
@@ -110,7 +109,7 @@ def params_plot(
             training_signs = jnp.where(graph.train_mask, training_signs, 0)
             training_graph = graph._replace(sign=training_signs)
 
-            spring_state = sim.simulate(
+            spring_state = train.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
                 force_params=spring_params,
@@ -118,7 +117,7 @@ def params_plot(
                 nn_force_params={},
                 graph=training_graph)
 
-            metrics = sim.evaluate(
+            metrics = train.evaluate(
                 spring_state,
                 graph.edge_index,
                 graph.sign,
@@ -165,7 +164,7 @@ def params_plot(
             print(f"shot: {shot}")
 
             # initialize spring state
-            spring_state = sim.init_spring_state(
+            spring_state = train.init_spring_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -176,7 +175,7 @@ def params_plot(
             # training_signs = graphsigns.copy()
             # training_signs = training_signs.at[train_mask].set(0)
 
-            simulation_params_test = sim.SimulationParams(
+            simulation_params_test = train.SimulationParams(
                 iterations=iteration,
                 dt=dt,
                 damping=damping,
@@ -186,7 +185,7 @@ def params_plot(
             training_signs = jnp.where(graph.train_mask, training_signs, 0)
             training_graph = graph._replace(sign=training_signs)
 
-            spring_state = sim.simulate(
+            spring_state = train.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
                 force_params=spring_params,
@@ -194,7 +193,7 @@ def params_plot(
                 nn_force_params={},
                 graph=training_graph)
 
-            metrics = sim.evaluate(
+            metrics = train.evaluate(
                 spring_state,
                 graph.edge_index,
                 graph.sign,
@@ -248,7 +247,7 @@ def params_plot(
             print(f"shot: {shot}")
 
             # initialize spring state
-            spring_state = sim.init_spring_state(
+            spring_state = train.init_spring_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -259,7 +258,7 @@ def params_plot(
             # training_signs = graphsigns.copy()
             # training_signs = training_signs.at[train_mask].set(0)
 
-            simulation_params_test = sim.SimulationParams(
+            simulation_params_test = train.SimulationParams(
                 iterations=iterations,
                 dt=dt,
                 damping=damping,
@@ -269,7 +268,7 @@ def params_plot(
             training_signs = jnp.where(graph.train_mask, training_signs, 0)
             training_graph = graph._replace(sign=training_signs)
 
-            spring_state = sim.simulate(
+            spring_state = train.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
                 force_params=spring_params,
@@ -277,7 +276,7 @@ def params_plot(
                 nn_force_params={},
                 graph=training_graph)
 
-            metrics = sim.evaluate(
+            metrics = train.evaluate(
                 spring_state,
                 graph.edge_index,
                 graph.sign,
@@ -313,7 +312,7 @@ def params_plot(
 def selected_wrong_classification(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : NeuralForceParams, 
+        spring_params : train.NeuralForceParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -333,7 +332,7 @@ def selected_wrong_classification(
         print(f"shot: {shot}")
 
         # initialize spring state
-        spring_state = sim.init_spring_state(
+        spring_state = train.init_spring_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -344,7 +343,7 @@ def selected_wrong_classification(
         # training_signs = graphsigns.copy()
         # training_signs = training_signs.at[train_mask].set(0)
 
-        simulation_params_test = sim.SimulationParams(
+        simulation_params_test = train.SimulationParams(
             iterations=iterations,
             dt=dt,
             damping=damping,
@@ -354,7 +353,7 @@ def selected_wrong_classification(
         training_signs = jnp.where(graph.train_mask, training_signs, 0)
         training_graph = graph._replace(sign=training_signs)
 
-        spring_state = sim.simulate(
+        spring_state = train.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
             force_params=spring_params,
@@ -362,7 +361,7 @@ def selected_wrong_classification(
             nn_force_params={},
             graph=training_graph)
 
-        metrics, y_pred = sim.evaluate(
+        metrics, y_pred = train.evaluate(
             spring_state,
             graph.edge_index,
             graph.sign,
