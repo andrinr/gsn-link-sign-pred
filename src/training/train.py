@@ -29,6 +29,34 @@ def clip_gradient_bwd(res, g):
 
 clip_gradient.defvjp(clip_gradient_fwd, clip_gradient_bwd)
 
+def train_step(
+      
+):
+   rnd_keys, 
+   spring_state = train.init_spring_state(
+        rng=random_keys[0],
+        range=training_params.init_pos_range,
+        n=batch_graph.num_nodes,
+        m=batch_graph.num_edges,
+        embedding_dim=training_params.embedding_dim)
+
+    # run simulation and compute loss, auxillaries and gradient
+    (loss_value, (spring_state, signs_pred)), grad = value_and_grad_fn(
+        simulation_params, #0
+        spring_state, #1
+        use_neural_force, #2
+        force_params, #3
+        batch_graph)
+
+    grad = clip_gradient(-1, 1, grad)
+
+    nn_force_update, force_optimizier_state = force_optimizer_multi_step.update(
+        grad, force_optimizier_state, force_params)
+
+    force_params = optax.apply_updates(force_params, nn_force_update)
+
+    epoch_loss += loss_value
+   
 def training_loop(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
@@ -76,7 +104,6 @@ def training_loop(
                 batch_graph)
             
             grad = clip_gradient(-1, 1, grad)
-            
 
             nn_force_update, force_optimizier_state = force_optimizer_multi_step.update(
                 grad, force_optimizier_state, force_params)

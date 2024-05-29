@@ -40,8 +40,7 @@ def main(argv) -> None:
     TEST_SHOTS = 5
 
     # TRAINING PARAMETERS
-    MULTISTPES_GRADIENT = 1
-    GRAPH_PARTITIONING = False
+    multisteps_gradient = 1
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -64,14 +63,14 @@ def main(argv) -> None:
     
     # read answers from inquirer
     train_parameters = False
-    use_neural_froce = False
+    use_neural_force = False
     convert_to_undirected = False
     graph_partitioning = False
     number_of_subgraphs = 10
     if 'Train Parameters' in answers['multiples']:
         train_parameters = True
     if 'Use Neural Force (SE-NN)' in answers['multiples']:
-        use_neural_froce = True
+        use_neural_force = True
     if 'Convert to undirected' in answers['multiples']:
         convert_to_undirected = True
     if 'Partition Graph' in answers['multiples']:
@@ -84,6 +83,7 @@ def main(argv) -> None:
         ]
         answers = inquirer.prompt(questions)
         number_of_subgraphs = int(answers['n_subgraphs'])
+        multisteps_gradient = number_of_subgraphs
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index) and convert_to_undirected:
@@ -100,13 +100,13 @@ def main(argv) -> None:
     # print(dataset.edge_attr)
     # print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
         
-    force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_params_{EMBEDDING_DIM}.yaml"
+    force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_force else 'spring'}_params_{EMBEDDING_DIM}.yaml"
     print(force_params_path)
     load_checkpoint = False
     if os.path.exists(force_params_path):
         questions = [
             inquirer.List('load',
-                message=f"We found a checkpoint for {'neural' if use_neural_froce else 'spring'} force parameters. Do you want to load it?",
+                message=f"We found a checkpoint for {'neural' if use_neural_force else 'spring'} force parameters. Do you want to load it?",
                 choices=['Yes', 'No'],
             )]
         
@@ -115,7 +115,7 @@ def main(argv) -> None:
             load_checkpoint = True
 
     batches = []
-    if GRAPH_PARTITIONING and train_parameters:
+    if graph_partitioning and train_parameters:
         cluster_data = ClusterData(
             dataset, 
             num_parts=number_of_subgraphs,
@@ -133,12 +133,12 @@ def main(argv) -> None:
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')
         force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
-    elif use_neural_froce:
+    elif use_neural_force:
         force_params = train.init_neural_force_params()
     else:
         force_params = train.init_spring_force_params()
             
-    schedule_params_path = f"{SCHEDULE_PATH}{'neural' if use_neural_froce else 'spring'}_schedule.yaml"
+    schedule_params_path = f"{SCHEDULE_PATH}{'neural' if use_neural_force else 'spring'}_schedule.yaml"
     if os.path.exists(schedule_params_path):
         stream = open(schedule_params_path, 'r')
         schedule_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
@@ -176,7 +176,7 @@ def main(argv) -> None:
             force_params, loss_hist_, metrics_hist_, force_params_hist_ = train.training_loop(
                 random_key=key_training,
                 batches=batches,
-                use_neural_force=use_neural_froce,
+                use_neural_force=use_neural_force,
                 force_params=force_params,
                 training_params= train.TrainingParams(
                     num_epochs=number_of_simulations,
@@ -184,7 +184,7 @@ def main(argv) -> None:
                     batch_size=number_of_subgraphs,
                     init_pos_range=INIT_POS_RANGE,
                     embedding_dim=EMBEDDING_DIM,
-                    multi_step=MULTISTPES_GRADIENT),
+                    multi_step=multisteps_gradient),
                 simulation_params=simulation_params_train)
             
             loss_hist = loss_hist + loss_hist_
@@ -205,7 +205,7 @@ def main(argv) -> None:
         df['dt'] = dt_hist
         df['damping'] = damping_hist
         df['iterations'] = iterations_hist
-        df.to_csv(f"{OUTPUT_PATH}{'neural' if use_neural_froce else 'spring'}_training_results_{EMBEDDING_DIM}.csv")
+        df.to_csv(f"{OUTPUT_PATH}{'neural' if use_neural_force else 'spring'}_training_results_{EMBEDDING_DIM}.csv")
 
     shot_metrics = []
     times = []
@@ -242,7 +242,7 @@ def main(argv) -> None:
         spring_state = train.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
-            use_neural_force=use_neural_froce,
+            use_neural_force=use_neural_force,
             force_params=force_params,
             graph=training_graph)
         
@@ -321,7 +321,7 @@ def main(argv) -> None:
             spring_state = train.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                use_neural_force=use_neural_froce,
+                use_neural_force=use_neural_force,
                 force_params=force_params,
                 graph=training_graph)
             
@@ -381,7 +381,7 @@ def main(argv) -> None:
         batch_size=number_of_subgraphs,
         init_pos_range=INIT_POS_RANGE,
         embedding_dim=EMBEDDING_DIM,
-        multi_step=MULTISTPES_GRADIENT)
+        multi_step=multisteps_gradient)
 
     colors = ['#d73027', '#fc8d59', '#4575b4', '#984ea3', '#ff7f00']
     if answers['save'] == 'Yes':

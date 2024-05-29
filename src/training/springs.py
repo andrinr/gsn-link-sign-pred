@@ -21,13 +21,14 @@ def update_spring_state(
 ) -> train.SpringState:
 
     # Neural uses 1st order neural ODE
+    # if True: #use_neural_force:
     if use_neural_force:
-        node_velocity = neural_node_velocity(force_params, spring_state, graph)
-    # Spring uses 2nd order ODE
+        node_acceleration = neural_node_acceleration(force_params, spring_state, graph)
     else:
-        node_accelerations = spring_node_acceleration(force_params, spring_state, graph)
-        node_velocity = spring_state.velocity * (1 - simulation_params.damping)
-        node_velocity = node_velocity + simulation_params.dt * node_accelerations
+        node_acceleration = spring_node_acceleration(force_params, spring_state, graph)
+
+    node_velocity = spring_state.velocity * (1 - simulation_params.damping)
+    node_velocity = node_velocity + simulation_params.dt * node_acceleration
 
     position = spring_state.position + simulation_params.dt * node_velocity
 
@@ -63,7 +64,7 @@ def spring_node_acceleration(
 
     return per_node_acceleration
 
-def neural_node_velocity(
+def neural_node_acceleration(
     params : train.NeuralForceParams,
     state : train.SpringState,
     graph : g.SignedGraph
@@ -89,14 +90,11 @@ def neural_node_velocity(
         degree_i_pos, degree_j_pos,
         distance], axis=1)
 
-    friend = jnp.dot(input, params.friend.w0) + params.friend.b0
-    friend = jnp.dot(friend, params.friend.w1) + params.friend.b1
+    friend = train.evaluate_mlp(params.friend, input)
 
-    neutral = jnp.dot(input, params.neutral.w0) + params.neutral.b0
-    neutral = jnp.dot(neutral, params.neutral.w1) + params.neutral.b1
-  
-    enemy = jnp.dot(input, params.enemy.w0) + params.enemy.b0
-    enemy = jnp.dot(enemy, params.enemy.w1) + params.enemy.b1
+    neutral = train.evaluate_mlp(params.neutral, input)
+
+    enemy = train.evaluate_mlp(params.enemy, input)
 
     sign = jnp.expand_dims(graph.sign, axis=1)
 

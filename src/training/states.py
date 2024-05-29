@@ -21,6 +21,35 @@ class NeuralForceParams(NamedTuple):
     neutral : MLP
     enemy : MLP
 
+def init_neural_force_params() -> NeuralForceParams:
+    init_orth = jax.nn.initializers.orthogonal()
+    init_norm = jax.nn.initializers.normal()
+    c = 0.001
+    n_in = 7
+    n_hidden = 7
+
+    mlps = []
+
+    for i in range(3):
+        mlps.append(MLP(
+            w0=init_orth(random.PRNGKey(i), (n_in, n_hidden)),
+            b0=jnp.zeros(n_hidden),
+            w1=init_norm(random.PRNGKey(i+1), (n_hidden + n_in, 1)) * c,
+            b1=jnp.zeros(1)))
+    
+    return NeuralForceParams(
+        friend=mlps[0],
+        neutral=mlps[1],
+        enemy=mlps[2])
+
+def evaluate_mlp(mlp : MLP, x : jnp.ndarray) -> jnp.ndarray:
+    skip_state = x[:, :]
+    x = jnp.dot(x, mlp.w0) + mlp.b0
+    x = jax.nn.tanh(x)
+    x = jnp.concatenate([x, skip_state], axis=1)
+    x = jnp.dot(x, mlp.w1) + mlp.b1
+    return x
+
 class SpringForceParams(NamedTuple):
     friend_distance: float
     friend_stiffness: float
@@ -42,27 +71,6 @@ class SimulationParams(NamedTuple):
     iterations : int
     dt : float
     damping : float
-    
-def init_neural_force_params() -> NeuralForceParams:
-    friend=MLP(
-        w0=random.normal(random.PRNGKey(0), (7, 4)),
-        b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(1), (4,1)),
-        b1=jnp.zeros(1))
-    
-    neutral=MLP(
-        w0=random.normal(random.PRNGKey(2), (7, 4)),
-        b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(3), (4,1)),
-        b1=jnp.zeros(1))
-    
-    enemy=MLP(
-        w0=random.normal(random.PRNGKey(4), (7, 4)),
-        b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(5), (4,1)),
-        b1=jnp.zeros(1))
-    
-    return NeuralForceParams(friend, neutral, enemy)
 
 def init_spring_force_params() -> SpringForceParams:
     return SpringForceParams(
