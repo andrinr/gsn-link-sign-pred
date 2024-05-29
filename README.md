@@ -11,8 +11,7 @@ Installation instructions for Ubuntu (conda venv recommended):
 1. Install jax: 
 ``pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html``
 2. Install pytorch (CPU version !) ``pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu``
-3. Install pyg-lib ``` pyg-lib -f https://data.pyg.org/whl/torch-${TORCH}+cpu.html``` where ``${TORCH}`` is the version of pytorch you have installed. Again we need to install it for the CPU version.
-4. Install other dependencies: ``pip install torch_geometric matplotlib scikit-learn pyyaml tqdm optax inquirer pandas``
+3. Install other dependencies: ``pip install torch_geometric matplotlib scikit-learn pyyaml tqdm optax inquirer pandas``
 
 ### Running the code
 

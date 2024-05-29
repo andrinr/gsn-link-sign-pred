@@ -22,33 +22,25 @@ class NeuralForceParams(NamedTuple):
     enemy : MLP
 
 def init_neural_force_params() -> NeuralForceParams:
-    init_orth = jax.nn.initializers.orthogonal()
-    init_norm = jax.nn.initializers.normal()
-    c = 0.001
-    n_in = 7
-    n_hidden = 7
-
-    mlps = []
-
-    for i in range(3):
-        mlps.append(MLP(
-            w0=init_orth(random.PRNGKey(i), (n_in, n_hidden)),
-            b0=jnp.zeros(n_hidden),
-            w1=init_norm(random.PRNGKey(i+1), (n_hidden + n_in, 1)) * c,
-            b1=jnp.zeros(1)))
+    friend=MLP(
+        w0=random.normal(random.PRNGKey(0), (7, 4)),
+        b0=jnp.zeros(4),
+        w1=random.normal(random.PRNGKey(1), (4,1)),
+        b1=jnp.zeros(1))
     
-    return NeuralForceParams(
-        friend=mlps[0],
-        neutral=mlps[1],
-        enemy=mlps[2])
-
-def evaluate_mlp(mlp : MLP, x : jnp.ndarray) -> jnp.ndarray:
-    skip_state = x[:, :]
-    x = jnp.dot(x, mlp.w0) + mlp.b0
-    x = jax.nn.tanh(x)
-    x = jnp.concatenate([x, skip_state], axis=1)
-    x = jnp.dot(x, mlp.w1) + mlp.b1
-    return x
+    neutral=MLP(
+        w0=random.normal(random.PRNGKey(2), (7, 4)),
+        b0=jnp.zeros(4),
+        w1=random.normal(random.PRNGKey(3), (4,1)),
+        b1=jnp.zeros(1))
+    
+    enemy=MLP(
+        w0=random.normal(random.PRNGKey(4), (7, 4)),
+        b0=jnp.zeros(4),
+        w1=random.normal(random.PRNGKey(5), (4,1)),
+        b1=jnp.zeros(1))
+    
+    return NeuralForceParams(friend, neutral, enemy)
 
 class SpringForceParams(NamedTuple):
     friend_distance: float
@@ -58,19 +50,6 @@ class SpringForceParams(NamedTuple):
     enemy_distance: float
     enemy_stiffness: float
     degree_multiplier: float
-
-class SpringState(NamedTuple):
-    position : jnp.ndarray
-    velocity : jnp.ndarray
-
-class SimulationState(NamedTuple):
-    iteration : int
-    time : float
-
-class SimulationParams(NamedTuple):
-    iterations : int
-    dt : float
-    damping : float
 
 def init_spring_force_params() -> SpringForceParams:
     return SpringForceParams(
@@ -82,11 +61,24 @@ def init_spring_force_params() -> SpringForceParams:
         enemy_stiffness=2.0,
         degree_multiplier=3.0)
 
+class SpringState(NamedTuple):
+    position: jnp.ndarray
+    velocity: jnp.ndarray
+    
 def init_spring_state(
     rng : jax.random.PRNGKey, 
     n : int, m : int,
     range : float,
     embedding_dim : int) -> SpringState:
     position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
-    velocity = jnp.zeros_like(position)
+    velocity = jnp.zeros((n, embedding_dim))
     return SpringState(position, velocity)
+
+class SimulationState(NamedTuple):
+    iteration : int
+    time : float
+
+class SimulationParams(NamedTuple):
+    iterations : int
+    dt : float
+    damping : float

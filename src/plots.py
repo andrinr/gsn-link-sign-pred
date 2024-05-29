@@ -16,7 +16,7 @@ from timeit import default_timer as timer
 import pandas as pd
 
 # Local dependencies
-import training as train
+import simulation as sm
 import graph as g
 from io_helpers import get_dataset
 import stats as stats
@@ -124,25 +124,25 @@ def main(argv) -> None:
         stream = open(force_params_path, 'r')
         force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
     elif use_neural_froce:
-        force_params = train.NeuralForceParams(
-            friend=train.MLP(
+        force_params = sm.NeuralForceParams(
+            friend=sm.MLP(
                 w0=jax.random.normal(random.PRNGKey(0), (7, 4)),
                 b0=jnp.zeros(4),
                 w1=jax.random.normal(random.PRNGKey(1), (4,1)),
                 b1=jnp.zeros(1)),
-            neutral=train.MLP(
+            neutral=sm.MLP(
                 w0=jax.random.normal(random.PRNGKey(2), (7, 4)),
                 b0=jnp.zeros(4),
                 w1=jax.random.normal(random.PRNGKey(3), (4,1)),
                 b1=jnp.zeros(1)),
-            enemy=train.MLP(
+            enemy=sm.MLP(
                 w0=jax.random.normal(random.PRNGKey(4), (7, 4)),
                 b0=jnp.zeros(4),
                 w1=jax.random.normal(random.PRNGKey(5), (4,1)),
                 b1=jnp.zeros(1)),
         )
     else:
-        force_params = train.SpringForceParams(
+        force_params = sm.SpringForceParams(
             friend_distance=1.0,
             friend_stiffness=1.0,
             neutral_distance=1.0,
@@ -182,18 +182,18 @@ def main(argv) -> None:
             dt = settings[2]
             damping = settings[3]
 
-            simulation_params_train = train.SimulationParams(iterations=iterations, dt=dt, damping=damping)
+            simulation_params_train = sm.SimulationParams(iterations=iterations, dt=dt, damping=damping)
 
             print(f"Training run {index + 1} of {len(schedule_params['number_of_simulations'])}")
             print(f"Running {number_of_simulations} simulations with {iterations} iterations each")
             print(f"Simulation parameters are dt: {dt}, damping: {damping}")
 
-            force_params, loss_hist_, metrics_hist_, force_params_hist_ = train.train(
+            force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
                 random_key=key_training,
                 batches=batches,
                 use_neural_force=use_neural_froce,
                 force_params=force_params,
-                training_params= train.TrainingParams(
+                training_params= sm.TrainingParams(
                     num_epochs=number_of_simulations,
                     learning_rate=schedule_params['learning_rate'],
                     batch_size=number_of_subgraphs,
@@ -241,7 +241,7 @@ def main(argv) -> None:
         print(f"Running shot {shot + 1} of {TEST_SHOTS}")
    
         # initialize spring state
-        spring_state = train.init_spring_state(
+        spring_state = sm.init_spring_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -249,12 +249,12 @@ def main(argv) -> None:
             embedding_dim=EMBEDDING_DIM
         )
 
-        simulation_params_test = train.SimulationParams(
+        simulation_params_test = sm.SimulationParams(
             iterations=schedule_params['test_iterations'],
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
         
-        spring_state = train.simulate(
+        spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
             use_neural_force=use_neural_froce,
@@ -265,14 +265,14 @@ def main(argv) -> None:
         print(f"Shot {shot + 1} took {end_time - start_time} seconds")
         times.append(end_time - start_time)
 
-        metrics, pred = train.evaluate(
+        metrics, pred = sm.evaluate(
             spring_state,
             graph.edge_index,
             graph.sign,
             graph.train_mask,
             graph.test_mask)
         
-        pred_mu = train.predict(spring_state, graph, 0)
+        pred_mu = sm.predict(spring_state, graph, 0)
         pred_mu = pred_mu.at[graph.test_mask].get()
         pred_mu = jnp.where(pred_mu > 0.5, 1, -1)
 
@@ -313,7 +313,7 @@ def main(argv) -> None:
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
         # initialize spring state
-        spring_state = train.init_spring_state(
+        spring_state = sm.init_spring_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -322,7 +322,7 @@ def main(argv) -> None:
         )
 
         iter_stride = 5
-        simulation_params_test = train.SimulationParams(
+        simulation_params_test = sm.SimulationParams(
             iterations=iter_stride,
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
@@ -333,14 +333,14 @@ def main(argv) -> None:
         iterations_hist = []
         for i in range(1, 100):
             iterations_hist.append(i*iter_stride)
-            spring_state = train.simulate(
+            spring_state = sm.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
                 use_neural_force=use_neural_froce,
                 force_params=force_params,
                 graph=training_graph)
             
-            metrics, pred = train.evaluate(
+            metrics, pred = sm.evaluate(
                 spring_state,
                 graph.edge_index,
                 graph.sign,
@@ -388,27 +388,27 @@ def main(argv) -> None:
     answers = inquirer.prompt(questions)
 
     sim_params_list = [
-        train.SimulationParams(
+        sm.SimulationParams(
             iterations=50,
             dt=schedule_params['test_dt'],
             damping=0.01),
-        train.SimulationParams(
+        sm.SimulationParams(
             iterations=100,
             dt=schedule_params['test_dt'],
             damping=0.01),
-        train.SimulationParams(
+        sm.SimulationParams(
             iterations=150,
             dt=schedule_params['test_dt'],
             damping=0.01),
-        train.SimulationParams(
+        sm.SimulationParams(
             iterations=100,
             dt=schedule_params['test_dt'],
             damping=0.1),
-        train.SimulationParams(
+        sm.SimulationParams(
             iterations=100,
             dt=schedule_params['test_dt'],
             damping=0.01),
-        train.SimulationParams(
+        sm.SimulationParams(
             iterations=100,
             dt=schedule_params['test_dt'],
             damping=0.001),
@@ -428,7 +428,7 @@ def main(argv) -> None:
             training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
             # initialize spring state
-            spring_state = train.init_spring_state(
+            spring_state = sm.init_spring_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -441,7 +441,7 @@ def main(argv) -> None:
             mutations = []
             for i in range(-20, 20):
 
-                loss_value, (spring_state, predicted_sign) = train.simulate_and_loss(
+                loss_value, (spring_state, predicted_sign) = sm.simulate_and_loss(
                     simulation_params=sim_params,
                     spring_state=spring_state, 
                     use_neural_force=use_neural_froce,
@@ -452,17 +452,17 @@ def main(argv) -> None:
                 mutations.append(i * mut)
                 # make sure the above works for named tuples:
                 force_params_mut = force_params._replace(
-                    friend=train.MLP(
+                    friend=sm.MLP(
                         w0=force_params.friend.w0 + i * mut,
                         w1=force_params.friend.w1 + i * mut,
                         b0=force_params.friend.b0 + i * mut,
                         b1=force_params.friend.b1 + i * mut),
-                    neutral=train.MLP(
+                    neutral=sm.MLP(
                         w0=force_params.neutral.w0 + i * mut,
                         w1=force_params.neutral.w1 + i * mut,
                         b0=force_params.neutral.b0 + i * mut,
                         b1=force_params.neutral.b1 + i * mut),
-                    enemy=train.MLP(
+                    enemy=sm.MLP(
                         w0=force_params.enemy.w0 + i * mut,
                         w1=force_params.enemy.w1 + i * mut,
                         b0=force_params.enemy.b0 + i * mut,

@@ -16,7 +16,7 @@ from timeit import default_timer as timer
 import pandas as pd
 
 # Local dependencies
-import training as train
+import simulation as sm
 import graph as g
 from io_helpers import get_dataset
 import stats as stats
@@ -40,7 +40,8 @@ def main(argv) -> None:
     TEST_SHOTS = 5
 
     # TRAINING PARAMETERS
-    multisteps_gradient = 1
+    MULTISTPES_GRADIENT = 1
+    GRAPH_PARTITIONING = False
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -63,14 +64,14 @@ def main(argv) -> None:
     
     # read answers from inquirer
     train_parameters = False
-    use_neural_force = False
+    use_neural_froce = False
     convert_to_undirected = False
     graph_partitioning = False
     number_of_subgraphs = 10
     if 'Train Parameters' in answers['multiples']:
         train_parameters = True
     if 'Use Neural Force (SE-NN)' in answers['multiples']:
-        use_neural_force = True
+        use_neural_froce = True
     if 'Convert to undirected' in answers['multiples']:
         convert_to_undirected = True
     if 'Partition Graph' in answers['multiples']:
@@ -83,7 +84,6 @@ def main(argv) -> None:
         ]
         answers = inquirer.prompt(questions)
         number_of_subgraphs = int(answers['n_subgraphs'])
-        multisteps_gradient = number_of_subgraphs
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
     if not is_undirected(dataset.edge_index) and convert_to_undirected:
@@ -100,13 +100,13 @@ def main(argv) -> None:
     # print(dataset.edge_attr)
     # print(f"percentage of positive edges: {torch.sum(dataset.edge_attr == 1) / dataset.num_edges}")
         
-    force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_force else 'spring'}_params_{EMBEDDING_DIM}.yaml"
+    force_params_path = f"{CECKPOINT_PATH}{'neural' if use_neural_froce else 'spring'}_params_{EMBEDDING_DIM}.yaml"
     print(force_params_path)
     load_checkpoint = False
     if os.path.exists(force_params_path):
         questions = [
             inquirer.List('load',
-                message=f"We found a checkpoint for {'neural' if use_neural_force else 'spring'} force parameters. Do you want to load it?",
+                message=f"We found a checkpoint for {'neural' if use_neural_froce else 'spring'} force parameters. Do you want to load it?",
                 choices=['Yes', 'No'],
             )]
         
@@ -115,7 +115,7 @@ def main(argv) -> None:
             load_checkpoint = True
 
     batches = []
-    if graph_partitioning and train_parameters:
+    if GRAPH_PARTITIONING and train_parameters:
         cluster_data = ClusterData(
             dataset, 
             num_parts=number_of_subgraphs,
@@ -133,12 +133,12 @@ def main(argv) -> None:
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')
         force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
-    elif use_neural_force:
-        force_params = train.init_neural_force_params()
+    elif use_neural_froce:
+        force_params = sm.init_neural_force_params()
     else:
-        force_params = train.init_spring_force_params()
+        force_params = sm.init_spring_force_params()
             
-    schedule_params_path = f"{SCHEDULE_PATH}{'neural' if use_neural_force else 'spring'}_schedule.yaml"
+    schedule_params_path = f"{SCHEDULE_PATH}{'neural' if use_neural_froce else 'spring'}_schedule.yaml"
     if os.path.exists(schedule_params_path):
         stream = open(schedule_params_path, 'r')
         schedule_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
@@ -167,24 +167,24 @@ def main(argv) -> None:
             dt = settings[2]
             damping = settings[3]
 
-            simulation_params_train = train.SimulationParams(iterations=iterations, dt=dt, damping=damping)
+            simulation_params_train = sm.SimulationParams(iterations=iterations, dt=dt, damping=damping)
 
             print(f"Training run {index + 1} of {len(schedule_params['number_of_simulations'])}")
             print(f"Running {number_of_simulations} simulations with {iterations} iterations each")
             print(f"Simulation parameters are dt: {dt}, damping: {damping}")
 
-            force_params, loss_hist_, metrics_hist_, force_params_hist_ = train.training_loop(
+            force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
                 random_key=key_training,
                 batches=batches,
-                use_neural_force=use_neural_force,
+                use_neural_force=use_neural_froce,
                 force_params=force_params,
-                training_params= train.TrainingParams(
+                training_params= sm.TrainingParams(
                     num_epochs=number_of_simulations,
                     learning_rate=schedule_params['learning_rate'],
                     batch_size=number_of_subgraphs,
                     init_pos_range=INIT_POS_RANGE,
                     embedding_dim=EMBEDDING_DIM,
-                    multi_step=multisteps_gradient),
+                    multi_step=MULTISTPES_GRADIENT),
                 simulation_params=simulation_params_train)
             
             loss_hist = loss_hist + loss_hist_
@@ -205,7 +205,7 @@ def main(argv) -> None:
         df['dt'] = dt_hist
         df['damping'] = damping_hist
         df['iterations'] = iterations_hist
-        df.to_csv(f"{OUTPUT_PATH}{'neural' if use_neural_force else 'spring'}_training_results_{EMBEDDING_DIM}.csv")
+        df.to_csv(f"{OUTPUT_PATH}{'neural' if use_neural_froce else 'spring'}_training_results_{EMBEDDING_DIM}.csv")
 
     shot_metrics = []
     times = []
@@ -226,7 +226,7 @@ def main(argv) -> None:
         print(f"Running shot {shot + 1} of {TEST_SHOTS}")
    
         # initialize spring state
-        spring_state = train.init_spring_state(
+        spring_state = sm.init_spring_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -234,15 +234,15 @@ def main(argv) -> None:
             embedding_dim=EMBEDDING_DIM
         )
 
-        simulation_params_test = train.SimulationParams(
+        simulation_params_test = sm.SimulationParams(
             iterations=schedule_params['test_iterations'],
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
         
-        spring_state = train.simulate(
+        spring_state = sm.simulate(
             simulation_params=simulation_params_test,
             spring_state=spring_state, 
-            use_neural_force=use_neural_force,
+            use_neural_force=use_neural_froce,
             force_params=force_params,
             graph=training_graph)
         
@@ -250,14 +250,14 @@ def main(argv) -> None:
         print(f"Shot {shot + 1} took {end_time - start_time} seconds")
         times.append(end_time - start_time)
 
-        metrics, pred = train.evaluate(
+        metrics, pred = sm.evaluate(
             spring_state,
             graph.edge_index,
             graph.sign,
             graph.train_mask,
             graph.test_mask)
         
-        pred_mu = train.predict(spring_state, graph, 0)
+        pred_mu = sm.predict(spring_state, graph, 0)
         pred_mu = pred_mu.at[graph.test_mask].get()
         pred_mu = jnp.where(pred_mu > 0.5, 1, -1)
 
@@ -298,7 +298,7 @@ def main(argv) -> None:
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
         # initialize spring state
-        spring_state = train.init_spring_state(
+        spring_state = sm.init_spring_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -307,7 +307,7 @@ def main(argv) -> None:
         )
 
         iter_stride = 5
-        simulation_params_test = train.SimulationParams(
+        simulation_params_test = sm.SimulationParams(
             iterations=iter_stride,
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
@@ -318,14 +318,14 @@ def main(argv) -> None:
         iterations_hist = []
         for i in range(1, 100):
             iterations_hist.append(i*iter_stride)
-            spring_state = train.simulate(
+            spring_state = sm.simulate(
                 simulation_params=simulation_params_test,
                 spring_state=spring_state, 
-                use_neural_force=use_neural_force,
+                use_neural_force=use_neural_froce,
                 force_params=force_params,
                 graph=training_graph)
             
-            metrics, pred = train.evaluate(
+            metrics, pred = sm.evaluate(
                 spring_state,
                 graph.edge_index,
                 graph.sign,
@@ -375,13 +375,13 @@ def main(argv) -> None:
     iterations = np.linspace(50, 200, 3)
     dampings = np.linspace(0.1, 0.08, 3)
 
-    train_params = train.TrainingParams(
+    train_params = sm.TrainingParams(
         num_epochs=250,
         learning_rate=0.05,
         batch_size=number_of_subgraphs,
         init_pos_range=INIT_POS_RANGE,
         embedding_dim=EMBEDDING_DIM,
-        multi_step=multisteps_gradient)
+        multi_step=MULTISTPES_GRADIENT)
 
     colors = ['#d73027', '#fc8d59', '#4575b4', '#984ea3', '#ff7f00']
     if answers['save'] == 'Yes':
@@ -392,7 +392,7 @@ def main(argv) -> None:
         iters_grid = iters_grid.flatten()
         dampings_grid = dampings_grid.flatten()
         for index, (iterations, damping) in enumerate(zip(iters_grid, dampings_grid)):
-            sim_params = train.SimulationParams(
+            sim_params = sm.SimulationParams(
                 iterations=int(iterations),
                 dt=0.5/iterations,
                 damping=damping)
@@ -406,7 +406,7 @@ def main(argv) -> None:
             training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
             # initialize spring state
-            spring_state = train.init_spring_state(
+            spring_state = sm.init_spring_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -414,9 +414,9 @@ def main(argv) -> None:
                 embedding_dim=EMBEDDING_DIM
             )
             
-            force_params = train.init_neural_force_params()
+            force_params = sm.init_neural_force_params()
     
-            force_params, loss_hist_, metrics_hist_, force_params_hist_ = train.training_loop(
+            force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
                 random_key=key_training,
                 batches=batches,
                 use_neural_force=True,

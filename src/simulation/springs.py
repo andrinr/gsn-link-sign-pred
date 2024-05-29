@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import jax
 import graph as g
-import training as train
+import simulation as sm
 EPSILON = 1e-6
 
 # differntiable version of clip
@@ -13,31 +13,30 @@ def min(
     return jnp.where(x < min, min, x)
 
 def update_spring_state(
-    simulation_params : train.SimulationParams,
+    simulation_params : sm.SimulationParams,
     use_neural_force : bool,
-    force_params : train.NeuralForceParams | train.SpringForceParams,
-    spring_state : train.SpringState, 
+    force_params : sm.NeuralForceParams | sm.SpringForceParams,
+    spring_state : sm.SpringState, 
     graph : g.SignedGraph,
-) -> train.SpringState:
+) -> sm.SpringState:
 
-    # Neural uses 1st order neural ODE
     if use_neural_force:
-        node_velocity = neural_node_velocity(force_params, spring_state, graph)
-    # Spring uses 2nd order ODE
+        node_accelerations = neural_node_acceleration(force_params, spring_state, graph)
     else:
         node_accelerations = spring_node_acceleration(force_params, spring_state, graph)
-        node_velocity = spring_state.velocity * (1 - simulation_params.damping)
-        node_velocity = node_velocity + simulation_params.dt * node_accelerations
 
-    position = spring_state.position + simulation_params.dt * node_velocity
+    velocity = spring_state.velocity * (1 - simulation_params.damping)
+    velocity = velocity + simulation_params.dt * node_accelerations
 
-    spring_state = spring_state._replace(position=position)
+    position = spring_state.position + simulation_params.dt * velocity
+
+    spring_state = spring_state._replace(velocity=velocity, position=position)
     
     return spring_state
-
+  
 def spring_node_acceleration(
-    params : train.SpringForceParams,
-    state : train.SpringState,
+    params : sm.SpringForceParams,
+    state : sm.SpringState,
     graph : g.SignedGraph) -> jnp.ndarray:
 
     position_i = state.position[graph.edge_index[0]]
@@ -63,9 +62,9 @@ def spring_node_acceleration(
 
     return per_node_acceleration
 
-def neural_node_velocity(
-    params : train.NeuralForceParams,
-    state : train.SpringState,
+def neural_node_acceleration(
+    params : sm.NeuralForceParams,
+    state : sm.SpringState,
     graph : g.SignedGraph
 ) -> jnp.ndarray:
     
