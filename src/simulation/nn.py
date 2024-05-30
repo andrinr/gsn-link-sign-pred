@@ -36,7 +36,7 @@ def init_neural_params(key : jax.random.PRNGKey
     
     node_params = sm.MLP2(
         w0=init_orth(key, (n_in, n_hidden)),
-        w1=init_normal(key, (n_hidden, n_out)),
+        w1=init_orth(key, (n_hidden, n_out)),
         b0=init_zeros(key, (n_hidden,)),
         b1=init_zeros(key, (n_out,)))
     

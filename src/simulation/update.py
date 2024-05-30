@@ -41,7 +41,8 @@ def update(
 
     if use_neural_force:
         node_accelerations = \
-            neural_node_acceleration(force_params, node_state, graph)
+            neural_node_acceleration(force_params, node_state, graph) *\
+            neural_node_scaling(force_params, graph)
     else:
         node_accelerations =\
             spring_node_acceleration(force_params, node_state, graph) *\
