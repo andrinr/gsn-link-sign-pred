@@ -1,39 +1,18 @@
-from simulation import SpringState
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
 import jax.numpy as jnp
-from typing import NamedTuple
-
-class Metrics(NamedTuple):
-    auc : float
-    f1_binary : float
-    f1_micro : float
-    f1_macro : float
-    true_positives : float
-    false_positives : float
-    true_negatives : float
-    false_negatives : float
-
-    def __str__(self):
-        return "auc: {self.auc}," + \
-        "f1_binary: {self.f1_binary}, " + \
-        "f1_micro: {self.f1_micro}, " + \
-        "f1_macro: {self.f1_macro}, " + \
-        "true_positives: {self.true_positives}, " + \
-        "false_positives: {self.false_positives}, " + \
-        "true_negatives: {self.true_negatives}, " + \
-        "false_negatives: {self.false_negatives}"
+import simulation as sm
 
 def evaluate(
-    spring_state : SpringState, 
+    node_state : sm.NodeState, 
     edge_index : jnp.ndarray,
     signs : jnp.ndarray,
     training_mask : jnp.ndarray,
-    evaulation_mask : jnp.ndarray) -> Metrics:
+    evaulation_mask : jnp.ndarray) -> sm.Metrics:
 
     logreg = LogisticRegression()
         
-    embeddings = spring_state.position
+    embeddings = node_state.position
     position_i = embeddings.at[edge_index[0]].get()
     position_j = embeddings.at[edge_index[1]].get()
 
@@ -57,4 +36,4 @@ def evaluate(
         f1_macro = 0
         tn, fp, fn, tp = 0, 0, 0, 0
 
-    return Metrics(auc, f1_binary, f1_micro, f1_macro, tp, fp, tn, fn), y_pred
+    return sm.Metrics(auc, f1_binary, f1_micro, f1_macro, tp, fp, tn, fn), y_pred

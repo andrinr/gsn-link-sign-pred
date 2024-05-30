@@ -1,6 +1,6 @@
 import torch_geometric.transforms as T
 import matplotlib.pyplot as plt
-from simulation import SpringState, predict, NeuralForceParams
+from simulation import NodeState, predict, NeuralEdgeParams
 from graph import SignedGraph
 import simulation as sim
 from graph import to_SignedGraph
@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 from torch_geometric.data import Data
 from tqdm import tqdm
     
-def plot_embedding(spring_state : SpringState, graph : SignedGraph, axis : plt.Axes):
+def plot_embedding(spring_state : NodeState, graph : SignedGraph, axis : plt.Axes):
         # plot the embeddings
     embeddings = spring_state.position
     dim = embeddings.shape[1]
@@ -58,7 +58,7 @@ def plot_embedding(spring_state : SpringState, graph : SignedGraph, axis : plt.A
 def params_plot(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : NeuralForceParams, 
+        spring_params : NeuralEdgeParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -89,7 +89,7 @@ def params_plot(
             print(f"shot: {shot}")
 
             # initialize spring state
-            spring_state = sim.init_spring_state(
+            spring_state = sim.init_node_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -165,7 +165,7 @@ def params_plot(
             print(f"shot: {shot}")
 
             # initialize spring state
-            spring_state = sim.init_spring_state(
+            spring_state = sim.init_node_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -248,7 +248,7 @@ def params_plot(
             print(f"shot: {shot}")
 
             # initialize spring state
-            spring_state = sim.init_spring_state(
+            spring_state = sim.init_node_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -313,7 +313,7 @@ def params_plot(
 def selected_wrong_classification(
         dataset : Data, 
         key : jax.random.PRNGKey, 
-        spring_params : NeuralForceParams, 
+        spring_params : NeuralEdgeParams, 
         init_range : float,
         dim : int,
         iterations : int,
@@ -333,7 +333,7 @@ def selected_wrong_classification(
         print(f"shot: {shot}")
 
         # initialize spring state
-        spring_state = sim.init_spring_state(
+        spring_state = sim.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,

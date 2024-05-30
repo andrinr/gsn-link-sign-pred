@@ -124,7 +124,7 @@ def main(argv) -> None:
         stream = open(force_params_path, 'r')
         force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
     elif use_neural_froce:
-        force_params = sm.NeuralForceParams(
+        force_params = sm.NeuralEdgeParams(
             friend=sm.MLP(
                 w0=jax.random.normal(random.PRNGKey(0), (7, 4)),
                 b0=jnp.zeros(4),
@@ -241,7 +241,7 @@ def main(argv) -> None:
         print(f"Running shot {shot + 1} of {TEST_SHOTS}")
    
         # initialize spring state
-        spring_state = sm.init_spring_state(
+        spring_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -313,7 +313,7 @@ def main(argv) -> None:
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
         # initialize spring state
-        spring_state = sm.init_spring_state(
+        spring_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -428,7 +428,7 @@ def main(argv) -> None:
             training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
             # initialize spring state
-            spring_state = sm.init_spring_state(
+            spring_state = sm.init_node_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,

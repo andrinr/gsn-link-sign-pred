@@ -114,6 +114,9 @@ def main(argv) -> None:
         if answers['load'] == 'Yes':
             load_checkpoint = True
 
+    # Create initial values for neural network parameters
+    key_params, key_training, key_test = random.split(random.PRNGKey(2), 3)
+
     batches = []
     if GRAPH_PARTITIONING and train_parameters:
         cluster_data = ClusterData(
@@ -134,7 +137,7 @@ def main(argv) -> None:
         stream = open(force_params_path, 'r')
         force_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
     elif use_neural_froce:
-        force_params = sm.init_neural_force_params()
+        force_params = sm.init_neural_params(key_params)
     else:
         force_params = sm.init_spring_force_params()
             
@@ -145,8 +148,6 @@ def main(argv) -> None:
     elif train_parameters:
         raise ValueError("no training schedule params found")
 
-    # Create initial values for neural network parameters
-    key_force, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
     if train_parameters:
         loss_hist = []
@@ -226,7 +227,7 @@ def main(argv) -> None:
         print(f"Running shot {shot + 1} of {TEST_SHOTS}")
    
         # initialize spring state
-        spring_state = sm.init_spring_state(
+        node_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -239,9 +240,9 @@ def main(argv) -> None:
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
         
-        spring_state = sm.simulate(
+        node_state = sm.simulate(
             simulation_params=simulation_params_test,
-            spring_state=spring_state, 
+            node_state=node_state, 
             use_neural_force=use_neural_froce,
             force_params=force_params,
             graph=training_graph)
@@ -251,13 +252,13 @@ def main(argv) -> None:
         times.append(end_time - start_time)
 
         metrics, pred = sm.evaluate(
-            spring_state,
+            node_state,
             graph.edge_index,
             graph.sign,
             graph.train_mask,
             graph.test_mask)
         
-        pred_mu = sm.predict(spring_state, graph, 0)
+        pred_mu = sm.predict(node_state, graph, 0)
         pred_mu = pred_mu.at[graph.test_mask].get()
         pred_mu = jnp.where(pred_mu > 0.5, 1, -1)
 
@@ -298,7 +299,7 @@ def main(argv) -> None:
         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
         # initialize spring state
-        spring_state = sm.init_spring_state(
+        node_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
             m=graph.num_edges,
@@ -318,15 +319,15 @@ def main(argv) -> None:
         iterations_hist = []
         for i in range(1, 100):
             iterations_hist.append(i*iter_stride)
-            spring_state = sm.simulate(
+            node_state = sm.simulate(
                 simulation_params=simulation_params_test,
-                spring_state=spring_state, 
+                node_state=node_state, 
                 use_neural_force=use_neural_froce,
                 force_params=force_params,
                 graph=training_graph)
             
             metrics, pred = sm.evaluate(
-                spring_state,
+                node_state,
                 graph.edge_index,
                 graph.sign,
                 graph.train_mask,
@@ -334,11 +335,11 @@ def main(argv) -> None:
             
    
             metrics_hist.append(metrics)
-            energy = jnp.linalg.norm(spring_state.position, axis=1, keepdims=True) ** 2 * 0.5
+            energy = jnp.linalg.norm(node_state.position, axis=1, keepdims=True) ** 2 * 0.5
             energy_hist.append(jnp.mean(jnp.abs(energy)))
 
-            pos_i = spring_state.position[graph.edge_index[0]]
-            pos_j = spring_state.position[graph.edge_index[1]]
+            pos_i = node_state.position[graph.edge_index[0]]
+            pos_j = node_state.position[graph.edge_index[1]]
             edge_distance = jnp.linalg.norm(pos_i - pos_j, axis=1)
             mean_edge_distance.append(jnp.mean(edge_distance))
 
@@ -406,7 +407,7 @@ def main(argv) -> None:
             training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
             # initialize spring state
-            spring_state = sm.init_spring_state(
+            node_state = sm.init_node_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
                 m=graph.num_edges,
@@ -414,7 +415,7 @@ def main(argv) -> None:
                 embedding_dim=EMBEDDING_DIM
             )
             
-            force_params = sm.init_neural_force_params()
+            force_params = sm.init_neural_params()
     
             force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
                 random_key=key_training,
@@ -446,7 +447,7 @@ def main(argv) -> None:
         # create new axis
         fig, ax = plt.subplots(1, 1)
         plot_embedding(
-            spring_state,
+            node_state,
             graph,
             ax)
         plt.show()

@@ -1,46 +1,33 @@
 from typing import NamedTuple
 import jax.numpy as jnp
-import jax
-from jax import random
 
-class Spring(NamedTuple):
-    attraction_stiffness: float
-    repulsion_stiffness: float
-    rest_length: float
-    degree_i_multiplier: float
-    degree_j_multiplier: float  
+class SimulationState(NamedTuple):
+    iteration : int
+    time : float
 
-class MLP(NamedTuple):
+class SimulationParams(NamedTuple):
+    iterations : int
+    dt : float
+    damping : float
+
+class MLP2(NamedTuple):
     w0 : jnp.ndarray
     w1 : jnp.ndarray
     b0 : jnp.ndarray
     b1 : jnp.ndarray
 
-class NeuralForceParams(NamedTuple):
-    friend : MLP
-    neutral : MLP
-    enemy : MLP
+class NeuralEdgeParams(NamedTuple):
+    friend : MLP2
+    neutral : MLP2
+    enemy : MLP2
 
-def init_neural_force_params() -> NeuralForceParams:
-    friend=MLP(
-        w0=random.normal(random.PRNGKey(0), (7, 4)),
-        b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(1), (4,1)),
-        b1=jnp.zeros(1))
-    
-    neutral=MLP(
-        w0=random.normal(random.PRNGKey(2), (7, 4)),
-        b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(3), (4,1)),
-        b1=jnp.zeros(1))
-    
-    enemy=MLP(
-        w0=random.normal(random.PRNGKey(4), (7, 4)),
-        b0=jnp.zeros(4),
-        w1=random.normal(random.PRNGKey(5), (4,1)),
-        b1=jnp.zeros(1))
-    
-    return NeuralForceParams(friend, neutral, enemy)
+class NeuralParams(NamedTuple):
+    edge_params : NeuralEdgeParams
+    node_params : MLP2
+
+class NodeState(NamedTuple):
+    position: jnp.ndarray
+    velocity: jnp.ndarray
 
 class SpringForceParams(NamedTuple):
     friend_distance: float
@@ -51,34 +38,22 @@ class SpringForceParams(NamedTuple):
     enemy_stiffness: float
     degree_multiplier: float
 
-def init_spring_force_params() -> SpringForceParams:
-    return SpringForceParams(
-        friend_distance=1.0,
-        friend_stiffness=1.0,
-        neutral_distance=1.0,
-        neutral_stiffness=0.1,
-        enemy_distance=5.5,
-        enemy_stiffness=2.0,
-        degree_multiplier=3.0)
+class Metrics(NamedTuple):
+    auc : float
+    f1_binary : float
+    f1_micro : float
+    f1_macro : float
+    true_positives : float
+    false_positives : float
+    true_negatives : float
+    false_negatives : float
 
-class SpringState(NamedTuple):
-    position: jnp.ndarray
-    velocity: jnp.ndarray
-    
-def init_spring_state(
-    rng : jax.random.PRNGKey, 
-    n : int, m : int,
-    range : float,
-    embedding_dim : int) -> SpringState:
-    position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
-    velocity = jnp.zeros((n, embedding_dim))
-    return SpringState(position, velocity)
-
-class SimulationState(NamedTuple):
-    iteration : int
-    time : float
-
-class SimulationParams(NamedTuple):
-    iterations : int
-    dt : float
-    damping : float
+    def __str__(self):
+        return "auc: {self.auc}," + \
+        "f1_binary: {self.f1_binary}, " + \
+        "f1_micro: {self.f1_micro}, " + \
+        "f1_macro: {self.f1_macro}, " + \
+        "true_positives: {self.true_positives}, " + \
+        "false_positives: {self.false_positives}, " + \
+        "true_negatives: {self.true_negatives}, " + \
+        "false_negatives: {self.false_negatives}"

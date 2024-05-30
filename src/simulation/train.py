@@ -33,10 +33,10 @@ def train(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
     use_neural_force : bool,
-    force_params : sm.NeuralForceParams | sm.SpringForceParams,
+    force_params : sm.NeuralEdgeParams | sm.SpringForceParams,
     training_params : TrainingParams,
     simulation_params : sm.SimulationParams,
-) -> tuple[sm.NeuralForceParams, list[float], list[sm.Metrics]]:
+) -> tuple[sm.NeuralEdgeParams, list[float], list[sm.Metrics]]:
 
     optimizer = optax.adam(training_params.learning_rate)
     force_optimizer_multi_step = optax.MultiSteps(
@@ -60,7 +60,7 @@ def train(
         for batch_index, batch_graph in enumerate(batches):
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial conditions
-            spring_state = sm.init_spring_state(
+            spring_state = sm.init_node_state(
                 rng=random_keys[0],
                 range=training_params.init_pos_range,
                 n=batch_graph.num_nodes,

@@ -2,6 +2,7 @@ import jax.numpy as jnp
 import jax
 from functools import partial
 from typing import Tuple
+from typing import NamedTuple
 
 import graph as g
 import simulation as sm
@@ -9,36 +10,36 @@ import simulation as sm
 @partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate(
     simulation_params : sm.SimulationParams,
-    spring_state : sm.SpringState,
+    node_state : sm.NodeState,
     use_neural_force : bool,
-    force_params : sm.NeuralForceParams,
+    force_params : sm.NeuralEdgeParams,
     graph : g.SignedGraph
-) -> sm.SpringState:
+) -> sm.NodeState:
     
     # capture the spring_params and signs in the closure
-    simulation_update = lambda i, state: sm.update_spring_state(
+    simulation_update = lambda i, node_state: sm.update(
         simulation_params = simulation_params, 
         use_neural_force = use_neural_force,
         force_params = force_params,
-        spring_state = state,
+        node_state = node_state,
         graph = graph)
 
-    spring_state = jax.lax.fori_loop(
+    node_state = jax.lax.fori_loop(
         0, 
         simulation_params.iterations, 
         simulation_update,
-        spring_state)
+        node_state)
     
-    return spring_state
+    return node_state
 
 @partial(jax.jit, static_argnames=["simulation_params", "use_neural_force"])
 def simulate_and_loss(
     simulation_params : sm.SimulationParams,
-    spring_state : sm.SpringState,
+    node_state : sm.NodeState,
     use_neural_force : bool,
-    force_params : sm.NeuralForceParams,
+    force_params : sm.NeuralEdgeParams,
     graph : g.SignedGraph,
-) -> Tuple[float, Tuple[sm.SpringState, jnp.ndarray]]:
+) -> Tuple[float, Tuple[sm.NodeState, jnp.ndarray]]:
 
     training_signs = graph.sign.copy()
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -47,34 +48,34 @@ def simulate_and_loss(
     training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
     training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-    spring_state = simulate(
+    node_state = simulate(
         simulation_params = simulation_params,
-        spring_state = spring_state,
+        node_state = node_state,
         use_neural_force = use_neural_force,
         force_params = force_params,
         graph=training_graph)
 
     # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
     x_0s = jnp.linspace(-1.0, 1.0, 10)
-    losses = jnp.array([loss(spring_state, graph, x_0) for x_0 in x_0s])
+    losses = jnp.array([loss(node_state, graph, x_0) for x_0 in x_0s])
 
     loss_value = jnp.mean(losses)
     
     predicted_sign = predict(
-        spring_state = spring_state,
+        node_state = node_state,
         graph = graph,
         x_0 = 0)
 
-    return loss_value, (spring_state, predicted_sign)
+    return loss_value, (node_state, predicted_sign)
 
 def predict(
-    spring_state : sm.SpringState,
+    node_state : sm.NodeState,
     graph : g.SignedGraph,
     x_0 : float
 ) -> jnp.ndarray:
     
-    position_i = spring_state.position[graph.edge_index[0]]
-    position_j = spring_state.position[graph.edge_index[1]]
+    position_i = node_state.position[graph.edge_index[0]]
+    position_j = node_state.position[graph.edge_index[1]]
 
     distance = jnp.linalg.norm(position_j - position_i, axis=1) - 2.5
 
@@ -84,12 +85,12 @@ def predict(
     return predicted_sign
 
 def loss(
-    spring_state : sm.SpringState,
+    node_state : sm.NodeState,
     graph : g.SignedGraph,
     x_0 : float
 ) -> float:
     predicted_sign = predict(
-        spring_state = spring_state,
+        node_state = node_state,
         graph = graph,
         x_0 = x_0)
 
