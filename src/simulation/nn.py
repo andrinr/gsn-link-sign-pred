@@ -14,7 +14,7 @@ def init_neural_params(key : jax.random.PRNGKey
     mlps = []
 
     n_in = 7
-    n_hidden = 5
+    n_hidden = 7
     n_out = 1
 
     for _ in range(3):
@@ -28,7 +28,6 @@ def init_neural_params(key : jax.random.PRNGKey
         friend=mlps[0],
         neutral=mlps[1],
         enemy=mlps[2])
-    
     
     n_in = 3
     n_hidden = 3
@@ -44,5 +43,6 @@ def init_neural_params(key : jax.random.PRNGKey
 
 def apply_mlp2(mlp : sm.MLP2, x : jnp.ndarray) -> jnp.ndarray:
     x = jnp.dot(x, mlp.w0) + mlp.b0
+    x = jax.nn.relu(x)
     x = jnp.dot(x, mlp.w1) + mlp.b1
     return x

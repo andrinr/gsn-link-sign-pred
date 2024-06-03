@@ -28,6 +28,7 @@ class NeuralParams(NamedTuple):
 class NodeState(NamedTuple):
     position: jnp.ndarray
     velocity: jnp.ndarray
+    acceleration: jnp.ndarray
 
 class SpringForceParams(NamedTuple):
     friend_distance: float

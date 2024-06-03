@@ -307,15 +307,15 @@ def main(argv) -> None:
             embedding_dim=EMBEDDING_DIM
         )
 
-        iter_stride = 5
+        iter_stride = 2
         simulation_params_test = sm.SimulationParams(
             iterations=iter_stride,
             dt=schedule_params['test_dt'],
             damping=schedule_params['test_damping'])
         
         metrics_hist = []
-        energy_hist = []
-        mean_edge_distance = []
+        vel_hist = []
+        acc_hist = []
         iterations_hist = []
         for i in range(1, 100):
             iterations_hist.append(i*iter_stride)
@@ -335,13 +335,9 @@ def main(argv) -> None:
             
    
             metrics_hist.append(metrics)
-            energy = jnp.linalg.norm(node_state.position, axis=1, keepdims=True) ** 2 * 0.5
-            energy_hist.append(jnp.mean(jnp.abs(energy)))
-
-            pos_i = node_state.position[graph.edge_index[0]]
-            pos_j = node_state.position[graph.edge_index[1]]
-            edge_distance = jnp.linalg.norm(pos_i - pos_j, axis=1)
-            mean_edge_distance.append(jnp.mean(edge_distance))
+           
+            vel_hist.append(jnp.mean(jnp.linalg.norm(node_state.velocity, axis=1)))
+            acc_hist.append(jnp.mean(jnp.linalg.norm(node_state.acceleration, axis=1)))
 
         auc = [metrics.auc for metrics in metrics_hist]
         f1_binary = [metrics.f1_binary for metrics in metrics_hist]
@@ -358,8 +354,10 @@ def main(argv) -> None:
         ax1.set_ylabel('metrics')
         ax1.legend()
        
-        ax2.plot(iterations_hist, energy_hist, label='mean energy', color='#d73027')
-        ax2.plot(iterations_hist, mean_edge_distance, label='mean edge distance', color='#4575b4')
+        ax2.plot(iterations_hist, vel_hist, label='mean velocity', color='#d73027')
+        ax2.plot(iterations_hist, acc_hist, label='mean acceleration', color='#fc8d59')
+
+        # ax2.plot(iterations_hist, mean_edge_distance, label='mean edge distance', color='#4575b4')
         ax2.set_xlabel('iterations')
         ax2.set_ylabel('values')
         ax2.legend()

@@ -21,7 +21,8 @@ def init_node_state(
     embedding_dim : int) -> sm.NodeState:
     position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
     velocity = jnp.zeros((n, embedding_dim))
-    return sm.NodeState(position, velocity)
+    acceleration = jnp.zeros((n, embedding_dim))
+    return sm.NodeState(position, velocity, acceleration)
 
 # differntiable version of clip
 @jax.jit
@@ -53,7 +54,10 @@ def update(
 
     position = node_state.position + simulation_params.dt * velocity
 
-    node_state = node_state._replace(velocity=velocity, position=position)
+    node_state = node_state._replace(
+        velocity=velocity, 
+        position=position, 
+        acceleration=node_accelerations)
     
     return node_state
 
