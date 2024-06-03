@@ -49,7 +49,7 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     # Set the precision to 64 bit in case of NaN gradients
-    jax.config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", False)
     print(xla_bridge.get_backend().platform)
     # disable jit compilation for debugging
     jax.config.update("jax_disable_jit", False)
@@ -213,74 +213,72 @@ def main(argv) -> None:
     key_shots = random.split(key_test, TEST_SHOTS)     
     graph = {}
 
-    for shot in range(TEST_SHOTS):
+    for i in range(2):
+        if i == 0:
+            jax.config.update("jax_disable_jit", False)
+            print("JIT enabled")
+        else:
+            jax.config.update("jax_disable_jit", True)
+            print("JIT disabled")
 
-        graph = g.to_SignedGraph(dataset, convert_to_undirected)
+        for shot in range(TEST_SHOTS):
 
-        training_signs = graph.sign.copy()
-        training_signs = jnp.where(graph.train_mask, training_signs, 0)
-        training_graph = graph._replace(sign=training_signs)
-        training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
-        training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+            graph = g.to_SignedGraph(dataset, convert_to_undirected)
 
-        start_time = timer()
-        print(f"Running shot {shot + 1} of {TEST_SHOTS}")
-   
-        # initialize spring state
-        node_state = sm.init_node_state(
-            rng=key_shots[shot],
-            n=graph.num_nodes,
-            m=graph.num_edges,
-            range=INIT_POS_RANGE,
-            embedding_dim=EMBEDDING_DIM
-        )
+            training_signs = graph.sign.copy()
+            training_signs = jnp.where(graph.train_mask, training_signs, 0)
+            training_graph = graph._replace(sign=training_signs)
+            training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+            training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-        simulation_params_test = sm.SimulationParams(
-            iterations=schedule_params['test_iterations'],
-            dt=schedule_params['test_dt'],
-            damping=schedule_params['test_damping'])
+            start_time = timer()
+            print(f"Running shot {shot + 1} of {TEST_SHOTS}")
+
+            # initialize spring state
+            node_state = sm.init_node_state(
+                rng=key_shots[shot],
+                n=graph.num_nodes,
+                m=graph.num_edges,
+                range=INIT_POS_RANGE,
+                embedding_dim=EMBEDDING_DIM
+            )
+
+            simulation_params_test = sm.SimulationParams(
+                iterations=schedule_params['test_iterations'],
+                dt=schedule_params['test_dt'],
+                damping=schedule_params['test_damping'])
+            
+            node_state = sm.simulate(
+                simulation_params=simulation_params_test,
+                node_state=node_state, 
+                use_neural_force=use_neural_froce,
+                force_params=force_params,
+                graph=training_graph)
+            
+            end_time = timer()
+            print(f"Shot {shot + 1} took {end_time - start_time} seconds")
+            times.append(end_time - start_time)
+
+            metrics, pred = sm.evaluate(
+                node_state,
+                graph.edge_index,
+                graph.sign,
+                graph.train_mask,
+                graph.test_mask)
         
-        node_state = sm.simulate(
-            simulation_params=simulation_params_test,
-            node_state=node_state, 
-            use_neural_force=use_neural_froce,
-            force_params=force_params,
-            graph=training_graph)
-        
-        end_time = timer()
-        print(f"Shot {shot + 1} took {end_time - start_time} seconds")
-        times.append(end_time - start_time)
+            shot_metrics.append(metrics)
 
-        metrics, pred = sm.evaluate(
-            node_state,
-            graph.edge_index,
-            graph.sign,
-            graph.train_mask,
-            graph.test_mask)
-        
-        pred_mu = sm.predict(node_state, graph, 0)
-        pred_mu = pred_mu.at[graph.test_mask].get()
-        pred_mu = jnp.where(pred_mu > 0.5, 1, -1)
+        print(f"average metrics over {TEST_SHOTS} shots:")
+        print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
+        print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
+        print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
+        print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
+        print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
+        print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
+        print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
+        print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
 
-        
-        print(f"log regr pred vs mu pred diff: {jnp.mean(jnp.abs(pred - pred_mu))}")
-        print(pred)
-        print(pred_mu)
-    
-        
-        shot_metrics.append(metrics)
-
-    print(f"average metrics over {TEST_SHOTS} shots:")
-    print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
-    print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
-    print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
-    print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
-    print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
-    print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
-    print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
-    print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
-
-    print(f"average time per shot: {np.mean(times)}")
+        print(f"average time per shot: {np.mean(times)}")
 
     questions = [
         inquirer.List('save',
@@ -355,7 +353,7 @@ def main(argv) -> None:
         ax1.legend()
        
         ax2.plot(iterations_hist, vel_hist, label='mean velocity', color='#d73027')
-        ax2.plot(iterations_hist, acc_hist, label='mean acceleration', color='#fc8d59')
+        # ax2.plot(iterations_hist, acc_hist, label='mean acceleration', color='#fc8d59')
 
         # ax2.plot(iterations_hist, mean_edge_distance, label='mean edge distance', color='#4575b4')
         ax2.set_xlabel('iterations')
