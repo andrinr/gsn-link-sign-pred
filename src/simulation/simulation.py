@@ -53,10 +53,12 @@ def simulate_and_loss(
         graph=training_graph)
 
     # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
-    x_0s = jnp.linspace(-1.0, 1.0, 10)
+    x_0s = jnp.linspace(-1.0, 1.0, 5)
     losses = jnp.array([loss(node_state, graph, x_0) for x_0 in x_0s])
 
     loss_value = jnp.mean(losses)
+
+    # loss_value = loss(node_state, graph, 0.0)
     
     predicted_sign = predict(
         node_state = node_state,

@@ -17,9 +17,12 @@ class MLP2(NamedTuple):
     b1 : jnp.ndarray
 
 class NeuralEdgeParams(NamedTuple):
-    friend : MLP2
-    neutral : MLP2
-    enemy : MLP2
+    friend_in : MLP2
+    friend_out : MLP2
+    neutral_in : MLP2
+    neutral_out : MLP2
+    enemy_in : MLP2
+    enemy_out : MLP2
 
 class NeuralParams(NamedTuple):
     edge_params : NeuralEdgeParams

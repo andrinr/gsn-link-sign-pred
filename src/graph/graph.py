@@ -148,7 +148,5 @@ def to_SignedGraph(
         num_edges,
         test_mask,
         train_mask)
-    
-    print(graph)
-    
+
     return graph

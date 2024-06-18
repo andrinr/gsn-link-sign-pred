@@ -107,7 +107,7 @@ def neural_node_scaling(
         graph.out_pos.values + graph.in_pos.values
         ], axis=1)
     
-    return sm.apply_mlp2(params.node_params, input)
+    return 1 + sm.apply_mlp2(params.node_params, input)
 
 def neural_node_acceleration(
     params : sm.NeuralParams,
@@ -147,20 +147,28 @@ def neural_node_acceleration(
         degree_i_in_pos, degree_j_in_pos,
         distance], axis=1)
     
-    friend = sm.apply_mlp2(params.edge_params.friend, input)
+    friend_in = sm.apply_mlp2(params.edge_params.friend_in, input)
+    friend_out = sm.apply_mlp2(params.edge_params.friend_out, input)
 
-    neutral = sm.apply_mlp2(params.edge_params.neutral, input)
+    neutral_in = sm.apply_mlp2(params.edge_params.neutral_in, input)
+    neutral_out = sm.apply_mlp2(params.edge_params.neutral_out, input)
 
-    enemy = - sm.apply_mlp2(params.edge_params.enemy, input)
+    enemy_in = sm.apply_mlp2(params.edge_params.enemy_in, input)
+    enemy_out = sm.apply_mlp2(params.edge_params.enemy_out, input)
 
     sign = jnp.expand_dims(graph.sign, axis=1)
 
-    per_edge_force = jnp.where(sign == 1, friend, enemy)
-    per_edge_force = jnp.where(sign == 0, neutral, per_edge_force)
-    per_edge_force *= spring_vector_norm
+    edge_in_force = jnp.where(sign == 1, friend_in, enemy_in)
+    edge_in_force = jnp.where(sign == 0, neutral_in, edge_in_force)
+    edge_in_force *= spring_vector_norm
+
+    edge_out_force = jnp.where(sign == 1, friend_out, enemy_out)
+    edge_out_force = jnp.where(sign == 0, neutral_out, edge_out_force)
+    edge_out_force *= -spring_vector_norm
 
     per_node_force = jnp.zeros_like(node_state.position)
-    per_node_force = per_node_force.at[graph.edge_index[0]].add(per_edge_force)
+    per_node_force = per_node_force.at[graph.edge_index[0]].add(edge_out_force)
+    per_node_force = per_node_force.at[graph.edge_index[1]].add(edge_in_force)
 
     # mass is constant for all nodes
     per_node_acceleration = per_node_force

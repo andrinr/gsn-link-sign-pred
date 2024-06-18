@@ -41,7 +41,6 @@ def main(argv) -> None:
 
     # TRAINING PARAMETERS
     MULTISTPES_GRADIENT = 1
-    GRAPH_PARTITIONING = False
 
     # Deactivate preallocation of memory to avoid OOM errors
     #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -49,7 +48,7 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     # Set the precision to 64 bit in case of NaN gradients
-    jax.config.update("jax_enable_x64", False)
+    jax.config.update("jax_enable_x64", True)
     print(xla_bridge.get_backend().platform)
     # disable jit compilation for debugging
     jax.config.update("jax_disable_jit", False)
@@ -112,7 +111,7 @@ def main(argv) -> None:
     key_params, key_training, key_test = random.split(random.PRNGKey(2), 3)
 
     batches = []
-    if GRAPH_PARTITIONING and train_parameters:
+    if graph_partitioning and train_parameters:
         cluster_data = ClusterData(
             dataset, 
             num_parts=number_of_subgraphs,
@@ -124,6 +123,8 @@ def main(argv) -> None:
             print(f"num_nodes: {signedGraph.num_nodes}")
             if signedGraph.num_nodes > 50:
                 batches.append(signedGraph)
+
+        print(f"Number of subgraphs: {len(batches)}")
     else:
         batches.append(g.to_SignedGraph(dataset))
         

@@ -1,12 +1,12 @@
 number_of_simulations:
-  - 400
-simulation_iterations:
   - 100
+simulation_iterations:
+  - 120
 simulation_dt:
   - 0.01
 simulation_damping:
   - 0.05
-learning_rate: 0.003
+learning_rate: 0.01
 test_dt: 0.005
 test_iterations: 200
 test_damping: 0.05
