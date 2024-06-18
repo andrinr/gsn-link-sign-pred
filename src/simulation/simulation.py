@@ -45,9 +45,6 @@ def simulate_and_loss(
     training_signs = jnp.where(graph.train_mask, training_signs, 0)
     training_graph = graph._replace(sign=training_signs)
 
-    training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
-    training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
-
     node_state = simulate(
         simulation_params = simulation_params,
         node_state = node_state,

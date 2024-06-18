@@ -6,7 +6,7 @@ simulation_dt:
   - 0.01
 simulation_damping:
   - 0.05
-learning_rate: 0.03
+learning_rate: 0.003
 test_dt: 0.005
 test_iterations: 200
 test_damping: 0.05

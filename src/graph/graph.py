@@ -13,12 +13,21 @@ class Measures(NamedTuple):
     percentile : int
     values : jnp.ndarray
 
-def init_measures(values : jnp.ndarray):
+def init_measures(values : jnp.ndarray, normalize : bool = False, log : bool = False) -> Measures:
     max = jnp.max(values)
     avg = jnp.mean(values)
     percentile = jnp.percentile(values, 80)
 
+    if normalize:
+        values = values / max
+
+    if log:
+        values = jnp.log(values)
+
     return Measures(max, avg, percentile, values)
+
+def remove_nans(values : jnp.ndarray) -> jnp.ndarray:
+    return jnp.nan_to_num(values, nan=0.0)
 
 class SignedGraph(NamedTuple):
     """
@@ -26,10 +35,13 @@ class SignedGraph(NamedTuple):
     """
     edge_index : jnp.ndarray
     sign : jnp.ndarray
-    sign_one_hot : jnp.ndarray
     degree : Measures
-    neg_degree : Measures
-    pos_degree : Measures
+    out_deg : Measures
+    in_deg : Measures
+    out_neg : Measures
+    out_pos : Measures
+    in_neg : Measures
+    in_pos : Measures
     centrality : Measures
     num_nodes : int
     num_edges : int
@@ -38,10 +50,9 @@ class SignedGraph(NamedTuple):
 
 def to_SignedGraph(
     data : Data,
-    treat_as_undirected : bool,
     reindexing : bool = True) -> SignedGraph:
 
-    data, train_mask, test_mask = g.permute_split(data, 0.8, treat_as_undirected)
+    data, train_mask, test_mask = g.permute_split(data, 0.8)
 
     if reindexing:
         keep = torch.unique(data.edge_index)
@@ -56,15 +67,16 @@ def to_SignedGraph(
 
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
-    signs_one_hot = jax.nn.one_hot(signs + 1, 3)
     test_mask = jnp.array(test_mask)
     train_mask = jnp.array(train_mask)
 
     signs_train = jnp.where(train_mask, signs, 0)
 
-    node_degrees = jnp.bincount(edge_index[0])
+    degrees_out = jnp.bincount(edge_index[0])
+    degrees_in = jnp.bincount(edge_index[1])
+    degree = degrees_out + degrees_in
 
-    centrality = node_degrees
+    centrality = degree
     centrality = centrality / jnp.max(centrality)
     for i in range(3):
         edge_centrality = centrality[edge_index[1]]
@@ -77,45 +89,66 @@ def to_SignedGraph(
     centrality = jnp.minimum(centrality, centrality_measures.percentile) / centrality_measures.percentile
     centrality_measures = centrality_measures._replace(values=jnp.expand_dims(centrality, axis=1))
 
-    node_neg_degrees = jnp.zeros(node_degrees.shape)
-    node_neg_degrees = node_neg_degrees.at[edge_index[0]].add(signs_train < 0)
-    node_neg_degrees = node_neg_degrees / node_degrees
-    neg_degree_measures = init_measures(jnp.expand_dims(node_neg_degrees, axis=1))
+    out_neg = jnp.zeros(degrees_out.shape)
+    out_neg = out_neg.at[edge_index[0]].add(signs_train < 0)
+    out_neg = out_neg / degrees_out
+    out_neg = jnp.expand_dims(out_neg, axis=1)
+    out_neg = remove_nans(out_neg)
+    out_neg_measures = init_measures(out_neg)
 
-    node_pos_degrees = jnp.zeros(node_degrees.shape)
-    node_pos_degrees = node_pos_degrees.at[edge_index[0]].add(signs_train > 0)
-    node_pos_degrees = node_pos_degrees / node_degrees
-    pos_degree_measures = init_measures(jnp.expand_dims(node_pos_degrees, axis=1))
+    out_pos = jnp.zeros(degrees_out.shape)
+    out_pos = out_pos.at[edge_index[0]].add(signs_train > 0)
+    out_pos = out_pos / degrees_out
+    out_pos = jnp.expand_dims(out_pos, axis=1)
+    out_pos = remove_nans(out_pos)
+    out_pos_measures = init_measures(out_pos)
+
+    in_neg = jnp.zeros(degrees_in.shape)
+    in_neg = in_neg.at[edge_index[1]].add(signs_train < 0)
+    in_neg = in_neg / degrees_in
+    in_neg = jnp.expand_dims(in_neg, axis=1)
+    in_neg = remove_nans(in_neg)
+    in_neg_measures = init_measures(in_neg)
+
+    in_pos = jnp.zeros(degrees_in.shape)
+    in_pos = in_pos.at[edge_index[1]].add(signs_train > 0)
+    in_pos = in_pos / degrees_in
+    in_pos = jnp.expand_dims(in_pos, axis=1)
+    in_pos = remove_nans(in_pos)
+    in_pos_measures = init_measures(in_pos)
 
     num_nodes = jnp.max(edge_index) + 1
     num_edges = edge_index.shape[1]
 
-    node_degrees = jnp.expand_dims(node_degrees, axis=1)
-    degree_measures = init_measures(node_degrees)
+    degrees = jnp.expand_dims(degree, axis=1)
+    degrees = init_measures(degrees, log=True)
 
-    node_degrees = jnp.minimum(node_degrees, degree_measures.percentile) / degree_measures.percentile
-    degree_measures = degree_measures._replace(values=node_degrees)
+    degrees_out = degrees_out / degree
+    degrees_out = remove_nans(degrees_out)  
+    degrees_out = jnp.expand_dims(degrees_out, axis=1)
+    degrees_out = init_measures(degrees_out, log=False)
 
-    # # output train and test graph edge list to file
-    # with open('train_graph_ep.txt', 'w') as f:
-    #     for i in range(edge_index.shape[1]):
-    #         if train_mask[i]:
-    #             f.write(f"{edge_index[0, i]} {edge_index[1, i]} {signs_train[i]}\n")
+    degrees_in = degrees_in / degree
+    degrees_in = remove_nans(degrees_in)
+    degrees_in = jnp.expand_dims(degrees_in, axis=1)
+    degrees_in = init_measures(degrees_in, log=False)
 
-    # with open('test_graph_ep.txt', 'w') as f:
-    #     for i in range(edge_index.shape[1]):
-    #         if test_mask[i]:
-    #             f.write(f"{edge_index[0, i]} {edge_index[1, i]} {signs[i]}\n")
-
-    return SignedGraph(
+    graph = SignedGraph(
         edge_index, 
         signs, 
-        signs_one_hot,
-        degree_measures,
-        neg_degree_measures,
-        pos_degree_measures,
+        degrees,
+        degrees_out,
+        degrees_in,
+        out_neg_measures,
+        out_pos_measures,
+        in_neg_measures,
+        in_pos_measures,
         centrality_measures,
         num_nodes, 
         num_edges,
         test_mask,
         train_mask)
+    
+    print(graph)
+    
+    return graph

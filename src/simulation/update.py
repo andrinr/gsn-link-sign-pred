@@ -101,8 +101,11 @@ def neural_node_scaling(
 
     input = jnp.concatenate([
         graph.degree.values,
-        graph.neg_degree.values,
-        graph.pos_degree.values], axis=1)
+        graph.out_deg.values,
+        graph.in_deg.values,
+        graph.out_neg.values + graph.in_neg.values,
+        graph.out_pos.values + graph.in_pos.values
+        ], axis=1)
     
     return sm.apply_mlp2(params.node_params, input)
 
@@ -117,10 +120,18 @@ def neural_node_acceleration(
 
     degree_i = graph.degree.values[graph.edge_index[0]]
     degree_j = graph.degree.values[graph.edge_index[1]]
-    degree_i_neg = graph.neg_degree.values[graph.edge_index[0]]
-    degree_j_neg = graph.neg_degree.values[graph.edge_index[1]]
-    degree_i_pos = graph.pos_degree.values[graph.edge_index[0]]
-    degree_j_pos = graph.pos_degree.values[graph.edge_index[1]]
+    degree_i_out = graph.out_deg.values[graph.edge_index[0]]
+    degree_j_out = graph.out_deg.values[graph.edge_index[1]]
+    degree_i_in = graph.in_deg.values[graph.edge_index[0]]
+    degree_j_in = graph.in_deg.values[graph.edge_index[1]]
+    degree_i_out_neg = graph.out_neg.values[graph.edge_index[0]]
+    degree_j_out_neg = graph.out_neg.values[graph.edge_index[1]]
+    degree_i_out_pos = graph.out_pos.values[graph.edge_index[0]]
+    degree_j_out_pos = graph.out_pos.values[graph.edge_index[1]]
+    degree_i_in_neg = graph.in_neg.values[graph.edge_index[0]]
+    degree_j_in_neg = graph.in_neg.values[graph.edge_index[1]]
+    degree_i_in_pos = graph.in_pos.values[graph.edge_index[0]]
+    degree_j_in_pos = graph.in_pos.values[graph.edge_index[1]]
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
@@ -128,15 +139,19 @@ def neural_node_acceleration(
 
     input = jnp.concatenate([
         degree_i, degree_j, 
-        degree_i_neg, degree_j_neg, 
-        degree_i_pos, degree_j_pos,
+        degree_i_out, degree_j_out,
+        degree_i_in, degree_j_in,
+        degree_i_out_neg, degree_j_out_neg,
+        degree_i_out_pos, degree_j_out_pos,
+        degree_i_in_neg, degree_j_in_neg,
+        degree_i_in_pos, degree_j_in_pos,
         distance], axis=1)
-
+    
     friend = sm.apply_mlp2(params.edge_params.friend, input)
 
     neutral = sm.apply_mlp2(params.edge_params.neutral, input)
 
-    enemy = sm.apply_mlp2(params.edge_params.enemy, input)
+    enemy = - sm.apply_mlp2(params.edge_params.enemy, input)
 
     sign = jnp.expand_dims(graph.sign, axis=1)
 

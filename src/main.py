@@ -56,8 +56,8 @@ def main(argv) -> None:
 
     questions = [inquirer.Checkbox('multiples',
         message="Select the options: (Press <space> to select, Enter when finished).",
-        choices=['Use Neural Force (SE-NN)', 'Train Parameters', 'Convert to undirected', 'Partition Graph'],
-        default=['Convert to undirected']),
+        choices=['Use Neural Force (SE-NN)', 'Train Parameters', 'Partition Graph'],
+        default=[]),
     ]
 
     answers = inquirer.prompt(questions)
@@ -65,15 +65,12 @@ def main(argv) -> None:
     # read answers from inquirer
     train_parameters = False
     use_neural_froce = False
-    convert_to_undirected = False
     graph_partitioning = False
     number_of_subgraphs = 10
     if 'Train Parameters' in answers['multiples']:
         train_parameters = True
     if 'Use Neural Force (SE-NN)' in answers['multiples']:
         use_neural_froce = True
-    if 'Convert to undirected' in answers['multiples']:
-        convert_to_undirected = True
     if 'Partition Graph' in answers['multiples']:
         graph_partitioning = True
 
@@ -86,9 +83,6 @@ def main(argv) -> None:
         number_of_subgraphs = int(answers['n_subgraphs'])
     
     dataset, dataset_name = get_dataset(DATA_PATH, argv) 
-    if not is_undirected(dataset.edge_index) and convert_to_undirected:
-        transform = T.ToUndirected(reduce="min")
-        dataset = transform(dataset)
 
     # uncomment to print dataset information
     # num_nodes = dataset.num_nodes
@@ -126,14 +120,12 @@ def main(argv) -> None:
         
         loader = ClusterLoader(cluster_data)
         for batch in loader:
-            signedGraph = g.to_SignedGraph(batch, convert_to_undirected)
+            signedGraph = g.to_SignedGraph(batch)
             print(f"num_nodes: {signedGraph.num_nodes}")
             if signedGraph.num_nodes > 50:
                 batches.append(signedGraph)
     else:
-        batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
-
-    return
+        batches.append(g.to_SignedGraph(dataset))
         
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')
@@ -225,7 +217,7 @@ def main(argv) -> None:
 
         for shot in range(TEST_SHOTS):
 
-            graph = g.to_SignedGraph(dataset, convert_to_undirected)
+            graph = g.to_SignedGraph(dataset)
 
             training_signs = graph.sign.copy()
             training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -290,7 +282,7 @@ def main(argv) -> None:
     ]
     answers = inquirer.prompt(questions)
     if answers['save'] == 'Yes':
-        graph = g.to_SignedGraph(dataset, convert_to_undirected)
+        graph = g.to_SignedGraph(dataset)
 
         training_signs = graph.sign.copy()
         training_signs = jnp.where(graph.train_mask, training_signs, 0)
@@ -396,7 +388,7 @@ def main(argv) -> None:
                 dt=0.5/iterations,
                 damping=damping)
             
-            graph = g.to_SignedGraph(dataset, convert_to_undirected)
+            graph = g.to_SignedGraph(dataset)
 
             training_signs = graph.sign.copy()
             training_signs = jnp.where(graph.train_mask, training_signs, 0)
