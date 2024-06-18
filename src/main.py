@@ -132,6 +132,8 @@ def main(argv) -> None:
                 batches.append(signedGraph)
     else:
         batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
+
+    return
         
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')

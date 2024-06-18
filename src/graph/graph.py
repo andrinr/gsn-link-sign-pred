@@ -96,6 +96,17 @@ def to_SignedGraph(
     node_degrees = jnp.minimum(node_degrees, degree_measures.percentile) / degree_measures.percentile
     degree_measures = degree_measures._replace(values=node_degrees)
 
+    # # output train and test graph edge list to file
+    # with open('train_graph_ep.txt', 'w') as f:
+    #     for i in range(edge_index.shape[1]):
+    #         if train_mask[i]:
+    #             f.write(f"{edge_index[0, i]} {edge_index[1, i]} {signs_train[i]}\n")
+
+    # with open('test_graph_ep.txt', 'w') as f:
+    #     for i in range(edge_index.shape[1]):
+    #         if test_mask[i]:
+    #             f.write(f"{edge_index[0, i]} {edge_index[1, i]} {signs[i]}\n")
+
     return SignedGraph(
         edge_index, 
         signs, 
