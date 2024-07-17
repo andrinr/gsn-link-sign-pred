@@ -33,7 +33,7 @@ def main(argv) -> None:
     DATA_PATH = 'src/data/'
     CECKPOINT_PATH = 'training_checkpoints/'
     SCHEDULE_PATH = 'schedule/'
-    OUTPUT_PATH = 'output/'
+    OUTPUT_PATH = 'plots/data/'
 
     # Define the range of the random distribution for the initial positions
     INIT_POS_RANGE = 1.0
@@ -132,8 +132,6 @@ def main(argv) -> None:
                 batches.append(signedGraph)
     else:
         batches.append(g.to_SignedGraph(dataset, convert_to_undirected))
-
-    return
         
     if os.path.exists(force_params_path) and load_checkpoint:
         stream = open(force_params_path, 'r')
@@ -149,7 +147,6 @@ def main(argv) -> None:
         schedule_params = yaml.load(stream,  Loader=yaml.UnsafeLoader)
     elif train_parameters:
         raise ValueError("no training schedule params found")
-
 
     if train_parameters:
         loss_hist = []
@@ -215,76 +212,76 @@ def main(argv) -> None:
     key_shots = random.split(key_test, TEST_SHOTS)     
     graph = {}
 
-    for i in range(2):
-        if i == 0:
-            jax.config.update("jax_disable_jit", False)
-            print("JIT enabled")
-        else:
-            jax.config.update("jax_disable_jit", True)
-            print("JIT disabled")
+    # for i in range(2):
+    #     if i == 0:
+    #         jax.config.update("jax_disable_jit", False)
+    #         print("JIT enabled")
+    #     else:
+    #         jax.config.update("jax_disable_jit", True)
+    #         print("JIT disabled")
 
-        for shot in range(TEST_SHOTS):
+    #     for shot in range(TEST_SHOTS):
 
-            graph = g.to_SignedGraph(dataset, convert_to_undirected)
+    #         graph = g.to_SignedGraph(dataset, convert_to_undirected)
 
-            training_signs = graph.sign.copy()
-            training_signs = jnp.where(graph.train_mask, training_signs, 0)
-            training_graph = graph._replace(sign=training_signs)
-            training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
-            training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+    #         training_signs = graph.sign.copy()
+    #         training_signs = jnp.where(graph.train_mask, training_signs, 0)
+    #         training_graph = graph._replace(sign=training_signs)
+    #         training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+    #         training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
 
-            start_time = timer()
-            print(f"Running shot {shot + 1} of {TEST_SHOTS}")
+    #         start_time = timer()
+    #         print(f"Running shot {shot + 1} of {TEST_SHOTS}")
 
-            # initialize spring state
-            node_state = sm.init_node_state(
-                rng=key_shots[shot],
-                n=graph.num_nodes,
-                m=graph.num_edges,
-                range=INIT_POS_RANGE,
-                embedding_dim=EMBEDDING_DIM
-            )
+    #         # initialize spring state
+    #         node_state = sm.init_node_state(
+    #             rng=key_shots[shot],
+    #             n=graph.num_nodes,
+    #             m=graph.num_edges,
+    #             range=INIT_POS_RANGE,
+    #             embedding_dim=EMBEDDING_DIM
+    #         )
 
-            simulation_params_test = sm.SimulationParams(
-                iterations=schedule_params['test_iterations'],
-                dt=schedule_params['test_dt'],
-                damping=schedule_params['test_damping'])
+    #         simulation_params_test = sm.SimulationParams(
+    #             iterations=schedule_params['test_iterations'],
+    #             dt=schedule_params['test_dt'],
+    #             damping=schedule_params['test_damping'])
             
-            node_state = sm.simulate(
-                simulation_params=simulation_params_test,
-                node_state=node_state, 
-                use_neural_force=use_neural_froce,
-                force_params=force_params,
-                graph=training_graph)
+    #         node_state = sm.simulate(
+    #             simulation_params=simulation_params_test,
+    #             node_state=node_state, 
+    #             use_neural_force=use_neural_froce,
+    #             force_params=force_params,
+    #             graph=training_graph)
             
-            end_time = timer()
-            print(f"Shot {shot + 1} took {end_time - start_time} seconds")
-            times.append(end_time - start_time)
+    #         end_time = timer()
+    #         print(f"Shot {shot + 1} took {end_time - start_time} seconds")
+    #         times.append(end_time - start_time)
 
-            metrics, pred = sm.evaluate(
-                node_state,
-                graph.edge_index,
-                graph.sign,
-                graph.train_mask,
-                graph.test_mask)
+    #         metrics, pred = sm.evaluate(
+    #             node_state,
+    #             graph.edge_index,
+    #             graph.sign,
+    #             graph.train_mask,
+    #             graph.test_mask)
         
-            shot_metrics.append(metrics)
+    #         shot_metrics.append(metrics)
 
-        print(f"average metrics over {TEST_SHOTS} shots:")
-        print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
-        print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
-        print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
-        print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
-        print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
-        print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
-        print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
-        print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
+    #     print(f"average metrics over {TEST_SHOTS} shots:")
+    #     print(f"auc: {np.mean([metrics.auc for metrics in shot_metrics])}")
+    #     print(f"f1_binary: {np.mean([metrics.f1_binary for metrics in shot_metrics])}")
+    #     print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
+    #     print(f"f1_macro: {np.mean([metrics.f1_macro for metrics in shot_metrics])}")
+    #     print(f"std auc: {np.std([metrics.auc for metrics in shot_metrics])}")
+    #     print(f"std f1_binary: {np.std([metrics.f1_binary for metrics in shot_metrics])}")
+    #     print(f"std f1_micro: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
+    #     print(f"std f1_macro: {np.std([metrics.f1_macro for metrics in shot_metrics])}")
 
-        print(f"average time per shot: {np.mean(times)}")
+    #     print(f"average time per shot: {np.mean(times)}")
 
     questions = [
         inquirer.List('save',
-            message="Do you want to visualize the accuracy for the forward simulation?",
+            message="Output accuraccy over forward euler integration?",
             choices=['Yes', 'No'],
         ),
     ]
@@ -300,7 +297,7 @@ def main(argv) -> None:
 
         # initialize spring state
         node_state = sm.init_node_state(
-            rng=key_shots[shot],
+            rng=key_shots[0],
             n=graph.num_nodes,
             m=graph.num_edges,
             range=INIT_POS_RANGE,
@@ -344,24 +341,17 @@ def main(argv) -> None:
         f1_micro = [metrics.f1_micro for metrics in metrics_hist]
         f1_macro = [metrics.f1_macro for metrics in metrics_hist]
 
-        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+        # store metrics to csv
+        df = pd.DataFrame()
 
-        ax1.plot(iterations_hist, auc, label='auc', color='#d73027')
-        ax1.plot(iterations_hist, f1_binary, label='f1_binary', color='#fc8d59')
-        ax1.plot(iterations_hist, f1_micro, label='f1_micro', color='#91bfdb')
-        ax1.plot(iterations_hist, f1_macro, label='f1_macro', color='#4575b4')
-        ax1.set_xlabel('iterations')
-        ax1.set_ylabel('metrics')
-        ax1.legend()
-       
-        ax2.plot(iterations_hist, vel_hist, label='mean velocity', color='#d73027')
-        # ax2.plot(iterations_hist, acc_hist, label='mean acceleration', color='#fc8d59')
-
-        # ax2.plot(iterations_hist, mean_edge_distance, label='mean edge distance', color='#4575b4')
-        ax2.set_xlabel('iterations')
-        ax2.set_ylabel('values')
-        ax2.legend()
-        plt.show()
+        df['auc'] = auc
+        df['f1_binary'] = f1_binary
+        df['f1_micro'] = f1_micro
+        df['f1_macro'] = f1_macro
+        df['mean_velocity'] = vel_hist
+        df['mean_acceleration'] = acc_hist
+        df['iterations'] = iterations_hist
+        df.to_csv(f"{OUTPUT_PATH}{'neural' if use_neural_froce else 'spring'}_forward_euler_results_{EMBEDDING_DIM}.csv")
 
     questions = [
         inquirer.List('save',
