@@ -14,7 +14,7 @@ def init_neural_params(key : jax.random.PRNGKey
     mlps = []
 
     n_in = 15
-    n_hidden = 10
+    n_hidden = 5
     n_out = 1
 
     for _ in range(6):
@@ -25,12 +25,9 @@ def init_neural_params(key : jax.random.PRNGKey
             b1=init_zeros(key, (n_out,))))
     
     edge_params = sm.NeuralEdgeParams(
-        friend_in=mlps[0],
-        friend_out=mlps[1],
-        neutral_in=mlps[2],
-        neutral_out=mlps[3],
-        enemy_in=mlps[4],
-        enemy_out=mlps[5])
+        friend=mlps[0],
+        neutral=mlps[1],
+        enemy=mlps[2])
     
     n_in = 5
     n_hidden = 5
@@ -46,7 +43,6 @@ def init_neural_params(key : jax.random.PRNGKey
 
 def apply_mlp2(mlp : sm.MLP2, x : jnp.ndarray) -> jnp.ndarray:
     x = jnp.dot(x, mlp.w0) + mlp.b0
-    x = jax.nn.leaky_relu(x)
-    x = jnp.dot(x, mlp.w1) + mlp.b1
     x = jax.nn.tanh(x)
+    x = jnp.dot(x, mlp.w1) + mlp.b1
     return x

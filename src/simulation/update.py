@@ -20,9 +20,7 @@ def init_node_state(
     range : float,
     embedding_dim : int) -> sm.NodeState:
     position = jax.random.uniform(rng, (n, embedding_dim), minval=-range, maxval=range)
-    velocity = jnp.zeros((n, embedding_dim))
-    acceleration = jnp.zeros((n, embedding_dim))
-    return sm.NodeState(position, velocity, acceleration)
+    return sm.NodeState(position)
 
 # differntiable version of clip
 @jax.jit
@@ -49,15 +47,12 @@ def update(
             spring_node_acceleration(force_params, node_state, graph) *\
             spring_node_scaling(force_params, graph)
 
-    velocity = node_state.velocity * (1 - simulation_params.damping)
-    velocity = velocity + simulation_params.dt * node_accelerations
+    # velocity = node_state.velocity * (1 - simulation_params.damping)
+    # velocity = velocity + simulation_params.dt * node_accelerations
 
-    position = node_state.position + simulation_params.dt * velocity
+    position = node_state.position + simulation_params.dt * node_accelerations
 
-    node_state = node_state._replace(
-        velocity=velocity, 
-        position=position, 
-        acceleration=node_accelerations)
+    node_state = node_state._replace(position=position)
     
     return node_state
 
@@ -145,30 +140,23 @@ def neural_node_acceleration(
         degree_i_out_pos, degree_j_out_pos,
         degree_i_in_neg, degree_j_in_neg,
         degree_i_in_pos, degree_j_in_pos,
-        distance], axis=1)
+        distance - 2.5], axis=1)
     
-    friend_in = sm.apply_mlp2(params.edge_params.friend_in, input)
-    friend_out = sm.apply_mlp2(params.edge_params.friend_out, input)
+    friend = sm.apply_mlp2(params.edge_params.friend, input)
 
-    neutral_in = sm.apply_mlp2(params.edge_params.neutral_in, input)
-    neutral_out = sm.apply_mlp2(params.edge_params.neutral_out, input)
+    neutral = sm.apply_mlp2(params.edge_params.neutral, input)
 
-    enemy_in = sm.apply_mlp2(params.edge_params.enemy_in, input)
-    enemy_out = sm.apply_mlp2(params.edge_params.enemy_out, input)
+    enemy = sm.apply_mlp2(params.edge_params.enemy, input)
 
     sign = jnp.expand_dims(graph.sign, axis=1)
 
-    edge_in_force = jnp.where(sign == 1, friend_in, enemy_in)
-    edge_in_force = jnp.where(sign == 0, neutral_in, edge_in_force)
-    edge_in_force *= spring_vector_norm
-
-    edge_out_force = jnp.where(sign == 1, friend_out, enemy_out)
-    edge_out_force = jnp.where(sign == 0, neutral_out, edge_out_force)
-    edge_out_force *= -spring_vector_norm
+    edge_force = jnp.where(sign == 1, friend, enemy)
+    edge_force = jnp.where(sign == 0, neutral, edge_force)
+    edge_force *= spring_vector_norm
 
     per_node_force = jnp.zeros_like(node_state.position)
-    per_node_force = per_node_force.at[graph.edge_index[0]].add(edge_out_force)
-    per_node_force = per_node_force.at[graph.edge_index[1]].add(edge_in_force)
+    per_node_force = per_node_force.at[graph.edge_index[0]].add(edge_force)
+    per_node_force = per_node_force.at[graph.edge_index[1]].add(-edge_force)
 
     # mass is constant for all nodes
     per_node_acceleration = per_node_force
