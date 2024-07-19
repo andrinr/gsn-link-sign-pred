@@ -9,7 +9,7 @@ This is the code for the paper called (Papername) which was published in (Journa
 Installation instructions for Ubuntu (conda venv recommended):
 
 1. Install jax: 
-``pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html``
+``pip install -U "jax[cuda12]"``
 2. Install pytorch (CPU version !) ``pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu``
 3. Install other dependencies: ``pip install torch_geometric matplotlib scikit-learn pyyaml tqdm optax inquirer pandas``
 

@@ -28,17 +28,17 @@ fig, ax = plt.subplots()
 
 fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
 
-ax1.plot(data.iterations, data.auc, label='auc', color='#d73027')
-ax1.plot(data.iterations, data.f1_binary, label='f1_binary', color='#fc8d59')
-ax1.plot(data.iterations, data.f1_micro, label='f1_micro', color='#91bfdb')
-ax1.plot(data.iterations, data.f1_macro, label='f1_macro', color='#4575b4')
+ax1.plot(data.iterations, data.auc, label='auc')
+ax1.plot(data.iterations, data.f1_binary, label='f1_binary')
+ax1.plot(data.iterations, data.f1_micro, label='f1_micro')
+ax1.plot(data.iterations, data.f1_macro, label='f1_macro')
 
 # put legend outside of the plot    
-ax1.legend(loc='upper right')
+ax1.legend(loc='lower right', ncol=2)
 
-ax2.plot(data.iterations, data.mean_velocity, label='mean velocity', color='#d73027')
+ax2.plot(data.iterations, data.mean_velocity, label='mean velocity')
 
-ax2.set_xlabel('iterations')
+ax2.set_xlabel('Iterations')
 ax2.legend()
 
 
