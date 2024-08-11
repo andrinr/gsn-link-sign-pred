@@ -32,4 +32,6 @@ A training run outputs a model file, which can be found under ```model/<ModelNam
 
 ### Testing
 
-To test the model against different datasets execute ```python src/train.py <Dataset Name> params/test_params.yaml```.
+To test the model against different datasets execute ```ipython src/get_benchmarks.py <Dataset Name> params/test_params.yaml```. Note that we use IPython here (install with ```pip install ipython```) for accurate time measurements. The script will generate a .csv file in the format ```<Dataset Name>_<num dimensions>_<nn / spring>.csv```. The training times are displayed in the command line and of now, manually collected in the ```plots/data/speedup.csv``` file. You can generate a plot of speedups with  ```python plots/speedup.py``` such as:
+
+![Forward](plots/performance.png)

@@ -11,16 +11,11 @@ data = pd.read_csv(
     'plots/data/speedup.csv', 
     header=0, delimiter=',', skipinitialspace=True,
     index_col=0)
-# DATAFRAME
-#                 BitcoinAlpha,   BitcoinOTC,     WikirRFA,   Slashdot,   Epinions
-# SpringE (JIT),  350,            354,            360,        397,        506
-# SE-NN (JIT),    700,            845,            745,        1300,       1100
-# SpringE,        8740,           10560,          9448,       10628,      14211
-# SE-NN,          20700,          10560,          23700,      29981,      33370
-# SGCN,           8089,           9791,           24355,      6000000,    21000000
-# SDGNN,          388000,        818250,          2618500,
 
 # transpose data
+# remove WikiRFA column
+print(data)
+data = data.drop(columns=['WikiRFA'])
 data = data.T
 
 fig, ax = plt.subplots()

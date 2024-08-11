@@ -1,11 +1,11 @@
 num_dimensions: 64
 use_neural_force: False
-use_blackbox : True
-num_simulations: 200
+use_blackbox : False
+num_simulations: 300
 train_iterations: 100
 train_dt: 0.01
 train_damping: 0.05
-learning_rate: 0.2
+learning_rate: 0.01
 init_pos_range: 1.0
 enable_partitioning: False
 number_of_subgraphs: 4

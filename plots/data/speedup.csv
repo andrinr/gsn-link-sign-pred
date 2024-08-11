@@ -1,7 +1,7 @@
-                BitcoinAlpha,   BitcoinOTC,     WikirRFA,   Slashdot,   Epinions
-SpringE (JIT),  350,            354,            360,        397,        506
-SE-NN (JIT),    700,            845,            745,        1300,       1100
-SpringE,        8740,           10560,          9448,       10628,      14211
-SE-NN,          20700,          10560,          23700,      29981,      33370
+                BitcoinAlpha,   BitcoinOTC,     WikiRFA,   Slashdot,   Epinions
+SpringE (JIT),  29,             57,             360,        1700,       2290
+SE-NN (JIT),    49,             79,             745,        2790,       3570
+SpringE,        3560,           3620,           9448,       7130,       9230
+SE-NN,          7600,           8770,           23700,      10200,      11900
 SGCN,           8089,           9791,           24355,      6000000,    21000000
-SDGNN,          388000,        818250,          2618500,
+SDGNN,          388000,         818250,         2618500,

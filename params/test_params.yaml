@@ -1,0 +1,9 @@
+num_dimensions: 64
+use_neural_force: False
+use_blackbox : False
+test_iterations: 300
+test_dt: 0.003
+test_damping: 0.05
+init_pos_range: 1.0
+threshold: 2.5
+num_shots : 5

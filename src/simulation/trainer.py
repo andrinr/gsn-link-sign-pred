@@ -31,7 +31,7 @@ def clip_gradient_bwd(res, g):
 
 clip_gradient.defvjp(clip_gradient_fwd, clip_gradient_bwd)
 
-def gradient_training   (
+def train(
     random_key : jax.random.PRNGKey,
     batches : list[g.SignedGraph],
     use_neural_force : bool,
@@ -94,6 +94,11 @@ def gradient_training(
 ) -> tuple[sm.NeuralEdgeParams, list[float], list[sm.Metrics]]:
 
     optimizer = optax.adam(training_params.learning_rate)
+    # optimizer = optax.noisy_sgd(
+    #     learning_rate=training_params.learning_rate,
+    #     eta=0.01,
+    #     gamma=0.55)
+    
     force_optimizer_multi_step = optax.MultiSteps(
         optimizer, training_params.multi_step)
     force_optimizier_state = force_optimizer_multi_step.init(
@@ -116,7 +121,7 @@ def gradient_training(
             # initialize spring state
             # take new key each time to avoid overfitting to specific initial condition
             spring_state = sm.init_node_state(
-                rng=random_keys[0],
+                rng=random_keys[epoch_index],
                 range=training_params.init_pos_range,
                 n=batch_graph.num_nodes,
                 m=batch_graph.num_edges,
