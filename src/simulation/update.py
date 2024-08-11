@@ -6,12 +6,12 @@ EPSILON = 1e-6
 
 def init_spring_force_params() -> sm.SpringForceParams:
     return sm.SpringForceParams(
-        friend_distance=1.0,
-        friend_stiffness=1.0,
+        friend_distance=0.0,
+        friend_stiffness=10.0,
         neutral_distance=1.0,
         neutral_stiffness=0.1,
-        enemy_distance=5.5,
-        enemy_stiffness=2.0,
+        enemy_distance=15.0,
+        enemy_stiffness=10.0,
         degree_multiplier=3.0)
 
 def init_node_state(
@@ -65,7 +65,7 @@ def spring_node_scaling(
     params : sm.SpringForceParams,
     graph : g.SignedGraph,
 ) -> jnp.ndarray:
-    return (graph.centrality.values * params.degree_multiplier + 0.1)    
+    return (graph.centrality.values * params.degree_multiplier + 1.0)    
 
 def spring_node_acceleration(
     params : sm.SpringForceParams,
@@ -104,7 +104,7 @@ def neural_node_scaling(
         graph.neg_degree.values,
         graph.pos_degree.values], axis=1)
     
-    return sm.apply_mlp2(params.node_params, input)
+    return sm.apply_mlp(params.node_params, input)
 
 def neural_node_acceleration(
     params : sm.NeuralParams,
@@ -132,11 +132,11 @@ def neural_node_acceleration(
         degree_i_pos, degree_j_pos,
         distance], axis=1)
 
-    friend = sm.apply_mlp2(params.edge_params.friend, input)
+    friend = sm.apply_mlp(params.edge_params.friend, input)
 
-    neutral = sm.apply_mlp2(params.edge_params.neutral, input)
+    neutral = sm.apply_mlp(params.edge_params.neutral, input)
 
-    enemy = sm.apply_mlp2(params.edge_params.enemy, input)
+    enemy = sm.apply_mlp(params.edge_params.enemy, input)
 
     sign = jnp.expand_dims(graph.sign, axis=1)
 

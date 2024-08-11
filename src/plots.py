@@ -188,7 +188,7 @@ def main(argv) -> None:
             print(f"Running {number_of_simulations} simulations with {iterations} iterations each")
             print(f"Simulation parameters are dt: {dt}, damping: {damping}")
 
-            force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.train(
+            force_params, loss_hist_, metrics_hist_, force_params_hist_ = sm.gradient_training(
                 random_key=key_training,
                 batches=batches,
                 use_neural_force=use_neural_froce,

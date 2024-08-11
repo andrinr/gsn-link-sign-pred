@@ -57,27 +57,29 @@ def simulate_and_loss(
 
     # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
     x_0s = jnp.linspace(-1.0, 1.0, 10)
-    losses = jnp.array([loss(node_state, graph, x_0) for x_0 in x_0s])
+    losses = jnp.array([loss(node_state, graph, x_0, simulation_params.threshold) for x_0 in x_0s])
 
     loss_value = jnp.mean(losses)
     
     predicted_sign = predict(
         node_state = node_state,
         graph = graph,
-        x_0 = 0)
+        x_0 = 0,
+        threshold = simulation_params.threshold)
 
     return loss_value, (node_state, predicted_sign)
 
 def predict(
     node_state : sm.NodeState,
     graph : g.SignedGraph,
-    x_0 : float
+    x_0 : float,
+    threshold : float,
 ) -> jnp.ndarray:
     
     position_i = node_state.position[graph.edge_index[0]]
     position_j = node_state.position[graph.edge_index[1]]
 
-    distance = jnp.linalg.norm(position_j - position_i, axis=1) - 2.5
+    distance = jnp.linalg.norm(position_j - position_i, axis=1) - threshold
 
     # apply sigmoid function to get sign (0 for negative, 1 for positive)
     predicted_sign = 1 / (1 + jnp.exp(1 * (distance-x_0)))
@@ -87,12 +89,14 @@ def predict(
 def loss(
     node_state : sm.NodeState,
     graph : g.SignedGraph,
-    x_0 : float
+    x_0 : float,
+    threshold : float,
 ) -> float:
     predicted_sign = predict(
         node_state = node_state,
         graph = graph,
-        x_0 = x_0)
+        x_0 = x_0,
+        threshold = threshold)
 
     sign_binary = graph.sign * 0.5 + 0.5
 

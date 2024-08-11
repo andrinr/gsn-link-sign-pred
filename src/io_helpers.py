@@ -4,22 +4,13 @@ from data import Slashdot, BitcoinO, BitcoinA, WikiRFA, Epinions, Tribes
 from torch_geometric.data import Data 
 import torch_geometric.transforms as T
     
-def get_dataset(data_path : str, argv : list) -> (Data, str):
-    dataset_names = ['Tribes', 'Bitcoin_Alpha', 'BitcoinOTC', 'WikiRFA', 'Slashdot', 'Epinions']
-    questions = [
-        inquirer.List('dataset',
-            message="Choose a dataset",
-            choices=dataset_names,
-        ),
-    ]
-    answers = inquirer.prompt(questions)
-    dataset_name = answers['dataset']
+def get_dataset(data_path : str, dataset_name : str) -> Data:
 
     pre_transform = T.Compose([])
     match dataset_name:
         case "BitcoinOTC":
             dataset = BitcoinO(root=data_path, pre_transform=pre_transform)
-        case "Bitcoin_Alpha":
+        case "BitcoinAlpha":
             dataset = BitcoinA(root=data_path, pre_transform=pre_transform)
         case "WikiRFA":
             dataset = WikiRFA(root=data_path, pre_transform=pre_transform)
@@ -32,4 +23,7 @@ def get_dataset(data_path : str, argv : list) -> (Data, str):
 
     data = dataset[0]
 
-    return data, dataset_name
+    transform = T.ToUndirected(reduce="min")
+    data = transform(data)
+
+    return data
