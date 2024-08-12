@@ -44,7 +44,7 @@ def main(argv) -> None:
     # Paths
     DATA_PATH = 'src/data/'
     MODEL_PATH = 'models/'
-    OUTPUT_PATH = 'plots/data/'
+    OUTPUT_PATH = 'plots/data/benchmarks/'
 
     dataset_name = argv[0]
     params_path = argv[1]
@@ -113,37 +113,6 @@ def main(argv) -> None:
     
         shot_metrics.append(metrics)
 
-    sim_jit = jax.jit(sm.simulate, static_argnames=["simulation_params", "use_neural_force"])
-
-    print("JIT compilation and execution times:")
-    # measure compilation time
-    ipython.run_line_magic("time", 'jax.block_until_ready(sim_jit(' +\
-        'simulation_params=simulation_params_test,' +\
-        'node_state=node_state,' +\
-        'use_neural_force=params.use_neural_force, ' +\
-        'force_params=force_params, ' +\
-        'graph=training_graph))')
-    
-    # measure execution time
-    ipython.run_line_magic("timeit", 'jax.block_until_ready(sim_jit(' +\
-        'simulation_params=simulation_params_test,' +\
-        'node_state=node_state,' +\
-        'use_neural_force=params.use_neural_force, ' +\
-        'force_params=force_params, ' +\
-        'graph=training_graph))')
-    
-    # disable JIT compilation
-    jax.config.update("jax_disable_jit", True)
-    sim_no_jit = sm.simulate
-
-    print("Execution time without JIT compilation:")
-    ipython.run_line_magic("timeit", 'sim_no_jit(' +\
-        'simulation_params=simulation_params_test,' +\
-        'node_state=node_state,' +\
-        'use_neural_force=params.use_neural_force, ' +\
-        'force_params=force_params, ' +\
-        'graph=training_graph)')
-
     print(f"average metrics over {params.num_shots} shots:")
     print(f"f1_micro: {np.mean([metrics.f1_micro for metrics in shot_metrics])}")
     print(f"f1_micro std: {np.std([metrics.f1_micro for metrics in shot_metrics])}")
@@ -186,6 +155,36 @@ def main(argv) -> None:
 
     df.to_csv(f"{OUTPUT_PATH}{dataset_name}_{params.num_dimensions}_{'nn' if params.use_neural_force else 'spring'}.csv")
 
+    sim_jit = jax.jit(sm.simulate, static_argnames=["simulation_params", "use_neural_force"])
+
+    print("JIT compilation and execution times:")
+    # measure compilation time
+    ipython.run_line_magic("time", 'jax.block_until_ready(sim_jit(' +\
+        'simulation_params=simulation_params_test,' +\
+        'node_state=node_state,' +\
+        'use_neural_force=params.use_neural_force, ' +\
+        'force_params=force_params, ' +\
+        'graph=training_graph))')
+    
+    # measure execution time
+    ipython.run_line_magic("timeit", 'jax.block_until_ready(sim_jit(' +\
+        'simulation_params=simulation_params_test,' +\
+        'node_state=node_state,' +\
+        'use_neural_force=params.use_neural_force, ' +\
+        'force_params=force_params, ' +\
+        'graph=training_graph))')
+    
+    # disable JIT compilation
+    jax.config.update("jax_disable_jit", True)
+    sim_no_jit = sm.simulate
+
+    print("Execution time without JIT compilation:")
+    ipython.run_line_magic("timeit", 'sim_no_jit(' +\
+        'simulation_params=simulation_params_test,' +\
+        'node_state=node_state,' +\
+        'use_neural_force=params.use_neural_force, ' +\
+        'force_params=force_params, ' +\
+        'graph=training_graph)')
 
 
 if __name__ == "__main__":

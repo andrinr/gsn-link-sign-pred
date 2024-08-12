@@ -1,5 +1,6 @@
 from torch_geometric.data import Data
 from torch_geometric.utils import subgraph
+import torch_geometric.transforms as T
 from typing import NamedTuple
 import jax.numpy as jnp
 import torch
@@ -41,8 +42,12 @@ def to_SignedGraph(
     treat_as_undirected : bool,
     reindexing : bool = True) -> SignedGraph:
 
-    data, train_mask, test_mask = g.permute_split(data, 0.8, treat_as_undirected)
+    # add largest connected component transform
+    transform = T.Compose([T.LargestConnectedComponents(num_components=1)])
+    data = transform(data)
 
+    data, train_mask, test_mask = g.permute_split(data, 0.8, treat_as_undirected)
+    
     if reindexing:
         keep = torch.unique(data.edge_index)
         edge_index, edge_attr = subgraph(
@@ -119,3 +124,46 @@ def to_SignedGraph(
         num_edges,
         test_mask,
         train_mask)
+
+def generate_synthetic_graph(
+        num_nodes : int,
+        num_edges : int,
+        p_positive = 0.9) -> SignedGraph:
+    
+    edge_index = jax.random.randint(
+        key=jax.random.PRNGKey(0),
+        minval=0,
+        maxval=num_nodes,
+        shape=(2, num_edges))
+    edge_index = jnp.concatenate((edge_index, edge_index[::-1]), axis=1)
+    
+    signs = jax.random.bernoulli(
+        key=jax.random.PRNGKey(1),
+        p=p_positive,
+        shape=(num_edges))
+    
+    signs = jnp.where(signs == 0, -1, 1)
+    signs = jnp.concatenate((signs, signs), axis=0)
+
+    signs_one_hot = jax.nn.one_hot(signs + 1, 3)
+
+    test_mask = jax.random.bernoulli(
+        key=jax.random.PRNGKey(2),
+        p=0.1,
+        shape=(num_edges,))
+    
+    train_mask = jnp.where(test_mask == 0, 1, 0)
+    
+    return SignedGraph(
+        edge_index, 
+        signs, 
+        signs_one_hot,
+        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
+        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
+        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
+        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
+        num_nodes, 
+        num_edges,
+        test_mask,
+        train_mask)
+

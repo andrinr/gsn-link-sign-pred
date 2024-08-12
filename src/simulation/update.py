@@ -6,13 +6,13 @@ EPSILON = 1e-6
 
 def init_spring_force_params() -> sm.SpringForceParams:
     return sm.SpringForceParams(
-        friend_distance=0.0,
-        friend_stiffness=10.0,
-        neutral_distance=1.0,
-        neutral_stiffness=0.1,
-        enemy_distance=15.0,
-        enemy_stiffness=10.0,
-        degree_multiplier=3.0)
+        friend_distance=1.0,
+        friend_stiffness=5.0,
+        neutral_distance=2.5,
+        neutral_stiffness=1.0,
+        enemy_distance=10.0,
+        enemy_stiffness=5.0,
+        degree_multiplier=1.0)
 
 def init_node_state(
     rng : jax.random.PRNGKey, 

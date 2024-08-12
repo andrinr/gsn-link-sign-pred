@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import jax
 from functools import partial
 from typing import Tuple
-from typing import NamedTuple
 
 import graph as g
 import simulation as sm
@@ -55,11 +54,13 @@ def simulate_and_loss(
         force_params = force_params,
         graph=training_graph)
 
-    # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
-    x_0s = jnp.linspace(-1.0, 1.0, 10)
-    losses = jnp.array([loss(node_state, graph, x_0, simulation_params.threshold) for x_0 in x_0s])
+    # # We evalute the loss function for different threeshold values to approximate the behavior of the auc metric
+    # x_0s = jnp.linspace(-1.0, 1.0, 10)
+    # losses = jnp.array([loss(node_state, graph, x_0, simulation_params.threshold) for x_0 in x_0s])
 
-    loss_value = jnp.mean(losses)
+    # loss_value = jnp.mean(losses)
+
+    loss_value = loss(node_state, graph, 0, simulation_params.threshold)    
     
     predicted_sign = predict(
         node_state = node_state,

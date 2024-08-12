@@ -30,7 +30,6 @@ colors = list(colors.colors)
 # add black stroke to colors
 barplot = data.plot(kind='bar', ax=ax, logy=True, width=0.9, color=colors, edgecolor='black', linewidth=0.5)
 
-
 # set grid to background
 ax.grid(axis='y', linestyle='-', alpha=1.0, linewidth=0.5, color='black')
 
