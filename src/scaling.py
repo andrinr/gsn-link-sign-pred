@@ -15,6 +15,8 @@ from IPython import get_ipython
 import torch
 import torch_geometric
 ipython = get_ipython()
+import time
+import pandas as pd
 
 # Local dependencies
 import simulation as sm
@@ -32,6 +34,51 @@ class TestParameters(NamedTuple):
     use_neural_force: bool
     threshold: float
     num_shots: int
+
+def measure_time(graph, params, force_params, key):
+
+    training_signs = graph.sign.copy()
+    training_signs = jnp.where(graph.train_mask, training_signs, 0)
+    training_graph = graph._replace(sign=training_signs)
+    training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
+    training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+
+    sim_jit = jax.jit(sm.simulate, static_argnames=["simulation_params", "use_neural_force"])
+
+    simulation_params_test = sm.SimulationParams(
+        iterations=params.test_iterations,
+        dt=params.test_dt,
+        damping=params.test_damping,
+        threshold=params.threshold)
+
+    node_state = sm.init_node_state(
+        rng=key,
+        n=graph.num_nodes,
+        m=graph.num_edges,
+        range=params.init_pos_range,
+        embedding_dim=params.num_dimensions)
+
+    # warm up
+    sim_jit(
+        simulation_params=simulation_params_test,
+        node_state=node_state,
+        use_neural_force=params.use_neural_force, 
+        force_params=force_params, 
+        graph=graph)
+    
+    total_time = 0
+    for _ in range(5):
+        start_time = time.time()
+        jax.block_until_ready(sim_jit(
+            simulation_params=simulation_params_test,
+            node_state=node_state,
+            use_neural_force=params.use_neural_force,
+            force_params=force_params,
+            graph=training_graph))
+        end_time = time.time()
+        total_time += end_time - start_time
+
+    return total_time / 5
 
 def main(argv) -> None:
     """
@@ -55,9 +102,7 @@ def main(argv) -> None:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
     params = TestParameters(**params)
-    # Create initial values for neural network parameters
-    key_params, key_training, key_test = random.split(random.PRNGKey(2), 3)
-        
+
     if params.use_neural_force:
         force_params_path = f"{MODEL_PATH}SPRING-NN.yaml"
         with open(force_params_path, 'r') as file:
@@ -67,53 +112,43 @@ def main(argv) -> None:
         with open(force_params_path, 'r') as file:
             force_params = yaml.load(file, Loader=yaml.UnsafeLoader)
     
-    for num_edges in [100, 1000, 10000, 100000]:
-        num_nodes = 1000
-        data = torch_geometric.data.Data()
+    edge_times = []
+    num_edges_list = jnp.logspace(3, 6, 4, base=10).astype(jnp.int32)
+    for num_edges in num_edges_list:
+        num_nodes = 10000
+        data = torch_geometric.data.Data(num_edges=num_edges, num_nodes=num_nodes)
         data.edge_index = torch.randint(0, num_nodes, (2, num_edges))
         num_edges = data.edge_index.shape[1]
         print(f"Number of nodes: {num_nodes}, number of edges: {num_edges}")
         signs = torch.randint(0, 2, (num_edges,))
         data.edge_attr = torch.where(signs == 0, -1, 1)
         graph = g.to_SignedGraph(data, True)
+        key = random.PRNGKey(num_edges)
+        edge_times.append(measure_time(graph, params, force_params, key))
 
-        training_signs = graph.sign.copy()
-        training_signs = jnp.where(graph.train_mask, training_signs, 0)
-        training_graph = graph._replace(sign=training_signs)
-        training_signs_one_hot = jax.nn.one_hot(training_signs + 1, 3)
-        training_graph = training_graph._replace(sign_one_hot=training_signs_one_hot)
+    node_times = []
+    num_nodes_list = jnp.logspace(3, 6, 4, base=10).astype(jnp.int32)
+    for num_nodes in num_edges_list:
+        num_edges = 10000
+        data = torch_geometric.data.Data(num_edges=num_edges, num_nodes=num_nodes)
+        data.edge_index = torch.randint(0, num_nodes, (2, num_edges))
+        num_edges = data.edge_index.shape[1]
+        print(f"Number of nodes: {num_nodes}, number of edges: {num_edges}")
+        signs = torch.randint(0, 2, (num_edges,))
+        data.edge_attr = torch.where(signs == 0, -1, 1)
+        graph = g.to_SignedGraph(data, True)
+        key = random.PRNGKey(num_edges)
+        edge_times.append(measure_time(graph, params, force_params, key))
 
-        sim_jit = jax.jit(sm.simulate, static_argnames=["simulation_params", "use_neural_force"])
+    df = pd.DataFrame({
+        "num_edges": num_edges_list,
+        "edge_times": edge_times,
+        "num_nodes": num_nodes_list,
+        "node_times": node_times
+    })
+    
 
-        simulation_params_test = sm.SimulationParams(
-            iterations=params.test_iterations,
-            dt=params.test_dt,
-            damping=params.test_damping,
-            threshold=params.threshold)
 
-        node_state = sm.init_node_state(
-            rng=key_test,
-            n=graph.num_nodes,
-            m=graph.num_edges,
-            range=params.init_pos_range,
-            embedding_dim=params.num_dimensions)
-
-        print("JIT compilation and execution times:")
-        # measure compilation time
-        ipython.run_line_magic("time", 'jax.block_until_ready(sim_jit(' +\
-            'simulation_params=simulation_params_test,' +\
-            'node_state=node_state,' +\
-            'use_neural_force=params.use_neural_force, ' +\
-            'force_params=force_params, ' +\
-            'graph=training_graph))')
-
-        # measure execution time
-        ipython.run_line_magic("timeit", 'jax.block_until_ready(sim_jit(' +\
-            'simulation_params=simulation_params_test,' +\
-            'node_state=node_state,' +\
-            'use_neural_force=params.use_neural_force, ' +\
-            'force_params=force_params, ' +\
-            'graph=training_graph))')
     
     # # disable JIT compilation
     # jax.config.update("jax_disable_jit", True)
