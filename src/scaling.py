@@ -67,7 +67,7 @@ def measure_time(graph, params, force_params, key):
         graph=graph)
     
     total_time = 0
-    for _ in range(5):
+    for _ in range(1):
         start_time = time.time()
         jax.block_until_ready(sim_jit(
             simulation_params=simulation_params_test,
@@ -78,7 +78,7 @@ def measure_time(graph, params, force_params, key):
         end_time = time.time()
         total_time += end_time - start_time
 
-    return total_time / 5
+    return total_time / 1
 
 def main(argv) -> None:
     """
@@ -112,10 +112,10 @@ def main(argv) -> None:
         with open(force_params_path, 'r') as file:
             force_params = yaml.load(file, Loader=yaml.UnsafeLoader)
     
-    edge_times = []
-    num_edges_list = jnp.logspace(3, 6, 4, base=10).astype(jnp.int32)
-    for num_edges in num_edges_list:
-        num_nodes = 10000
+    dim_times = []
+    dim_list = jnp.logspace(3, 6, 4).astype(int)
+    for num_nodes in dim_list:
+        num_edges = num_nodes * 10
         data = torch_geometric.data.Data(num_edges=num_edges, num_nodes=num_nodes)
         data.edge_index = torch.randint(0, num_nodes, (2, num_edges))
         num_edges = data.edge_index.shape[1]
@@ -124,28 +124,37 @@ def main(argv) -> None:
         data.edge_attr = torch.where(signs == 0, -1, 1)
         graph = g.to_SignedGraph(data, True)
         key = random.PRNGKey(num_edges)
-        edge_times.append(measure_time(graph, params, force_params, key))
-
-    node_times = []
-    num_nodes_list = jnp.logspace(3, 6, 4, base=10).astype(jnp.int32)
-    for num_nodes in num_edges_list:
-        num_edges = 10000
-        data = torch_geometric.data.Data(num_edges=num_edges, num_nodes=num_nodes)
-        data.edge_index = torch.randint(0, num_nodes, (2, num_edges))
-        num_edges = data.edge_index.shape[1]
-        print(f"Number of nodes: {num_nodes}, number of edges: {num_edges}")
-        signs = torch.randint(0, 2, (num_edges,))
-        data.edge_attr = torch.where(signs == 0, -1, 1)
-        graph = g.to_SignedGraph(data, True)
-        key = random.PRNGKey(num_edges)
-        edge_times.append(measure_time(graph, params, force_params, key))
+        dim_times.append(measure_time(graph, params, force_params, key))
 
     df = pd.DataFrame({
-        "num_edges": num_edges_list,
-        "edge_times": edge_times,
-        "num_nodes": num_nodes_list,
-        "node_times": node_times
+        "num_nodes": dim_list,
+        "node_times": dim_times
     })
+
+    df.to_csv(f"{OUTPUT_PATH}node_times.csv", index=False)
+
+    dim_times = []
+    dim_list = jnp.logspace(4, 7, 4, base=2).astype(int)
+    for dim in dim_list:
+        params = params._replace(num_dimensions=dim)
+        num_nodes = 10000
+        num_edges = num_nodes * 10
+        data = torch_geometric.data.Data(num_edges=num_edges, num_nodes=num_nodes)
+        data.edge_index = torch.randint(0, num_nodes, (2, num_edges))
+        num_edges = data.edge_index.shape[1]
+        print(f"Number of nodes: {num_nodes}, number of edges: {num_edges}")
+        signs = torch.randint(0, 2, (num_edges,))
+        data.edge_attr = torch.where(signs == 0, -1, 1)
+        graph = g.to_SignedGraph(data, True)
+        key = random.PRNGKey(num_edges)
+        dim_times.append(measure_time(graph, params, force_params, key))
+
+    df = pd.DataFrame({
+        "num_nodes": dim_list,
+        "node_times": dim_times
+    })
+
+    df.to_csv(f"{OUTPUT_PATH}dim_times.csv", index=False)
     
 
 
