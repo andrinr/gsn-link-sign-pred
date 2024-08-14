@@ -40,8 +40,8 @@ parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to
 parser.add_argument('--lr', type=float, default=0.001, help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=0.001, help='Weight decay (L2 loss on parameters).')
 parser.add_argument('--dataset', default='bitcoin_alpha', help='Dataset')
-parser.add_argument('--dim', type=int, default=20, help='Embedding dimension')
-parser.add_argument('--fea_dim', type=int, default=20, help='Feature embedding dimension')
+parser.add_argument('--dim', type=int, default=64, help='Embedding dimension')
+parser.add_argument('--fea_dim', type=int, default=64, help='Feature embedding dimension')
 parser.add_argument('--batch_size', type=int, default=500, help='Batch size')
 parser.add_argument('--dropout', type=float, default=0.0, help='Dropout k')
 parser.add_argument('--k', default=1, help='Folder k')
@@ -447,23 +447,23 @@ def run(dataset, k):
 
     for epoch in range(EPOCHS + 2):
         total_loss = []
-        if epoch % INTERVAL_PRINT == 0:
-            model.eval()
-            all_embedding = np.zeros((NUM_NODE, EMBEDDING_SIZE1))
-            for i in range(0, NUM_NODE, BATCH_SIZE):
-                begin_index = i
-                end_index = i + BATCH_SIZE if i + BATCH_SIZE < NUM_NODE else NUM_NODE
-                values = np.arange(begin_index, end_index)
-                embed = model.forward(values.tolist())
-                embed = embed.data.cpu().numpy()
-                all_embedding[begin_index: end_index] = embed
+        # if epoch % INTERVAL_PRINT == 0:
+        #     model.eval()
+        #     all_embedding = np.zeros((NUM_NODE, EMBEDDING_SIZE1))
+        #     for i in range(0, NUM_NODE, BATCH_SIZE):
+        #         begin_index = i
+        #         end_index = i + BATCH_SIZE if i + BATCH_SIZE < NUM_NODE else NUM_NODE
+        #         values = np.arange(begin_index, end_index)
+        #         embed = model.forward(values.tolist())
+        #         embed = embed.data.cpu().numpy()
+        #         all_embedding[begin_index: end_index] = embed
 
-            fpath = os.path.join(OUTPUT_DIR, 'embedding-{}-{}-{}.npy'.format(dataset, k, str(epoch)))
-            np.save(fpath, all_embedding)
-            pos_ratio, accuracy, f1_score0, f1_score1, f1_score2, auc_score = logistic_embedding(k=k, dataset=dataset,
-                                                                                                 epoch=epoch,
-                                                                                                dirname=OUTPUT_DIR)
-            model.train()
+        #     fpath = os.path.join(OUTPUT_DIR, 'embedding-{}-{}-{}.npy'.format(dataset, k, str(epoch)))
+        #     np.save(fpath, all_embedding)
+        #     # pos_ratio, accuracy, f1_score0, f1_score1, f1_score2, auc_score = logistic_embedding(k=k, dataset=dataset,
+        #     #                                                                                      epoch=epoch,
+        #     #                                                                                     dirname=OUTPUT_DIR)
+        #     model.train()
 
         time1 = time.time()
         nodes_pku = np.random.permutation(NUM_NODE).tolist()
@@ -493,7 +493,6 @@ def main():
     print('DROUPOUT', DROUPOUT)
     dataset = args.dataset
     run(dataset=dataset, k=K)
-
 
 if __name__ == "__main__":
     main()
