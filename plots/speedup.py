@@ -15,7 +15,6 @@ data = pd.read_csv(
 # transpose data
 # remove WikiRFA column
 print(data)
-data = data.drop(columns=['WikiRFA'])
 data = data.T
 
 fig, ax = plt.subplots()

@@ -34,7 +34,7 @@ from logistic_function import logistic_embedding
 
 # Training settings
 parser = argparse.ArgumentParser()
-parser.add_argument('--devices', type=str, default='cpu', help='Devices')
+parser.add_argument('--devices', type=str, default='cuda', help='Devices')
 parser.add_argument('--seed', type=int, default=13, help='Random seed.')
 parser.add_argument('--epochs', type=int, default=100, help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.001, help='Initial learning rate.')

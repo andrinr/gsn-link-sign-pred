@@ -61,9 +61,9 @@ def read_in_feature_data(feature_file_name, num_input_features):
     return num_feats, feat_data
 
 
-def load_data(network_file_name, feature_file_name, test_network_file_name, num_input_features):
+def load_data(network_file_name, test_network_file_name):
     num_nodes, num_edges, adj_lists_pos, adj_lists_neg = read_in_undirected_network(network_file_name)
-    num_feats, feat_data = read_in_feature_data(feature_file_name, num_input_features)
+    # num_feats, feat_data = read_in_feature_data(feature_file_name, num_input_features)
 
     if test_network_file_name is not None:
         test_num_nodes, test_num_edges, test_adj_lists_pos, test_adj_lists_neg = \
@@ -72,7 +72,7 @@ def load_data(network_file_name, feature_file_name, test_network_file_name, num_
         test_num_nodes, test_adj_lists_pos, test_adj_lists_neg = None, None, None
 
     return num_nodes, num_edges, adj_lists_pos, adj_lists_neg, \
-           num_feats, feat_data, test_adj_lists_pos, test_adj_lists_neg
+           test_adj_lists_pos, test_adj_lists_neg
 
 
 def calculate_class_weights(num_V, num_pos, num_neg, w_no=None):

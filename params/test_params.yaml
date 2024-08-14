@@ -2,8 +2,8 @@ num_dimensions: 64
 use_neural_force: True
 use_blackbox : False
 test_iterations: 120
-test_dt: 0.01
-test_damping: 0.05
+test_dt: 0.001
+test_damping: 0.95
 init_pos_range: 1.0
 threshold: 2.5
 num_shots : 5

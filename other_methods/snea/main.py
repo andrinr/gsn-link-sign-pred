@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(description="""This is the code to run the SNEA
 parser.add_argument('--cuda_available', type=bool, default=True)
 parser.add_argument('--cuda_device', type=int, default=0)  # -1 for cpu;
 parser.add_argument('--network_file_name', type=str, required=True)
-parser.add_argument('--feature_file_name', type=str, required=True)
+parser.add_argument('--feature_file_name', type=str, required=False)
 parser.add_argument('--test_network_file_name', type=str, required=False, default=None)
 parser.add_argument('--lambda_structure', type=float, default=4.0)
 parser.add_argument('--learning_rate', type=float, default=0.01)
@@ -78,10 +78,11 @@ num_neighbors_sample = args['num_neighbors_sample']  # None
 # ================================================================================= #
 
 
-num_nodes, num_edges, adj_lists_pos, adj_lists_neg, num_feats, feat_data, test_adj_lists_pos, test_adj_lists_neg = \
-    load_data(args['network_file_name'], args['feature_file_name'], args['test_network_file_name'],
-              args['num_input_features'],  # test_size=0.2
-              )
+num_nodes, num_edges, adj_lists_pos, adj_lists_neg, test_adj_lists_pos, test_adj_lists_neg = \
+    load_data(args['network_file_name'], args['test_network_file_name'])
+
+feat_data = torch.zeros(num_nodes,64)
+num_feats = 64
 
 if args['num_input_features'] is None:
     args['num_input_features'] = num_feats

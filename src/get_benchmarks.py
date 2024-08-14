@@ -68,6 +68,8 @@ def main(argv) -> None:
         with open(force_params_path, 'r') as file:
             force_params = yaml.load(file, Loader=yaml.UnsafeLoader)
 
+    print(force_params)
+
     shot_metrics = []
     key_shots = random.split(key_test, params.num_shots)  
     graph = {}

@@ -1,8 +1,8 @@
-                BitcoinAlpha,   Slashdot,   Epinions
-SpringE (JIT),  12,                         2290
-SE-NN (JIT),    20,                         3570
-SpringE,        1600,                       9230
-SE-NN,          2870,                       11900
-SGCN,           2888,           513698,     21000000
-SDGNN,          861950,                     0,
-SIGAT,          439250,                     0,
+                BitcoinAlpha,   Slashdot,   
+SpringE (JIT),  10,             642,
+SE-NN (JIT),    18,             990,
+SpringE,        1230,           3170,
+SE-NN,          2410,           4010,
+SGCN,           1719,           53918,
+SDGNN,          702194,         28367920,            
+SIGAT,          355642,         9152422,
