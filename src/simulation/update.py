@@ -8,8 +8,8 @@ def init_spring_force_params() -> sm.SpringForceParams:
     return sm.SpringForceParams(
         friend_distance=1.0,
         friend_stiffness=1.0,
-        enemy_distance=10.0,
-        enemy_stiffness=5.0,
+        enemy_distance=1.0,
+        enemy_stiffness=1.0,
         degree_multiplier=1.0)
 
 def init_node_state(
@@ -77,8 +77,8 @@ def spring_node_acceleration(
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)
     spring_vector_norm = spring_vector / (distance + EPSILON)
 
-    attraction = jnp.maximum(distance - params.friend_distance, 0) * params.friend_stiffness /2
-    retraction = -jnp.maximum(params.enemy_distance - distance, 0) * params.enemy_stiffness /2
+    attraction = (distance - params.friend_distance) * params.friend_stiffness /2
+    retraction = -(params.enemy_distance - distance) * params.enemy_stiffness /2
    
     sign = jnp.expand_dims(graph.train_sign, axis=1)
 

@@ -49,23 +49,18 @@ def simulate_and_loss(
 
     loss_value = loss(node_state, graph, 0, simulation_params.threshold)    
     
-    predicted_sign = predict(
-        node_state = node_state,
-        graph = graph,
-        x_0 = 0,
-        threshold = simulation_params.threshold)
 
-    return loss_value, (node_state, predicted_sign)
+    return loss_value, node_state
 
 def predict(
     node_state : sm.NodeState,
-    graph : g.SignedGraph,
+    edge_index : jax.Array,
     x_0 : float,
     threshold : float,
 ) -> jnp.ndarray:
     
-    position_i = node_state.position[graph.train_edge_index[0]]
-    position_j = node_state.position[graph.train_edge_index[1]]
+    position_i = node_state.position[edge_index[0]]
+    position_j = node_state.position[edge_index[1]]
 
     distance = jnp.linalg.norm(position_j - position_i, axis=1) - threshold
 
@@ -80,32 +75,41 @@ def loss(
     x_0 : float,
     threshold : float,
 ) -> float:
-    predicted_sign = predict(
+    predicted_sign_train = predict(
         node_state = node_state,
-        graph = graph,
+        edge_index= graph.train_edge_index,
+        x_0 = x_0,
+        threshold = threshold)
+    
+    predicted_sign_test = predict(
+        node_state = node_state,
+        edge_index= graph.test_edge_index,
         x_0 = x_0,
         threshold = threshold)
 
-    sign_binary = graph.train_sign * 0.5 + 0.5
+    sign_binary_train = graph.train_sign * 0.5 + 0.5
+    sign_binary_test = graph.test_sign * 0.5 + 0.5
 
-    incorrect_predictions = jnp.square(sign_binary - predicted_sign)
+    incorrect_predictions_train = jnp.square(sign_binary_train - predicted_sign_train)
+    incorrect_predictions_test = jnp.square(sign_binary_test - predicted_sign_test)
 
-    fraction_negatives = jnp.sum(sign_binary == 0) / sign_binary.shape[0]
-    fraction_positives =  1 - fraction_negatives
+    print(sign_binary_train.shape)
+    print(incorrect_predictions_train.shape)
 
-    weight_positives = 1 / fraction_positives
-    weight_negatives = 1 / fraction_negatives
+    # fraction_negatives = jnp.sum(sign_binary_train == 0) / sign_binary_train.shape[0]
+    # fraction_positives =  1 - fraction_negatives
 
-    jnp.where(
-        sign_binary == 1, 
-        incorrect_predictions * weight_positives, 
-        incorrect_predictions * weight_negatives)
+    # weight_positives = 1 / fraction_positives
+    # weight_negatives = 1 / fraction_negatives
     
-    incorrect_predictions_weighted = jnp.where(
-        sign_binary == 1, 
-        incorrect_predictions * weight_positives, 
-        incorrect_predictions * weight_negatives)
+    loss_train = jnp.mean(jnp.where(
+        sign_binary_train == 1, 
+        incorrect_predictions_train * 1/0.9, 
+        incorrect_predictions_train * 1/0.1))
     
-    loss = jnp.mean(incorrect_predictions_weighted)
+    # loss_test = jnp.mean(jnp.where(
+    #     sign_binary_test == 1, 
+    #     incorrect_predictions_test * 1/0.9, 
+    #     incorrect_predictions_test * 1/0.1))
 
-    return loss
+    return loss_train

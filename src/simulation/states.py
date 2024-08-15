@@ -14,8 +14,10 @@ class SimulationParams(NamedTuple):
 class MLP(NamedTuple):
     w0 : jnp.ndarray
     w1 : jnp.ndarray
+    w2 : jnp.ndarray
     b0 : jnp.ndarray
     b1 : jnp.ndarray
+    b2 : jnp.ndarray
 
 class NeuralEdgeParams(NamedTuple):
     friend : MLP

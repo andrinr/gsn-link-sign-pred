@@ -43,7 +43,7 @@ def main(argv) -> None:
     #os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
 
     # Set the precision to 64 bit in case of NaN gradients
-    jax.config.update("jax_enable_x64", True)
+    jax.config.update("jax_enable_x64", False)
     print(xla_bridge.get_backend().platform)
     # disable jit compilation for debugging
     jax.config.update("jax_disable_jit", False)
@@ -83,6 +83,7 @@ def main(argv) -> None:
                 batches.append(signedGraph)
     else:
         batches.append(g.to_SignedGraph(dataset, True))
+        print(batches[0])
         
     if params.use_neural_force:
         force_params = sm.init_neural_params(key_params)

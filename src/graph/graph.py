@@ -3,6 +3,9 @@ from typing import NamedTuple
 import jax.numpy as jnp
 import graph as g
 import matplotlib.pyplot as plt
+import torch_geometric.transforms as T
+import torch
+from torch_geometric.utils import subgraph
 
 class Measures(NamedTuple):
     max : int
@@ -35,8 +38,24 @@ class SignedGraph(NamedTuple):
 
 def to_SignedGraph(
     data : Data,
-    treat_as_undirected : bool,
-    reindexing : bool = True) -> SignedGraph:
+    treat_as_undirected : bool) -> SignedGraph:
+
+    transform = T.Compose([T.LargestConnectedComponents(num_components=1)])
+    data = transform(data)
+
+    # get node indices of largest connected component
+    nodes = torch.unique(data.edge_index.flatten())
+
+    edge_index, edge_attr  = subgraph(
+        nodes, 
+        data.edge_index,
+        data.edge_attr,
+        relabel_nodes=True)
+    
+    data = Data(edge_attr=edge_attr, edge_index=edge_index)
+
+    transform = T.Compose([T.ToUndirected(reduce='min')])
+    data = transform(data)
 
     train_data, test_data = g.permute_split(data, 0.8, treat_as_undirected)
 
@@ -51,7 +70,9 @@ def to_SignedGraph(
     test_num_edges = test_edge_index.shape[1]
     train_num_edges = train_edge_index.shape[1]
 
-    train_degs = jnp.bincount(train_edge_index[0])
+    train_degs = jnp.bincount(train_edge_index[0]) + 1
+
+    print(f" avg deg {train_degs.mean()}")
 
     train_centr = train_degs
     train_centr = train_centr / jnp.max(train_centr)

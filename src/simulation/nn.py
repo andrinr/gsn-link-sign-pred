@@ -8,7 +8,7 @@ def init_neural_params(key : jax.random.PRNGKey
 ) -> sm.NeuralParams:
     init_orth = jax.nn.initializers.orthogonal()
     init_zeros = jax.nn.initializers.zeros
-    init_normal = jax.nn.initializers.normal()
+    init_normal = jax.nn.initializers.normal(stddev=0.01)
 
     mlps = []
 
@@ -19,10 +19,12 @@ def init_neural_params(key : jax.random.PRNGKey
     for _ in range(2):
         mlps.append(sm.MLP(
             w0=init_orth(key, (n_in, n_hidden)),
-            w1=init_normal(key, (n_hidden, n_out)),
+            w1=init_orth(key, (n_hidden, n_hidden)),
+            w2=init_normal(key, (n_hidden, n_out)),
             b0=init_zeros(key, (n_hidden,)),
-            b1=init_zeros(key, (n_out,))))
-    
+            b1=init_zeros(key, (n_hidden,)),
+            b2=init_zeros(key, (n_out,))))
+            
     edge_params = sm.NeuralEdgeParams(
         friend=mlps[0],
         enemy=mlps[1])
@@ -33,9 +35,11 @@ def init_neural_params(key : jax.random.PRNGKey
     
     node_params = sm.MLP(
         w0=init_orth(key, (n_in, n_hidden)),
-        w1=init_orth(key, (n_hidden, n_out)),
+        w1=init_orth(key, (n_hidden, n_hidden)),
+        w2=init_normal(key, (n_hidden, n_out)),
         b0=init_zeros(key, (n_hidden,)),
-        b1=init_zeros(key, (n_out,)))
+        b1=init_zeros(key, (n_hidden,)),
+        b2=init_zeros(key, (n_out,)))
     
     return sm.NeuralParams(edge_params, node_params)
 
@@ -43,4 +47,6 @@ def apply_mlp(mlp : sm.MLP, x : jnp.ndarray) -> jnp.ndarray:
     x = jnp.dot(x, mlp.w0) + mlp.b0
     x = jax.nn.relu(x)
     x = jnp.dot(x, mlp.w1) + mlp.b1
+    x = jax.nn.relu(x)
+    x = jnp.dot(x, mlp.w2) + mlp.b2
     return x

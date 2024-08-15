@@ -12,7 +12,7 @@
     - !!python/tuple []
     - &id003 !!python/object/apply:numpy.dtype
       args:
-      - f8
+      - f4
       - false
       - true
       state: !!python/tuple
@@ -26,9 +26,8 @@
       - 0
     - false
     - !!binary |
-      iO7olhV50j8=
-  - named_shape: &id004 {}
-    weak_type: false
+      VoQEwA==
+  - weak_type: false
 - !!python/object/apply:jax._src.array._reconstruct_array
   - *id001
   - !!python/tuple
@@ -43,9 +42,8 @@
     - *id003
     - false
     - !!binary |
-      msNWkZwaJkA=
-  - named_shape: *id004
-    weak_type: false
+      +9dmQA==
+  - weak_type: false
 - !!python/object/apply:jax._src.array._reconstruct_array
   - *id001
   - !!python/tuple
@@ -60,9 +58,8 @@
     - *id003
     - false
     - !!binary |
-      QzL/nuqJ4D8=
-  - named_shape: *id004
-    weak_type: false
+      wE2vQA==
+  - weak_type: false
 - !!python/object/apply:jax._src.array._reconstruct_array
   - *id001
   - !!python/tuple
@@ -77,9 +74,8 @@
     - *id003
     - false
     - !!binary |
-      M28adzXEFUA=
-  - named_shape: *id004
-    weak_type: false
+      s0qbQA==
+  - weak_type: false
 - !!python/object/apply:jax._src.array._reconstruct_array
   - *id001
   - !!python/tuple
@@ -94,40 +90,5 @@
     - *id003
     - false
     - !!binary |
-      LsnU2+1hI0A=
-  - named_shape: *id004
-    weak_type: false
-- !!python/object/apply:jax._src.array._reconstruct_array
-  - *id001
-  - !!python/tuple
-    - *id002
-    - !!python/tuple
-      - 0
-    - !!binary |
-      Yg==
-  - !!python/tuple
-    - 1
-    - !!python/tuple []
-    - *id003
-    - false
-    - !!binary |
-      adY/lcm+LEA=
-  - named_shape: *id004
-    weak_type: false
-- !!python/object/apply:jax._src.array._reconstruct_array
-  - *id001
-  - !!python/tuple
-    - *id002
-    - !!python/tuple
-      - 0
-    - !!binary |
-      Yg==
-  - !!python/tuple
-    - 1
-    - !!python/tuple []
-    - *id003
-    - false
-    - !!binary |
-      rtVMmJ0oBkA=
-  - named_shape: *id004
-    weak_type: false
+      845xPw==
+  - weak_type: false

@@ -92,10 +92,6 @@ def gradient_training(
 ) -> tuple[sm.NeuralEdgeParams, list[float], list[sm.Metrics]]:
 
     optimizer = optax.adam(training_params.learning_rate)
-    # optimizer = optax.noisy_sgd(
-    #     learning_rate=training_params.learning_rate,
-    #     eta=0.01,
-    #     gamma=0.55)
     
     force_optimizer_multi_step = optax.MultiSteps(
         optimizer, training_params.multi_step)
@@ -124,7 +120,7 @@ def gradient_training(
                 n=batch_graph.num_nodes,
                 embedding_dim=training_params.embedding_dim)
             # run simulation and compute loss, auxillaries and gradient
-            (loss_value, (spring_state, signs_pred)), grad = value_and_grad_fn(
+            (loss_value, spring_state), grad = value_and_grad_fn(
                 simulation_params, #0
                 spring_state, #1
                 use_neural_force, #2
@@ -145,6 +141,10 @@ def gradient_training(
                     spring_state,
                     batch_graph.test_edge_index,
                     batch_graph.test_sign)
+                
+                print(spring_state.position.mean())
+                print(spring_state.position.min())
+                print(spring_state.position.max())
 
             # update progress bar
             epochs.set_postfix({
@@ -154,12 +154,15 @@ def gradient_training(
                 "loss": f"{loss_value:.5f}",
                 "auc_p": round(metrics.auc_p, 5),
                 "auc_l": round(metrics.auc_l, 5),
-                "f1_macro": round(metrics.f1_macro, 5),
+                "f1_mac": round(metrics.f1_macro, 5),
+                "fi_wt" : round(metrics.f1_weighted, 5),
             })
 
         loss_history.append(epoch_loss)
         epoch_loss = 0
         metrics_history.append(metrics)
         force_params_history.append(force_params)
+
+    print(force_params)
 
     return force_params, loss_history, metrics_history, force_params_history
