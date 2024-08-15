@@ -3,7 +3,7 @@ import pandas as pd
 import torch_geometric
 
 
-epinions = get_dataset('src/data/', 'Epinions')
+epinions = get_dataset('src/data/', 'BitcoinOTC')
 
 # transforms = torch_geometric.transforms.Compose([torch_geometric.transforms.ToUndirected(reduce='min')])
 # epinions = transforms(epinions)
@@ -43,8 +43,8 @@ df['id2'] = edge_index_test[1].numpy()
 df['sign'] = signs_test
 
 # export 
-df_train.to_csv('other_methods/SiGAT/experiment-data/epinions-test-1.edgelist', index=False, header=False, sep=' ')
-df.to_csv('other_methods/SiGAT/experiment-data/epinions-train-1.edgelist', index=False, header=False, sep=' ')
+df_train.to_csv('other_methods/SiGAT/experiment-data/bitcoin_otc-test-1.edgelist', index=False, header=False, sep=' ')
+df.to_csv('other_methods/SiGAT/experiment-data/bitcoin_otc-train-1.edgelist', index=False, header=False, sep=' ')
 
 # # df_train.to_csv('other_methods/snea/slashdot.csv', index=False, header=False, sep=' ')
 # print('done')

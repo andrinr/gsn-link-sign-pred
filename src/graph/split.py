@@ -57,9 +57,19 @@ def permute_split(
     # create new graph with train edges and check if it is connected
     print(data.edge_index.shape )
     edge_index_train = data.edge_index[:, train_mask]
+<<<<<<< HEAD
 
     train_graph = Data(edge_index=edge_index_train, edge_attr=data.edge_attr[train_mask])
     test_graph = Data(edge_index=data.edge_index[:, test_mask], edge_attr=data.edge_attr[test_mask])
+=======
+    edge_index_train = jnp.array(edge_index_train)
+
+    edge_index_test 
+
+    node_degrees = jnp.bincount(edge_index_train[0])
+    print(jnp.sum(node_degrees == 0))
+    connected = jnp.all(node_degrees > 0)
+>>>>>>> 1be37199823fcc5f1d102f944336d3c7b7ff0637
     
     # get largest connected component
     transform = T.Compose([T.LargestConnectedComponents(num_components=1)])

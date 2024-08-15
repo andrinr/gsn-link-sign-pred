@@ -89,7 +89,7 @@ def main(argv) -> None:
         node_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
-            m=graph.num_edges,
+            m=graph.train_num_edges,
             range=params.init_pos_range,
             embedding_dim=params.num_dimensions)
 
@@ -159,14 +159,14 @@ def main(argv) -> None:
 
     sim_jit = jax.jit(sm.simulate, static_argnames=["simulation_params", "use_neural_force"])
 
-    print("JIT compilation and execution times:")
-    # measure compilation time
-    ipython.run_line_magic("time", 'jax.block_until_ready(sim_jit(' +\
-        'simulation_params=simulation_params_test,' +\
-        'node_state=node_state,' +\
-        'use_neural_force=params.use_neural_force, ' +\
-        'force_params=force_params, ' +\
-        'graph=training_graph))')
+    # print("JIT compilation and execution times:")
+    # # measure compilation time
+    # ipython.run_line_magic("time", 'jax.block_until_ready(sim_jit(' +\
+    #     'simulation_params=simulation_params_test,' +\
+    #     'node_state=node_state,' +\
+    #     'use_neural_force=params.use_neural_force, ' +\
+    #     'force_params=force_params, ' +\
+    #     'graph=training_graph))')
     
     # measure execution time
     ipython.run_line_magic("timeit", 'jax.block_until_ready(sim_jit(' +\

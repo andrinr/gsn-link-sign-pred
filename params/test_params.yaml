@@ -1,5 +1,5 @@
-num_dimensions: 128
-use_neural_force: False
+num_dimensions: 64
+use_neural_force: True
 use_blackbox : False
 test_iterations: 120
 test_dt: 0.001

@@ -244,7 +244,7 @@ def main(argv) -> None:
         spring_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
-            m=graph.num_edges,
+            m=graph.train_num_edges,
             range=INIT_POS_RANGE,
             embedding_dim=EMBEDDING_DIM
         )
@@ -316,7 +316,7 @@ def main(argv) -> None:
         spring_state = sm.init_node_state(
             rng=key_shots[shot],
             n=graph.num_nodes,
-            m=graph.num_edges,
+            m=graph.train_num_edges,
             range=INIT_POS_RANGE,
             embedding_dim=EMBEDDING_DIM
         )
@@ -431,7 +431,7 @@ def main(argv) -> None:
             spring_state = sm.init_node_state(
                 rng=key_shots[shot],
                 n=graph.num_nodes,
-                m=graph.num_edges,
+                m=graph.train_num_edges,
                 range=INIT_POS_RANGE,
                 embedding_dim=EMBEDDING_DIM
             )

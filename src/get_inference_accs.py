@@ -88,7 +88,7 @@ def main(argv) -> None:
     node_state = sm.init_node_state(
         rng=key_shots[0],
         n=graph.num_nodes,
-        m=graph.num_edges,
+        m=graph.train_num_edges,
         range=init_pos_range,
         embedding_dim=embedding_dim
     )
