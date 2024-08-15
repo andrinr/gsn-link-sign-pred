@@ -27,11 +27,6 @@ def permute_split(
     node_degrees = jnp.bincount(edge_index_train[0])
     print(jnp.sum(node_degrees == 0))
 
-    # connected = False
-    # i = 0
-    # while not connected:
-    # i += 1
-    # print(f"Permuting graph {i} times")
     if treat_as_undirected:
         mask = data.edge_index[0] < data.edge_index[1]
         data.edge_index = data.edge_index[:, mask]
@@ -40,9 +35,6 @@ def permute_split(
     num_total = data.edge_attr.shape[0]
     num_train = int(train_percentage * num_total)
     num_test = num_total - num_train
-
-    degs = torch.bincount(data.edge_index[0])
-    
 
     perm = torch.randperm(num_total, device=data.edge_index.device)
 
@@ -64,8 +56,9 @@ def permute_split(
     # create new graph with train edges and check if it is connected
     print(data.edge_index.shape )
     edge_index_train = data.edge_index[:, train_mask]
-
     edge_index_train = jnp.array(edge_index_train)
+
+    edge_index_test 
 
     node_degrees = jnp.bincount(edge_index_train[0])
     print(jnp.sum(node_degrees == 0))

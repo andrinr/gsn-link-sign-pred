@@ -65,7 +65,7 @@ def spring_node_scaling(
     params : sm.SpringForceParams,
     graph : g.SignedGraph,
 ) -> jnp.ndarray:
-    return (graph.centrality.values * params.degree_multiplier + 1.0)    
+    return (graph.train_centr.values * params.degree_multiplier + 1.0)    
 
 def spring_node_acceleration(
     params : sm.SpringForceParams,
@@ -100,9 +100,9 @@ def neural_node_scaling(
 ) -> jnp.ndarray:
 
     input = jnp.concatenate([
-        graph.degree.values,
-        graph.neg_degree.values,
-        graph.pos_degree.values], axis=1)
+        graph.train_deg.values,
+        graph.train_neg_deg.values,
+        graph.train_pos_deg.values], axis=1)
     
     return sm.apply_mlp(params.node_params, input)
 
@@ -115,12 +115,12 @@ def neural_node_acceleration(
     position_i = node_state.position[graph.edge_index[0]]
     position_j = node_state.position[graph.edge_index[1]]
 
-    degree_i = graph.degree.values[graph.edge_index[0]]
-    degree_j = graph.degree.values[graph.edge_index[1]]
-    degree_i_neg = graph.neg_degree.values[graph.edge_index[0]]
-    degree_j_neg = graph.neg_degree.values[graph.edge_index[1]]
-    degree_i_pos = graph.pos_degree.values[graph.edge_index[0]]
-    degree_j_pos = graph.pos_degree.values[graph.edge_index[1]]
+    degree_i = graph.train_deg.values[graph.edge_index[0]]
+    degree_j = graph.train_deg.values[graph.edge_index[1]]
+    degree_i_neg = graph.train_neg_deg.values[graph.edge_index[0]]
+    degree_j_neg = graph.train_neg_deg.values[graph.edge_index[1]]
+    degree_i_pos = graph.train_pos_deg.values[graph.edge_index[0]]
+    degree_j_pos = graph.train_pos_deg.values[graph.edge_index[1]]
 
     spring_vector = position_j - position_i
     distance = jnp.linalg.norm(spring_vector, axis=1, keepdims=True)

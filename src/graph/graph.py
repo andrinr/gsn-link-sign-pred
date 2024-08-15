@@ -25,17 +25,17 @@ class SignedGraph(NamedTuple):
     """
     A signed undirected graph.
     """
-    edge_index : jnp.ndarray
-    sign : jnp.ndarray
-    sign_one_hot : jnp.ndarray
-    degree : Measures
-    neg_degree : Measures
-    pos_degree : Measures
-    centrality : Measures
     num_nodes : int
-    num_edges : int
-    test_mask : torch.Tensor
-    train_mask : torch.Tensor
+    train_num_edges : int
+    test_num_edges : int
+    train_edge_index : jnp.ndarray
+    test_edge_index : jnp.ndarray
+    train_sign : jnp.ndarray
+    test_sign : jnp.ndarray
+    train_deg : Measures
+    train_neg_deg : Measures
+    train_pos_deg : Measures
+    train_centr : Measures
 
 def to_SignedGraph(
     data : Data,
@@ -61,7 +61,6 @@ def to_SignedGraph(
 
     edge_index = jnp.array(data.edge_index)
     signs = jnp.array(data.edge_attr)
-    signs_one_hot = jax.nn.one_hot(signs + 1, 3)
     test_mask = jnp.array(test_mask)
     train_mask = jnp.array(train_mask)
 
@@ -115,55 +114,9 @@ def to_SignedGraph(
     return SignedGraph(
         edge_index, 
         signs, 
-        signs_one_hot,
         degree_measures,
         neg_degree_measures,
         pos_degree_measures,
         centrality_measures,
         num_nodes, 
-        num_edges,
-        test_mask,
-        train_mask)
-
-def generate_synthetic_graph(
-        num_nodes : int,
-        num_edges : int,
-        p_positive = 0.9) -> SignedGraph:
-    
-    edge_index = jax.random.randint(
-        key=jax.random.PRNGKey(0),
-        minval=0,
-        maxval=num_nodes,
-        shape=(2, num_edges))
-    edge_index = jnp.concatenate((edge_index, edge_index[::-1]), axis=1)
-    
-    signs = jax.random.bernoulli(
-        key=jax.random.PRNGKey(1),
-        p=p_positive,
-        shape=(num_edges))
-    
-    signs = jnp.where(signs == 0, -1, 1)
-    signs = jnp.concatenate((signs, signs), axis=0)
-
-    signs_one_hot = jax.nn.one_hot(signs + 1, 3)
-
-    test_mask = jax.random.bernoulli(
-        key=jax.random.PRNGKey(2),
-        p=0.1,
-        shape=(num_edges,))
-    
-    train_mask = jnp.where(test_mask == 0, 1, 0)
-    
-    return SignedGraph(
-        edge_index, 
-        signs, 
-        signs_one_hot,
-        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
-        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
-        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
-        Measures(0, 0, 0, jnp.zeros((num_nodes, 1))),
-        num_nodes, 
-        num_edges,
-        test_mask,
-        train_mask)
-
+        num_edges)

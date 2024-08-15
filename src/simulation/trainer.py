@@ -75,7 +75,7 @@ def blackbox_training(
                 rng=random_key,
                 range=training_params.init_pos_range,
                 n=batches[0].num_nodes,
-                m=batches[0].num_edges,
+                m=batches[0].train_num_edges,
                 embedding_dim=training_params.embedding_dim),
             use_neural_force,
             x,
@@ -124,7 +124,7 @@ def gradient_training(
                 rng=random_keys[0],
                 range=training_params.init_pos_range,
                 n=batch_graph.num_nodes,
-                m=batch_graph.num_edges,
+                m=batch_graph.train_num_edges,
                 embedding_dim=training_params.embedding_dim)
             # run simulation and compute loss, auxillaries and gradient
             (loss_value, (spring_state, signs_pred)), grad = value_and_grad_fn(
