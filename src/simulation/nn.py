@@ -16,7 +16,7 @@ def init_neural_params(key : jax.random.PRNGKey
     n_hidden = 7
     n_out = 1
 
-    for _ in range(3):
+    for _ in range(2):
         mlps.append(sm.MLP(
             w0=init_orth(key, (n_in, n_hidden)),
             w1=init_normal(key, (n_hidden, n_out)),
@@ -25,8 +25,7 @@ def init_neural_params(key : jax.random.PRNGKey
     
     edge_params = sm.NeuralEdgeParams(
         friend=mlps[0],
-        neutral=mlps[1],
-        enemy=mlps[2])
+        enemy=mlps[1])
     
     n_in = 3
     n_hidden = 3

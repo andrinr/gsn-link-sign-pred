@@ -2,6 +2,7 @@ from torch_geometric.data import Data
 from torch_geometric.transforms import RandomLinkSplit
 import torch
 import jax.numpy as jnp
+import torch_geometric.transforms as T
 
 def permute_split(
     data : Data, 
@@ -27,11 +28,6 @@ def permute_split(
     node_degrees = jnp.bincount(edge_index_train[0])
     print(jnp.sum(node_degrees == 0))
 
-    # connected = False
-    # i = 0
-    # while not connected:
-    # i += 1
-    # print(f"Permuting graph {i} times")
     if treat_as_undirected:
         mask = data.edge_index[0] < data.edge_index[1]
         data.edge_index = data.edge_index[:, mask]
@@ -40,9 +36,6 @@ def permute_split(
     num_total = data.edge_attr.shape[0]
     num_train = int(train_percentage * num_total)
     num_test = num_total - num_train
-
-    degs = torch.bincount(data.edge_index[0])
-    
 
     perm = torch.randperm(num_total, device=data.edge_index.device)
 
@@ -65,10 +58,17 @@ def permute_split(
     print(data.edge_index.shape )
     edge_index_train = data.edge_index[:, train_mask]
 
-    edge_index_train = jnp.array(edge_index_train)
-
-    node_degrees = jnp.bincount(edge_index_train[0])
-    print(jnp.sum(node_degrees == 0))
-    connected = jnp.all(node_degrees > 0)
+    train_graph = Data(edge_index=edge_index_train, edge_attr=data.edge_attr[train_mask])
+    test_graph = Data(edge_index=data.edge_index[:, test_mask], edge_attr=data.edge_attr[test_mask])
     
-    return data, train_mask, test_mask
+    # get largest connected component
+    transform = T.Compose([T.LargestConnectedComponents(num_components=1)])
+    train_graph = transform(train_graph)
+
+    # get node indices of largest connected component
+    nodes = torch.unique(train_graph.edge_index.flatten())
+
+    # get subgraph of test graph
+    test_graph = test_graph.subgraph(nodes)
+
+    return train_graph, test_graph

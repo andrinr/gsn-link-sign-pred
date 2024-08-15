@@ -19,7 +19,6 @@ class MLP(NamedTuple):
 
 class NeuralEdgeParams(NamedTuple):
     friend : MLP
-    neutral : MLP
     enemy : MLP
 
 class NeuralParams(NamedTuple):
@@ -34,8 +33,6 @@ class NodeState(NamedTuple):
 class SpringForceParams(NamedTuple):
     friend_distance: float
     friend_stiffness: float
-    neutral_distance: float
-    neutral_stiffness: float
     enemy_distance: float
     enemy_stiffness: float
     degree_multiplier: float

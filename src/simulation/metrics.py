@@ -6,9 +6,7 @@ import simulation as sm
 def evaluate(
     node_state : sm.NodeState, 
     edge_index : jnp.ndarray,
-    signs : jnp.ndarray,
-    training_mask : jnp.ndarray,
-    evaulation_mask : jnp.ndarray) -> sm.Metrics:
+    signs : jnp.ndarray) -> sm.Metrics:
 
     logreg = LogisticRegression()
         
@@ -19,21 +17,21 @@ def evaluate(
     spring_vec_norm = jnp.linalg.norm(position_i - position_j, axis=1)
     spring_vec_norm = jnp.expand_dims(spring_vec_norm, axis=1)
 
-    logreg.fit(spring_vec_norm.at[training_mask].get(), signs.at[training_mask].get())
-    y_pred = logreg.predict(spring_vec_norm.at[evaulation_mask].get())
+    logreg.fit(spring_vec_norm, signs)
+    y_pred = logreg.predict(spring_vec_norm)
 
     # get y_pred probabilities
-    y_pred_prob = logreg.predict_proba(spring_vec_norm.at[evaulation_mask].get())[:, 1]
+    y_pred_prob = logreg.predict_proba(spring_vec_norm)[:, 1]
 
     try:
-        auc_l = roc_auc_score(signs.at[evaulation_mask].get(), y_pred)
-        auc_p = roc_auc_score(signs.at[evaulation_mask].get(), y_pred_prob)
-        f1_binary = f1_score(signs.at[evaulation_mask].get(), y_pred, average='binary')
-        f1_micro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='micro')
-        f1_macro = f1_score(signs.at[evaulation_mask].get(), y_pred, average='macro')
-        f1_weighted = f1_score(signs.at[evaulation_mask].get(), y_pred, average='weighted')
+        auc_l = roc_auc_score(signs, y_pred)
+        auc_p = roc_auc_score(signs, y_pred_prob)
+        f1_binary = f1_score(signs, y_pred, average='binary')
+        f1_micro = f1_score(signs, y_pred, average='micro')
+        f1_macro = f1_score(signs, y_pred, average='macro')
+        f1_weighted = f1_score(signs, y_pred, average='weighted')
         
-        tn, fp, fn, tp = confusion_matrix(signs.at[evaulation_mask].get(), y_pred).ravel()
+        tn, fp, fn, tp = confusion_matrix(signs, y_pred).ravel()
 
     except ValueError:
         auc_l = 0
