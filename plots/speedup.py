@@ -40,6 +40,6 @@ ax.set_ylabel('Runtime (ms)')
 ax.legend(title='Method', loc='upper left', bbox_to_anchor=(1, 1), fontsize=10, title_fontsize=10, facecolor='white', framealpha=1)
 
 # tilt x labels
-plt.xticks(rotation=45)
+plt.xticks(rotation=0)
 
 plt.savefig('plots/performance.png')
