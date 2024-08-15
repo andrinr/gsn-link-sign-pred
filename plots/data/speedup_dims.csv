@@ -1,8 +1,11 @@
-                16,     32,       64,     128
-SpringE (JIT),  
-SE-NN (JIT),
-SpringE,
-SE-NN,
-SGCN,
-SDGNN,  
+                16,     32,       64,       128
+SpringE (JIT),  4,      6,        10        23  
+SE-NN (JIT),    9,      14,       18,       30                       
+SpringE,        1350,   1180,     1230,     1210
+SE-NN,          2370,   2310,     2410,     2360
+SGCN,           1457,   53940,    53918,    56640
+SDGNN,          
 SIGAT,
+
+44168
+62264
