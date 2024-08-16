@@ -108,3 +108,7 @@ is evaluated in ``src/trainer.py`` using the line
 ```
 value_and_grad_fn = jax.value_and_grad(sm.simulate_and_loss, argnums=3, has_aux=True)
 ```
+
+### Graph preprocessing
+
+All releveant code to graph preprocessing can be found in ``src/graph/graph.py`` and ``src/graph/split.py``.
