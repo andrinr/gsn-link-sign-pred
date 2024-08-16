@@ -94,10 +94,6 @@ def gradient_training(
 ) -> tuple[sm.NeuralEdgeParams, list[float], list[sm.Metrics]]:
 
     optimizer = optax.adam(training_params.learning_rate)
-    # optimizer = optax.noisy_sgd(
-    #     learning_rate=training_params.learning_rate,
-    #     eta=0.01,
-    #     gamma=0.55)
     
     force_optimizer_multi_step = optax.MultiSteps(
         optimizer, training_params.multi_step)

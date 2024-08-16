@@ -32,22 +32,26 @@ def min(
 ) -> jnp.ndarray:
     return jnp.where(x < min, min, x)
 
-def update(
+def euler_step(
     simulation_params : sm.SimulationParams,
     use_neural_force : bool,
     force_params : sm.NeuralEdgeParams | sm.SpringForceParams,
     node_state : sm.NodeState, 
     graph : g.SignedGraph,
 ) -> sm.NodeState:
+    """
+    A single step of the simulation using the Euler method. 
+    Equivalent to function Phi in the paper.
+    """
 
     if use_neural_force:
         node_accelerations = \
-            neural_node_acceleration(force_params, node_state, graph) *\
-            neural_node_scaling(force_params, graph)
+            f_SPR_NN(force_params, node_state, graph) *\
+            g_SPR_NN(force_params, graph)
     else:
         node_accelerations =\
-            spring_node_acceleration(force_params, node_state, graph) *\
-            spring_node_scaling(force_params, graph)
+            f_SPR(force_params, node_state, graph) *\
+            g_SPR(force_params, graph)
 
     velocity = node_state.velocity * (1 - simulation_params.damping)
     velocity = velocity + simulation_params.dt * node_accelerations
@@ -61,16 +65,22 @@ def update(
     
     return node_state
 
-def spring_node_scaling(
+def g_SPR(
     params : sm.SpringForceParams,
     graph : g.SignedGraph,
 ) -> jnp.ndarray:
+    """
+    Equivalent to function g for the SPR model in the paper.
+    """
     return (graph.centrality.values * params.degree_multiplier + 1.0)    
 
-def spring_node_acceleration(
+def f_SPR(
     params : sm.SpringForceParams,
     node_state : sm.NodeState,
     graph : g.SignedGraph) -> jnp.ndarray:
+    """
+    Equivalent to function f for the SPR model in the paper.
+    """
 
     position_i = node_state.position[graph.edge_index[0]]
     position_j = node_state.position[graph.edge_index[1]]
@@ -94,10 +104,13 @@ def spring_node_acceleration(
 
     return per_node_force
 
-def neural_node_scaling(
+def g_SPR_NN(
     params : sm.NeuralParams,
     graph : g.SignedGraph,
 ) -> jnp.ndarray:
+    """
+    Equivalent to function g for the SPR-NN model in the paper.
+    """
 
     input = jnp.concatenate([
         graph.degree.values,
@@ -106,11 +119,14 @@ def neural_node_scaling(
     
     return sm.apply_mlp(params.node_params, input)
 
-def neural_node_acceleration(
+def f_SPR_NN(
     params : sm.NeuralParams,
     node_state : sm.NodeState,
     graph : g.SignedGraph
 ) -> jnp.ndarray:
+    """
+    Equivalent to function f for the SPR-NN model in the paper.
+    """
     
     position_i = node_state.position[graph.edge_index[0]]
     position_j = node_state.position[graph.edge_index[1]]

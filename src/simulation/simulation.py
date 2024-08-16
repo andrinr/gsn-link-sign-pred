@@ -14,9 +14,12 @@ def simulate(
     force_params : sm.NeuralEdgeParams,
     graph : g.SignedGraph
 ) -> sm.NodeState:
+    """
+    Complete forward integration of the simulation using the Euler method.
+    """
     
     # capture the spring_params and signs in the closure
-    simulation_update = lambda i, node_state: sm.update(
+    simulation_update = lambda i, node_state: sm.euler_step(
         simulation_params = simulation_params, 
         use_neural_force = use_neural_force,
         force_params = force_params,
@@ -93,6 +96,9 @@ def loss(
     x_0 : float,
     threshold : float,
 ) -> float:
+    """
+    Differentiable loss function for link sign prediction.
+    """
     predicted_sign = predict(
         node_state = node_state,
         graph = graph,

@@ -1,8 +1,8 @@
-                    BitcoinAlpha,   Slashdot
-SPR,                10,             642
-SPR-NN,             18,             990
-SPR (No JIT),   1230,           3170
-SPR-NN (No JIT),     2410,           4010
-SGCN,               1719,           53918
+                    BitcoinOTC,   Slashdot
+SPR,                18,             642
+SPR-NN,             40,             990
+SPR (No JIT),       1250,           3170
+SPR-NN (No JIT),    2500,           4010
+SGCN,               7133,           62993
 SDGNN,              702194,         28367920            
 SIGAT,              355642,         9152422

@@ -32,6 +32,7 @@ class Parameters(NamedTuple):
     use_neural_force: bool
     gradient_multisteps: int
     threshold: float
+    seed : int
 
 def main(argv) -> None:
     """
@@ -64,7 +65,7 @@ def main(argv) -> None:
     params = Parameters(**params)
 
     # Create initial values for neural network parameters
-    key_params, key_training, key_test = random.split(random.PRNGKey(2), 3)
+    key_params, key_training = random.split(random.PRNGKey(params.seed), 2)
 
     dataset = get_dataset(DATA_PATH, dataset_name)
 

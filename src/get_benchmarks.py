@@ -30,6 +30,7 @@ class TestParameters(NamedTuple):
     use_neural_force: bool
     threshold: float
     num_shots: int
+    seed : int
 
 def main(argv) -> None:
     """
@@ -55,7 +56,7 @@ def main(argv) -> None:
 
     params = TestParameters(**params)
     # Create initial values for neural network parameters
-    key_params, key_training, key_test = random.split(random.PRNGKey(2), 3)
+    key = random.PRNGKey(params.seed)
 
     dataset = get_dataset(DATA_PATH, dataset_name)
         
@@ -71,7 +72,7 @@ def main(argv) -> None:
     print(force_params)
 
     shot_metrics = []
-    key_shots = random.split(key_test, params.num_shots)  
+    key_shots = random.split(key, params.num_shots)  
     graph = {}
 
     for shot in range(params.num_shots):
