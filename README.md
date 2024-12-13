@@ -1,6 +1,6 @@
 # Graph Spring Neural ODE
 
-Original implementation of the paper "Graph Spring Neural ODEs for Link Sign Prediction". 
+Official codebase of the paper "Graph Spring Neural ODEs for Link Sign Prediction". 
 
 ## Running the code
 
