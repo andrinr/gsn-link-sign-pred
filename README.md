@@ -1,6 +1,6 @@
-# Force Directed Node Embedding for Link Sign Prediction
+# Graph Spring Neural ODE
 
-This is the code for the paper called (Papername) which was published in (Journalname). The paper can be found here: (Link to paper)
+Original implementation of the paper "Graph Spring Neural ODEs for Link Sign Prediction". 
 
 ## Running the code
 
