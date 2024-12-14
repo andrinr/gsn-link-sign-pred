@@ -25,7 +25,7 @@ To start the training run ```python src/train.py <Dataset Name> params/train_par
 - WikiRFA
 - Tribes
 
-the parameter file can be adjusted as desired.
+the parameter file found at ```params/train_params.yaml``` can be adjusted as desired. The script will automatically download the datasets and cache them for later usage. This process can take a few seconds when executed for the first time.
 
 A training run outputs a model file, which can be found under ```model/<ModelName>.yaml``` and a csv with the stats of the training under ```plots/data/training_process.csv```. The stats can be ploted by running ```python plots/forward.py``` which produces the following image:
 
