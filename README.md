@@ -16,7 +16,7 @@ Installation instructions for Ubuntu (conda venv recommended):
 Note that this repository relies on torch_geometric for dataloading capabilities, the Neural Network / Graph Neural Network implementation is however done from scratch in pure JAX. This is the reason this repo does not have a dependency on any JAX neural network libraries.
 ### Training
 
-To start the training run ```python src/train.py <Dataset Name> params/train_params.yaml``` where <Dataset Name> can be either:
+To start the training run ```python src/train.py <Dataset Name> params/train_params.yaml``` where ```<Dataset Name>``` can be either:
 
 - BitcoinAlpha
 - BitcoinOTC
