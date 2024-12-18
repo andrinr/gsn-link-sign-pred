@@ -1,6 +1,6 @@
 # Graph Spring Neural ODE
 
-Official jax implementation of the paper "Graph Spring Neural ODEs for Link Sign Prediction". 
+Official jax implementation of the paper "[Graph Spring Neural ODEs for Link Sign Prediction](https://arxiv.org/abs/2412.12916)". 
 
 ## Running the code
 
