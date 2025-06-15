@@ -1,6 +1,6 @@
-# Force Directed Node Embedding for Link Sign Prediction
+# Graph Spring Neural ODE
 
-This is the code for the paper called (Papername) which was published in (Journalname). The paper can be found here: (Link to paper)
+Official jax implementation of the paper "[Graph Spring Neural ODEs for Link Sign Prediction](https://arxiv.org/abs/2412.12916)". 
 
 ## Running the code
 
@@ -13,9 +13,10 @@ Installation instructions for Ubuntu (conda venv recommended):
 2. Install pytorch (CPU version !) ``pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu``
 3. Install other dependencies: ``pip install torch_geometric matplotlib scikit-learn pyyaml tqdm optax inquirer pandas``
 
+Note that this repository relies on torch_geometric for dataloading capabilities, the Neural Network / Graph Neural Network implementation is however done from scratch in pure JAX. This is the reason this repo does not have a dependency on any JAX neural network libraries.
 ### Training
 
-To start the training run ```python src/train.py <Dataset Name> params/train_params.yaml``` where BitcoinAlpha can be either:
+To start the training run ```python src/train.py <Dataset Name> params/train_params.yaml``` where ```<Dataset Name>``` can be either:
 
 - BitcoinAlpha
 - BitcoinOTC
@@ -24,24 +25,7 @@ To start the training run ```python src/train.py <Dataset Name> params/train_par
 - WikiRFA
 - Tribes
 
-The datasets are downloaded over network, hence an active internet connection is necessary. The parameter file can be adjusted as desired and looks as follows:
-
-```
-num_dimensions: 64 # k from the paper
-use_neural_force: False # True is SPR-NN, False is SPR
-use_blackbox : False
-num_simulations: 300
-train_iterations: 120 # n from the paper
-train_dt: 0.01 #dt from the paper
-train_damping: 0.05 # damping from the papaer
-learning_rate: 0.09
-init_pos_range: 1.0 # range from the initial uniform random distibution
-enable_partitioning: False # not used in paper
-number_of_subgraphs: 4 # not used in paper
-gradient_multisteps: 1 # not used in paper
-threshold: 2.5 # mu from the paper
-seed: 0 # seed the seed for reproducability. Numerical Instabilities cannot be completely avoided.
-```
+the parameter file found at ```params/train_params.yaml``` can be adjusted as desired. The script will automatically download the datasets and cache them for later usage. This process can take a few seconds when executed for the first time.
 
 A training run outputs a model file, which can be found under ```model/<ModelName>.yaml``` and a csv with the stats of the training under ```plots/data/training_process.csv```. The stats can be ploted by running ```python plots/forward.py``` which produces the following image:
 
@@ -49,22 +33,7 @@ A training run outputs a model file, which can be found under ```model/<ModelNam
 
 ### Testing
 
-To test the model against different datasets execute ```ipython src/get_benchmarks.py <Dataset Name> params/test_params.yaml```. The parameter file can be adjusted as desired and looks as follows. For describtions of the parameters refer to the Training section.
-
-```
-num_dimensions: 64
-use_neural_force: True
-use_blackbox : False
-test_iterations: 120
-test_dt: 0.001
-test_damping: 0.95
-init_pos_range: 1.0
-threshold: 2.5
-num_shots : 5
-seed : 0
-```
-
-Note that we use IPython here (install with ```pip install ipython```) for accurate time measurements. The script will generate a .csv file in the format ```<Dataset Name>_<num dimensions>_<nn / spring>.csv```. The training times are displayed in the command line and of now, manually collected in the ```plots/data/speedup.csv``` file. You can generate a plot of speedups with  ```python plots/speedup.py``` such as:
+To test the model against different datasets execute ```ipython src/get_benchmarks.py <Dataset Name> params/test_params.yaml```. Note that we use IPython here (install with ```pip install ipython```) for accurate time measurements. The script will generate a .csv file in the format ```<Dataset Name>_<num dimensions>_<nn / spring>.csv```. The training times are displayed in the command line and of now, manually collected in the ```plots/data/speedup.csv``` file. You can generate a plot of speedups with  ```python plots/speedup.py``` such as:
 
 ![Forward](plots/performance.png)
 

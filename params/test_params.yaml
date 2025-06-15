@@ -6,5 +6,5 @@ test_dt: 0.01
 test_damping: 0.05
 init_pos_range: 1.0
 threshold: 2.5
-num_shots : 5
+num_shots : 1
 seed : 0

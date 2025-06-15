@@ -1,5 +1,5 @@
 num_dimensions: 64
-use_neural_force: False
+use_neural_force: True
 use_blackbox : False
 num_simulations: 300
 train_iterations: 120
