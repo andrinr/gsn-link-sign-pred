@@ -1,6 +1,21 @@
 # Graph Spring Neural ODE
 
-Official jax implementation of the paper "[Graph Spring Neural ODEs for Link Sign Prediction](https://arxiv.org/abs/2412.12916)". 
+Official jax implementation of the paper "[Graph Spring Neural ODEs for Link Sign Prediction](https://link.springer.com/article/10.1007/s10994-025-06794-1)". 
+
+To cite this work, please use the following BibTeX entry:
+
+```bibtex
+@article{rehmann2025graph,
+  title={Graph spring neural ODEs for link sign prediction},
+  author={Rehmann, Andrin and Bovet, Alexandre},
+  journal={Machine Learning},
+  volume={114},
+  number={7},
+  pages={1--19},
+  year={2025},
+  publisher={Springer}
+}
+```
 
 ## Running the code
 
